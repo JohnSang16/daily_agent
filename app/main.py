@@ -2,7 +2,7 @@ import logging
 
 from fastapi import FastAPI, Request
 
-from app.api import audit, health
+from app.api import audit, health, today
 from app.config import Settings
 from app.db import make_session_factory
 from app.logging_config import new_request_id, setup_logging
@@ -10,14 +10,16 @@ from app.logging_config import new_request_id, setup_logging
 log = logging.getLogger("app")
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, llm=None) -> FastAPI:
     settings = settings or Settings()
     setup_logging(secrets=[settings.api_token])
     app = FastAPI()
     app.state.settings = settings
+    app.state.llm = llm  # None until a real client is configured: explanations use the template
     app.state.session_factory = make_session_factory(settings.database_url)
     app.include_router(health.router)
     app.include_router(audit.router)
+    app.include_router(today.router)
 
     @app.middleware("http")
     async def request_id(request: Request, call_next):

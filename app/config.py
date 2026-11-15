@@ -1,3 +1,4 @@
+from datetime import time
 from zoneinfo import available_timezones
 
 from pydantic import field_validator
@@ -10,6 +11,12 @@ class Settings(BaseSettings):
     api_token: str
     database_url: str
     user_timezone: str = "America/New_York"
+    work_start: time = time(9)
+    work_end: time = time(17)
+    default_effort_minutes: int = 60
+    llm_model: str = ""  # never hard coded: set LLM_MODEL when a real client is wired in
+    llm_daily_token_budget: int = 20000
+    stale_after_hours: int = 26
 
     @field_validator("user_timezone")
     @classmethod

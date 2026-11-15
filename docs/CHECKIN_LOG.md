@@ -41,3 +41,10 @@ Acceptance criteria passing: AC7.1 to AC7.14.
 Tests and lint: 73 passed; ruff clean. Mutation checks: loosening at-risk fails tests; flipping importance order fails tests.
 Deviations: none. Open questions answered by default, change if wrong: same working hours every day, 09:00 to 17:00 (Config.work_start/work_end); tentative events block time. `suggested_block` returns the whole free block, not a trimmed slot.
 Next step: spec 08 /today endpoint.
+
+### 2026-11-15, spec 08 today endpoint
+Acceptance criteria passing: AC8.1 to AC8.11.
+Tests and lint: 88 passed; ruff clean. Mutation checks: disabling the cache fails 3 tests; disabling the contradiction guard fails 1.
+Deviations: no real LLM client yet (needs your Anthropic key and spec 06). `create_app(settings, llm=None)` takes any client with `complete(prompt)`; with none, the explanation is the template. `date` only changes the events day and the response date, ranking always uses the real now. Budget is per local day via LLM_DAILY_TOKEN_BUDGET (default 20000). Settings gained work_start, work_end, default_effort_minutes, llm_model, stale_after_hours.
+Open question answered by default: no tomorrow preview (the response shape in the spec has none). Say if you want it.
+Next step: end-to-end test, then spec 04 needs your Google OAuth.
