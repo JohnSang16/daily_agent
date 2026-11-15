@@ -17,7 +17,7 @@ def upgrade() -> None:
     op.create_table(
         "outbound_calls",
         sa.Column("id", sa.Integer, primary_key=True),
-        sa.Column("user_id", sa.String, nullable=False),
+        sa.Column("user_id", sa.Integer, nullable=False),
         sa.Column("ts", sa.DateTime, nullable=False, index=True),
         sa.Column("integration", sa.String, nullable=False),
         sa.Column("method", sa.String, nullable=False),

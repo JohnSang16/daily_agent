@@ -28,3 +28,10 @@ Deviations: implementation was written before the tests (process slip), then ver
 Found by tests: httpx's own logger wrote full URLs with query strings at INFO. Silenced httpx/httpcore loggers.
 Open questions: host firewall rule; browser-level submit blocking (spec 13).
 Next step: strongest-model review of spec 17, then spec 03.
+
+### 2026-11-15, spec 03 shared model
+Acceptance criteria passing: AC3.1 to AC3.9 (migration verified with real alembic upgrade).
+Tests and lint: 52 passed; ruff clean.
+Deviations: added a `scope` column on tasks (spec needs "source scope" for gone-marking but lists no column). Importance: a source only sets it when no value exists, so a local override survives. OutboundCall (spec 17) now uses integer user_id and the tz-aware UTC type to match this spec. Tests written first, shown failing at import.
+Open questions: none.
+Next step: spec 07 priority engine.
