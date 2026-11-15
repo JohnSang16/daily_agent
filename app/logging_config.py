@@ -28,6 +28,9 @@ def setup_logging(secrets: Iterable[str] = ()) -> None:
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(logging.INFO)
+    # these log full URLs including query strings, which can carry private text
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 def new_request_id() -> str:
