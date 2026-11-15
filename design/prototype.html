@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>js ai prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #000000; --surface: #0B0B0B; --raised: #161616; --line: #242424;
+  --ink: #F4F4F4; --body: #DCDCDC; --muted: #A4A4A4; --faint: #858585;
+  --font: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark; box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+html { height: 100%; background: var(--bg); scroll-padding-top: env(safe-area-inset-top, 0px); }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { margin: 0; height: 100%; background: var(--bg); color: var(--body); font-family: var(--font); font-size: 14.5px; font-weight: 400; letter-spacing: 0.006em; line-height: 1.5; overflow: hidden; -webkit-font-smoothing: antialiased; }
+button { font: inherit; letter-spacing: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+:focus-visible { outline: 1px solid #fff; outline-offset: 3px; border-radius: 8px; }
+#app { position: relative; height: 100%; max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+@media (max-width: 559px) { #app { border: 0; } }
+@media (min-width: 560px) {
+  body { display: flex; align-items: center; justify-content: center; }
+  #app { width: 390px; max-width: 390px; height: min(100%, 844px); border: 1px solid #333; border-radius: 40px; margin: 0; }
+}
+
+.topbar { display: grid; grid-template-columns: 52px 1fr 52px; align-items: center; height: 56px; flex: none; padding: 0 6px; }
+.icon-btn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; color: var(--muted); position: relative; transition: color .2s; }
+.icon-btn:hover, .icon-btn:active { color: #fff; }
+.icon-btn svg { width: 20px; height: 20px; }
+.switch { justify-self: center; display: inline-grid; position: relative; border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+.switch.two { grid-template-columns: 1fr 1fr; }
+.switch.three { grid-template-columns: 1fr 1fr 1fr; }
+.switch.three .thumb { width: calc(33.333% - 1.4px); }
+.switch button { position: relative; z-index: 1; padding: 6px 16px; font-size: 13px; color: var(--muted); border-radius: 999px; text-align: center; transition: color .25s; white-space: nowrap; }
+.switch button[aria-selected="true"] { color: #fff; }
+.switch .thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px); border-radius: 999px; background: var(--raised); transition: transform .35s cubic-bezier(.2,.8,.2,1); }
+.alerts { display: grid; gap: 10px; margin-top: 24px; }
+.alert-row { display: flex; align-items: center; gap: 14px; width: 100%; padding: 15px 18px; border-radius: 16px; border: 1px solid #fff; }
+.alert-row i { width: 6px; height: 6px; border-radius: 50%; background: #fff; flex: none; }
+.alert-row svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
+.alert-row span { flex: 1; font-size: 14.5px; color: #fff; }
+.alert-row small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 1px; }
+.sec { display: flex; justify-content: space-between; align-items: baseline; margin: 36px 0 16px; }
+.sec .label { margin: 0; }
+.sec .linkbtn { padding: 0; }
+.dashlist { margin-top: 0 !important; }
+.sheet input.txt { width: 100%; height: 46px; background: var(--surface); border: 1px solid #2c2c2c; border-radius: 14px; padding: 0 14px; color: #fff; font: inherit; font-size: 15px; color-scheme: dark; }
+.sheet input.txt:focus { border-color: #8a8a8a; outline: 0; }
+.lbl2 { color: var(--muted); font-size: 12.5px; margin: 18px 0 8px; }
+.chipsel { display: flex; flex-wrap: wrap; gap: 8px; }
+.chipsel button { border: 1px solid #333; border-radius: 999px; padding: 7px 12px; font-size: 13px; color: var(--body); }
+.chipsel button[aria-pressed="true"] { background: #fff; color: #000; border-color: #fff; }
+.centerrow { display: flex; justify-content: center; margin-bottom: 4px; }
+.sheet p.small { color: var(--faint); font-size: 12.5px; margin: 16px 0 18px; }
+.goal-field { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid #2c2c2c; border-radius: 999px; padding: 3px 3px 3px 20px; transition: border-color .2s; }
+.goal-field:focus-within { border-color: #8a8a8a; }
+.goal-field input { flex: 1; min-width: 0; height: 40px; background: none; border: 0; outline: 0; color: #fff; font: inherit; font-size: 15px; }
+.goal-field input::placeholder { color: var(--muted); }
+.goal-text { display: block; width: 100%; text-align: left; font-size: 21px; line-height: 1.3; font-weight: 400; letter-spacing: -0.01em; color: #fff; }
+.dashgoals li, .dashdl li { padding-bottom: 22px; }
+.dashdl .ag .ti, .dashgoals .ti { font-size: 16px; line-height: 1.35; }
+.dashgoals .ti { display: block; color: #fff; }
+.dashgoals .tm { display: block; margin-top: 4px; color: #B4B4B4; font-size: 13px; }
+.menu-dot { position: absolute; top: 11px; right: 9px; width: 5px; height: 5px; border-radius: 50%; background: #fff; display: none; }
+
+.screens { position: relative; flex: 1; overflow: hidden; }
+.screen { position: absolute; inset: 0; overflow-y: auto; padding: 10px 26px 32px; transition: transform .38s cubic-bezier(.2,.8,.2,1), opacity .25s; overscroll-behavior: contain; }
+.screen[data-pos="left"] { transform: translateX(-24%); opacity: 0; pointer-events: none; visibility: hidden; }
+.screen[data-pos="right"] { transform: translateX(24%); opacity: 0; pointer-events: none; visibility: hidden; }
+.screen[data-pos="active"] { transform: none; opacity: 1; }
+.screen.chat { display: flex; flex-direction: column; padding-bottom: 14px; }
+.screen.chat > * { flex-shrink: 0; }
+
+.pill { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 20px; border-radius: 999px; background: #fff; color: #000; font-weight: 500; font-size: 13.5px; transition: transform .12s, opacity .2s; }
+.pill:active { transform: scale(.97); opacity: .9; }
+.pill svg { width: 15px; height: 15px; }
+.pill.quiet { background: transparent; color: var(--body); font-weight: 400; box-shadow: inset 0 0 0 1px #333; }
+.pill.sm { height: 32px; padding: 0 14px; font-size: 12.5px; }
+.pill.alert { background: #000; color: #fff; box-shadow: inset 0 0 0 1px #fff; }
+.tag { margin-left: 10px; font-size: 11px; padding: 0 8px; border-radius: 999px; color: #fff; box-shadow: inset 0 0 0 1px #fff; white-space: nowrap; }
+.tag.dim { color: var(--muted); box-shadow: inset 0 0 0 1px #3d3d3d; }
+.label { color: var(--muted); font-size: 12.5px; letter-spacing: 0.08em; margin: 34px 0 4px; }
+
+/* calendar */
+.big { margin: 10px 0 0; font-weight: 400; color: #fff; }
+.big .dow { display: block; font-size: 46px; font-weight: 300; line-height: 1; letter-spacing: -0.04em; }
+.big .dt { display: block; margin-top: 8px; font-size: 15px; font-weight: 400; letter-spacing: 0.02em; color: var(--muted); }
+.week { display: grid; grid-template-columns: repeat(7, 1fr); margin: 22px -6px 0; }
+.day { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 0; color: var(--muted); font-size: 11.5px; }
+.day .n { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; font-size: 14.5px; color: var(--body); transition: background .2s, color .2s; }
+.day[aria-pressed="true"] .n { background: #fff; color: #000; font-weight: 500; }
+.day.today:not([aria-pressed="true"]) .n { box-shadow: inset 0 0 0 1px #666; }
+.day .pip, .mgrid .pip { width: 3px; height: 3px; border-radius: 50%; background: #7a7a7a; opacity: 0; }
+.day .pip.on, .mgrid .pip.on { opacity: 1; }
+.monthbar { display: flex; justify-content: space-between; margin: 4px 0 0; }
+.linkbtn { color: var(--muted); font-size: 12.5px; padding: 8px 0; display: inline-flex; gap: 6px; align-items: center; }
+.linkbtn:hover { color: #fff; }
+.linkbtn svg { width: 12px; height: 12px; transition: transform .3s; }
+.linkbtn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.month { overflow: hidden; max-height: 0; opacity: 0; transition: max-height .4s cubic-bezier(.2,.8,.2,1), opacity .3s; }
+.month.open { max-height: 380px; opacity: 1; }
+.mhead { font-size: 13px; color: var(--muted); margin: 6px 0 8px; }
+.mgrid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; margin: 0 -6px 10px; }
+.mgrid .h { text-align: center; color: var(--faint); font-size: 11.5px; padding: 4px 0; }
+.mgrid button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px 0; color: var(--body); }
+.mgrid button .n { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; font-size: 13.5px; }
+.mgrid button.out { color: #4a4a4a; }
+.mgrid button[aria-pressed="true"] .n { background: #fff; color: #000; font-weight: 500; }
+.mgrid button.today:not([aria-pressed="true"]) .n { box-shadow: inset 0 0 0 1px #666; }
+.agenda { margin: 22px 0 0; padding: 0; list-style: none; }
+.agenda li { position: relative; padding: 0 0 20px 26px; }
+.agenda li.task::before, .agenda li.event::before { content: ""; position: absolute; left: 2px; top: 7px; width: 9px; height: 9px; border-radius: 50%; }
+.agenda li.task::before { background: #fff; }
+.agenda li.event::before { box-shadow: inset 0 0 0 1.5px #c8c8c8; }
+.agenda li.done::before { background: #666; }
+.agenda li.period { padding: 10px 0 12px; color: var(--muted); font-size: 12.5px; letter-spacing: 0.08em; }
+.agenda li.nowli { padding: 0 0 20px; color: #fff; font-size: 13.5px; display: flex; align-items: center; gap: 10px; }
+.agenda li.nowli .tag { margin: 0; }
+.agenda li.empty { padding: 4px 0 0; color: var(--muted); }
+.ag { display: block; width: 100%; text-align: left; }
+.ag .ti { display: block; font-size: 16px; line-height: 1.3; color: #fff; }
+.ag .tm { display: block; margin-top: 4px; color: #B4B4B4; font-size: 13px; font-variant-numeric: tabular-nums; }
+.agenda li.done .ti, .agenda li.done .tm { color: var(--faint); }
+.agenda li.past .ti, .agenda li.past .tm { color: var(--faint); }
+.bul { margin: 8px 0 0; padding: 0; list-style: none; }
+.bul li { padding: 5px 0; }
+.bul li::marker, .steps li::marker { color: #8a8a8a; }
+
+/* money */
+.txlist { list-style: none; margin: 0; padding: 0; }
+.txlist li { padding: 0 0 18px; }
+.txlist li.period { padding: 8px 0 12px; color: var(--muted); font-size: 12.5px; letter-spacing: 0.08em; }
+.tx { display: grid; grid-template-columns: 1fr auto; column-gap: 16px; width: 100%; text-align: left; align-items: baseline; }
+.tx .ti { grid-column: 1; font-size: 16px; line-height: 1.3; color: #fff; }
+.tx .tm { grid-column: 1; margin-top: 3px; color: #B4B4B4; font-size: 13px; }
+.tx .amt { grid-column: 2; grid-row: 1; font-size: 16px; color: #fff; font-variant-numeric: tabular-nums; }
+.tx .amt.in { font-weight: 500; }
+.chiplead { margin: 20px 0 22px; }
+.demo { color: var(--faint); font-size: 12.5px; margin: 26px 0 0; }
+/* agent chat + digest */
+.modes { display: flex; justify-content: center; position: sticky; top: -10px; z-index: 3; margin: -10px 0 8px; padding: 10px 0 14px; background: linear-gradient(#000 72%, rgba(0,0,0,0)); }
+.chatlog { flex: 1 0 auto; }
+.you { color: var(--muted); font-size: 13.5px; text-align: right; margin: 22px 0 8px 20%; }
+.ai { color: var(--body); font-size: 15px; line-height: 1.65; max-width: 42ch; margin: 0 0 8px; }
+.ai small { display: block; color: var(--faint); font-size: 12px; margin-top: 8px; }
+.digest { margin: 6px 0 8px; }
+.dg-meta { color: var(--faint); font-size: 12.5px; margin: 0 0 14px; }
+.dg-date { color: #fff; font-size: 20px; font-weight: 500; letter-spacing: -0.01em; margin: 0 0 6px; }
+.dg-label { color: var(--muted); font-size: 12px; letter-spacing: 0.08em; margin: 24px 0 8px; }
+.dg-text { color: var(--body); font-size: 14.5px; line-height: 1.65; margin: 0; max-width: 46ch; }
+.dg-id { list-style: none; margin: 0; padding: 0; }
+.dg-id li { padding: 4px 0; font-size: 14.5px; line-height: 1.55; color: var(--body); max-width: 46ch; }
+.dg-ol { list-style: none; counter-reset: n; margin: 0; padding: 0; }
+.dg-ol li { counter-increment: n; position: relative; padding: 0 0 16px 28px; }
+.dg-ol li::before { content: counter(n); position: absolute; left: 0; top: 1px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.dg-ol .ti { display: block; font-size: 15px; color: #fff; line-height: 1.35; }
+.dg-ol .tm { display: block; margin-top: 3px; color: #B4B4B4; font-size: 13px; }
+.dg-more { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin: 2px 0 0; }
+.dg-warn { color: var(--muted); font-size: 13px; line-height: 1.55; margin: 22px 0 0; padding: 12px 14px; border-radius: 12px; box-shadow: inset 0 0 0 1px #333; }
+.dg-aff { color: #fff; font-size: 14.5px; line-height: 1.65; margin: 22px 0 0; max-width: 46ch; }
+.dg-actions { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+.chiprow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+.chiprow button { border: 1px solid #333; border-radius: 999px; padding: 8px 14px; font-size: 13px; color: var(--body); }
+.chiprow button:active { background: var(--raised); }
+.src b { display: block; font-weight: 500; font-size: 13.5px; color: #fff; margin-bottom: 2px; }
+.src span { color: var(--muted); font-size: 13.5px; }
+.sess h2 { font-weight: 400; font-size: 28px; line-height: 1.1; letter-spacing: -0.03em; margin: 6px 0 10px; color: #fff; }
+.status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--body); }
+.status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 2.2s ease-in-out infinite; }
+.status.paused, .status.done { color: var(--muted); }
+.status.paused::before, .status.done::before { animation: none; }
+@keyframes pulse { 50% { opacity: .25; } }
+.browser { border: 1px solid #2c2c2c; border-radius: 16px; overflow: hidden; background: var(--surface); margin-top: 16px; }
+.bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar svg { width: 12px; height: 12px; flex: none; }
+.page { padding: 14px 16px; position: relative; }
+.page h3 { margin: 0 0 2px; font-size: 14px; font-weight: 500; color: #fff; }
+.page .pm { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+.ln { height: 3px; border-radius: 2px; background: #1f1f1f; margin: 8px 0; }
+.ln.s { width: 70%; }
+.reply { margin-top: 12px; border: 1px solid #333; border-radius: 10px; padding: 10px 12px; }
+.reply .ln { background: #3a3a3a; }
+.reply small { color: var(--muted); font-size: 11.5px; }
+.fake { display: inline-block; margin-top: 10px; padding: 5px 14px; border-radius: 999px; font-size: 12px; color: var(--muted); box-shadow: inset 0 0 0 1px #3d3d3d; }
+.shade { position: absolute; inset: 0; display: none; place-items: center; text-align: center; padding: 24px; background: rgba(0,0,0,.88); color: #fff; font-size: 15px; }
+.shade.on { display: grid; }
+.actions { display: flex; gap: 8px; margin: 14px 0 0; flex-wrap: wrap; }
+.ask-ok { display: flex; align-items: center; gap: 14px; width: 100%; margin-top: 18px; padding: 16px 18px; border-radius: 16px; border: 1px solid #fff; }
+.ask-ok i { width: 6px; height: 6px; border-radius: 50%; background: #fff; flex: none; }
+.ask-ok svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
+.ask-ok span { flex: 1; font-size: 14.5px; color: #fff; }
+.ask-ok small { display: block; color: var(--muted); font-size: 12.5px; }
+.steps { list-style: none; margin: 26px 0 0; padding: 0; }
+.steps li { padding: 5px 0; font-size: 13.5px; color: var(--muted); }
+.steps li.wait, .steps li.held { color: #fff; }
+.safety { color: var(--faint); font-size: 12.5px; margin: 18px 0 0; }
+.arow { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 4px 0; }
+.arow .ti { font-size: 14.5px; color: #EDEDED; }
+.arow .ti small { display: block; color: var(--muted); font-size: 12.5px; }
+
+.cmd { flex: none; padding: 8px 16px 12px; display: none; background: linear-gradient(to top, #000 78%, rgba(0,0,0,0)); }
+#app[data-tab="agent"] .cmd { display: block; }
+.ctxbar { padding: 0 4px 8px; }
+.ctxchip { display: inline-flex; align-items: center; gap: 9px; border: 1px solid #333; border-radius: 999px; padding: 5px 12px; font-size: 12.5px; color: var(--muted); }
+.ctxchip::after { content: ""; width: 5px; height: 5px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg) translateY(-2px); }
+.ctxchip:hover { color: #fff; }
+.field { display: flex; align-items: center; gap: 2px; background: var(--surface); border: 1px solid #2c2c2c; border-radius: 999px; padding: 3px 3px 3px 20px; transition: border-color .2s; }
+.field:focus-within { border-color: #8a8a8a; }
+.field input { flex: 1; min-width: 0; height: 40px; background: none; border: 0; outline: 0; color: #fff; font: inherit; font-size: 15px; }
+.field input::placeholder { color: var(--muted); }
+.field .icon-btn { width: 40px; height: 40px; }
+.field .icon-btn svg { width: 18px; height: 18px; }
+.field .go { background: #fff; color: #000; }
+.field .go:hover, .field .go:active { color: #000; }
+
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,.74); opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 20; }
+.scrim.on { opacity: 1; pointer-events: auto; }
+.drawer { position: absolute; top: 0; bottom: 0; left: 0; width: min(78%, 310px); background: #050505; border-right: 1px solid var(--line); z-index: 30; transform: translateX(-102%); transition: transform .36s cubic-bezier(.2,.8,.2,1); display: flex; flex-direction: column; padding: 34px 14px 18px; }
+.drawer.on { transform: none; }
+.drawer.drag { transition: none; }
+.dhead { padding: 0 14px 30px; }
+.dhead b { display: block; font-weight: 300; font-size: 34px; line-height: 1; letter-spacing: -0.04em; color: #fff; }
+.dlist { flex: 1; }
+.ditem { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 48px; padding: 8px 14px; border-radius: 12px; font-size: 14.5px; color: var(--body); }
+.ditem:active { background: var(--raised); }
+.ditem svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.ditem .n { margin-left: auto; color: var(--body); font-size: 12px; text-align: center; padding: 0 8px; border-radius: 999px; box-shadow: inset 0 0 0 1px #3d3d3d; }
+.ditem[aria-current="page"] { color: #fff; font-weight: 500; }
+.ditem[aria-current="page"] svg { color: #fff; }
+.ditem .pend { margin-left: auto; width: 5px; height: 5px; border-radius: 50%; background: #fff; }
+.ditem[disabled] { color: var(--faint); cursor: default; }
+.ditem[disabled] svg { color: var(--faint); }
+.ditem .soon { margin-left: auto; font-size: 12px; color: var(--faint); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 40; background: #070707; border-top: 1px solid #2c2c2c; border-radius: 24px 24px 0 0; padding: 10px 26px 28px; transform: translateY(104%); transition: transform .38s cubic-bezier(.2,.8,.2,1); max-height: 88%; overflow-y: auto; }
+.sheet.on { transform: none; }
+.grab { width: 32px; height: 3px; border-radius: 2px; background: #333; margin: 0 auto 20px; }
+.sheet h3 { font-weight: 400; font-size: 26px; line-height: 1.1; letter-spacing: -0.03em; margin: 0 0 10px; color: #fff; }
+.sheet p { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+.kv { display: grid; grid-template-columns: 90px 1fr; gap: 12px; margin: 0 0 26px; font-size: 14px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; color: #EDEDED; }
+.stack { display: grid; gap: 8px; }
+.stack .pill { width: 100%; }
+.checks { list-style: none; padding: 0; margin: 0 0 24px; display: grid; gap: 12px; font-size: 14px; color: var(--body); }
+.checks li { display: flex; gap: 10px; }
+.checks svg { width: 16px; height: 16px; color: #fff; flex: none; margin-top: 3px; }
+.panel { position: absolute; inset: 0; z-index: 35; background: var(--bg); transform: translateX(100%); transition: transform .38s cubic-bezier(.2,.8,.2,1); display: flex; flex-direction: column; }
+.panel.on { transform: none; }
+.panel .body { flex: 1; overflow-y: auto; padding: 8px 26px 32px; }
+.panel .ptitle { font-size: 17px; font-weight: 500; text-align: center; color: #fff; }
+.st { display: flex; align-items: flex-start; gap: 12px; padding: 11px 0; font-size: 14.5px; color: #EDEDED; width: 100%; text-align: left; }
+.st > span:first-of-type { flex: 1; }
+.st .pill, .st .r { align-self: center; }
+.st small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.st .r { color: var(--muted); font-size: 12.5px; text-align: right; white-space: nowrap; }
+.st .r.w { color: #fff; }
+.st .r svg { width: 12px; height: 12px; margin-left: 6px; vertical-align: -1px; }
+.toast { position: absolute; left: 26px; right: 26px; bottom: 90px; z-index: 60; background: #fff; color: #000; padding: 12px 16px; border-radius: 12px; font-size: 13px; transform: translateY(16px); opacity: 0; pointer-events: none; transition: transform .3s, opacity .3s; text-align: center; }
+.toast.on { transform: none; opacity: 1; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="app" data-tab="dashboard">
+  <header class="topbar">
+    <button class="icon-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false"></button>
+    <span></span>
+    <span></span>
+  </header>
+  <main class="screens">
+    <section class="screen" id="screen-dashboard" data-pos="active" aria-label="Dashboard"></section>
+    <section class="screen" id="screen-calendar" data-pos="right" aria-label="Calendar"></section>
+    <section class="screen chat" id="screen-agent" data-pos="right" aria-label="Agent"></section>
+    <section class="screen" id="screen-money" data-pos="right" aria-label="Money"></section>
+    <section class="screen" id="screen-digest" data-pos="right" aria-label="Digest"></section>
+  </main>
+  <div class="cmd" id="cmd"><div class="ctxbar"><button class="ctxchip" id="ctxBtn"></button></div><div class="field">
+    <input id="ask" placeholder="ask anything" aria-label="Message" autocomplete="off" enterkeyhint="send">
+    <button class="icon-btn" id="micBtn" aria-label="Voice comes later"></button>
+    <button class="icon-btn go" id="goBtn" aria-label="Send"></button>
+  </div></div>
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-label="Menu" aria-hidden="true"></aside>
+  <section class="panel" id="panel" aria-hidden="true"></section>
+  <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-hidden="true"></section>
+  <div class="toast" id="toast" role="status"></div>
+</div>
+
+<script>
+const I = {
+  menu: 'M4 8h16M4 16h10', check: 'M5 12.5l4.5 4.5L19 7.5', lock: 'M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z',
+  mic: 'M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM6 11a6 6 0 0 0 12 0M12 17v4', up: 'M12 19V6M6 12l6-6 6 6',
+  back: 'M15 6l-6 6 6 6', next: 'M9 6l6 6-6 6', down: 'M6 9l6 6 6-6', plug: 'M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4',
+  pulse: 'M3 12h4l3-8 4 16 3-8h4', sliders: 'M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4', coin: 'M12 3v18M16 7.5H10a2.5 2.5 0 0 0 0 5h4a2.5 2.5 0 0 1 0 5H8',
+  cal: 'M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM4 10h16M8 3v4M16 3v4', mail: 'M4 6h16v12H4zM4 7l8 6 8-6', agent: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z',
+  home: 'M4 11l8-7 8 7M6 10v10h12V10',
+  open: 'M14 4h6v6M20 4l-9 9M18 14v5H5V6h5', spark: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z'
+};
+const ic = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${I[n]}"/></svg>`;
+const $ = s => document.querySelector(s);
+const app = $('#app');
+
+/* ---------- sample data (Friday, November 13, 2026) ---------- */
+const TODAY = 13, NOW = 8 * 60 + 5;
+const M = (h, m = 0) => h * 60 + m;
+const TASKS = {
+  1: { t: 'csc 3210l lab 10', due: M(23, 59), dueText: 'sunday, 11:59pm', src: 'school digest', why: 'the first deadline on your list. nothing is due today.' },
+  2: { t: 'phys 2212 physics ii homework', due: M(23, 59), dateOnly: true, dueText: 'monday', src: 'school digest', why: 'due monday. no time was given, so it counts as end of day.' },
+  3: { t: 'csc 3210 test: set up respondus', due: M(19), dueText: 'monday, 7:00pm', src: 'school digest', why: 'update the lockdown browser, launch it, and check the webcam so the quiz does not fail on setup.' },
+  4: { t: 'phys 2212 physics ii homework', due: M(23, 59), dateOnly: true, dueText: 'wednesday', src: 'school digest', why: 'due wednesday. no time was given, so it counts as end of day.' }
+};
+const DAY = {
+  15: [{ k: 'task', id: 1 }],
+  16: [{ k: 'task', id: 2 }, { k: 'task', id: 3 }],
+  17: [{ k: 'event', t: 'csc 3210l comp org lab', s: M(9) }],
+  18: [{ k: 'task', id: 4 }, { k: 'event', t: 'codex community meetup, atlanta', s: M(18), note: 'registration pending approval' }],
+  19: [{ k: 'event', t: 'csc 3210 comp org quiz', s: M(11, 45), note: 'in person, 40 pts, respondus' }]
+};
+const DIGEST = {
+  time: '6:40am', date: 'Friday, November 13',
+  mantra: 'Stay delusional about the goal. You’re closer to the dream life than you think, everything worth having sits on the other side of a little discomfort, and when you want something bad enough, you get it. Keep pushing.',
+  vision: 'Land the FAANG internship for next summer. It buys you Chicago, lean rent by design. Millionaire by 25, healthy body and mind.',
+  why: 'Nothing due today, so the first deadline is Lab 10 on Sunday night. Clean grades keep the GT transfer and every FAANG application standing while the interview prep carries the real weight.',
+  identity: ['I’m him, the version of me that loves this grind already exists.', 'I’m capable, I’m smart, I’ve done the work.', 'I am confident.', 'I solved both Amazon OA coding rounds optimally, so I know what I can do under pressure.', 'I’m fast at implementing, curious, and authentically myself.', 'I get a little uncomfortable today and push past my comfort zone.'],
+  deadlines: [
+    ['CSC 3210L Lab 10 due', 'Sun Nov 15, 11:59pm'],
+    ['PHYS 2212 Physics II homework due', 'Mon Nov 16'],
+    ['CSC 3210 test: update Respondus LockDown Browser, launch it, check the webcam', 'Mon Nov 16, 7:00pm'],
+    ['CSC 3210L Comp Org Lab', 'Tue Nov 17, 9:00am'],
+    ['PHYS 2212 Physics II homework due', 'Wed Nov 18'],
+    ['Codex Community Meetup, Atlanta (registration pending approval)', 'Wed Nov 18, 6:00pm'],
+    ['CSC 3210 Comp Org quiz: CPU Instructions and Digital Logic, 40 pts, in person, Respondus', 'Thu Nov 19, 11:45am']
+  ],
+  more: '+4 more past Nov 19: CSC 4320 Exam 2 (Dec 3), PHYS 2212L assessment closes (Dec 4), CSC 4320 Project 2 (Dec 7), CSC 3210 final (Dec 10).',
+  warn: 'gmail wasn’t reachable (mail service not enabled), so the oa sweep didn’t run. nothing turned up in the vault trackers, but that isn’t confirmed against your inbox.',
+  aff: 'You’ve got a clear runway to Thursday, and you don’t need to rush any of it. Your KSU/UGA/GT friends are grinding toward Uber and Amazon right now, and so are you. Stay ahead of them, run the quiz prep, and walk into that 11:45 knowing the material cold.'
+};
+const BANKS = ['chase checking', 'capital one card', 'ally savings'];
+const TX = [
+  { d: 13, m: 'starbucks', a: 5.75, b: 0, c: 'coffee', p: true },
+  { d: 12, m: 'chipotle', a: 11.85, b: 0, c: 'dining' },
+  { d: 12, m: 'spotify', a: 11.99, b: 1, c: 'subscriptions' },
+  { d: 11, m: 'marta breeze', a: 10.00, b: 0, c: 'transit' },
+  { d: 11, m: 'amazon', a: 34.18, b: 1, c: 'shopping' },
+  { d: 10, m: 'paycheck', a: 642.30, b: 0, c: 'income', i: true },
+  { d: 10, m: 'savings interest', a: 3.12, b: 2, c: 'income', i: true },
+  { d: 9, m: 'publix', a: 27.46, b: 0, c: 'groceries' },
+  { d: 9, m: 'venmo from maya', a: 18.00, b: 0, c: 'income', i: true },
+  { d: 8, m: 'taco bell', a: 9.32, b: 0, c: 'dining' },
+  { d: 8, m: 'apple icloud', a: 2.99, b: 1, c: 'subscriptions' },
+  { d: 7, m: 'pearson textbook', a: 89.99, b: 1, c: 'school' },
+  { d: 6, m: 'uber', a: 14.60, b: 1, c: 'transit' },
+  { d: 5, m: 'planet fitness', a: 15.00, b: 0, c: 'fitness' }
+];
+const usd = (a, i) => (i ? '+' : '') + '$' + a.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const state = { add: { type: 'task', day: 13, title: '', time: '' }, todayGoal: '', editGoal: false, banks: [true, true, true], tab: 'dashboard', day: TODAY, month: false, mode: 'ask', approval: 'pending', takeover: false, arm: false, digestNew: true,
+  chat: { ask: [['you', 'what’s due first?'], ['ai', 'csc 3210l lab 10, sunday at 11:59pm. nothing is due today.']] },
+  ctx: { vault: true, email: true, calendar: true }, course: 'phys 2212' };
+
+const fmt = m => { const h = Math.floor(m / 60), mm = m % 60; const hh = ((h + 11) % 12) + 1; return `${hh}:${String(mm).padStart(2, '0')}${h >= 12 ? 'pm' : 'am'}`; };
+const WD = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const wdOf = d => new Date(2026, 10, d).getDay();
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* ---------- calendar ---------- */
+function agendaFor(d) {
+  const items = DAY[d] || []; const isToday = d === TODAY; const rows = [];
+  items.forEach(it => {
+    if (it.k === 'task') { const t = TASKS[it.id]; rows.push({ at: t.due, html: `<li class="task"><button class="ag" data-task="${it.id}"><span class="ti">${t.t}</span><span class="tm">due ${t.dateOnly ? 'end of day' : fmt(t.due)}</span></button></li>` }); }
+    else rows.push({ at: it.s, html: `<li class="event"><button class="ag" data-ev="${it.t}|${it.s}|${it.note || ''}|${it.mid || ''}"><span class="ti">${it.t}</span><span class="tm">${fmt(it.s)}${it.note ? ', ' + it.note : ''}</span></button></li>` });
+  });
+  if (isToday) rows.push({ at: NOW - 0.1, html: `<li class="nowli"><span class="tag">now</span>${fmt(NOW)}</li>` });
+  rows.sort((a, b) => a.at - b.at);
+  const out = []; let last = '';
+  rows.forEach(r => { const p = r.at < M(12) ? 'morning' : r.at < M(17) ? 'afternoon' : 'evening'; if (p !== last) { out.push(`<li class="period">${p}</li>`); last = p; } out.push(r.html); });
+  if (isToday && !items.length) out.push('<li class="empty">nothing due today.</li>');
+  return out;
+}
+function renderCalendar() {
+  const d = state.day;
+  const L = ['m', 't', 'w', 't', 'f', 's', 's'];
+  const week = [13, 14, 15, 16, 17, 18, 19].map(n => `<button class="day ${n === TODAY ? 'today' : ''}" data-day="${n}" aria-pressed="${n === d}" aria-label="${cap(WD[wdOf(n)])} ${n}"><span>${WD[wdOf(n)][0]}</span><span class="n">${n}</span><i class="pip ${(DAY[n] || []).length ? 'on' : ''}"></i></button>`).join('');
+  let grid = L.map(x => `<span class="h">${x}</span>`).join('');
+  for (let i = 0; i < 42; i++) { const dt = new Date(2026, 9, 26 + i); const inM = dt.getMonth() === 10; const n = dt.getDate(); grid += `<button class="${inM ? '' : 'out'} ${inM && n === TODAY ? 'today' : ''}" ${inM ? `data-day="${n}"` : 'disabled'} aria-pressed="${inM && n === d}"><span class="n">${n}</span><i class="pip ${inM && (DAY[n] || []).length ? 'on' : ''}"></i></button>`; }
+  const rows = agendaFor(d);
+  $('#screen-calendar').innerHTML = `
+    <h1 class="big"><span class="dow">${cap(WD[wdOf(d)])}</span><span class="dt">November ${d}</span></h1>
+    <div class="week">${week}</div>
+    <div class="monthbar"><button class="linkbtn" id="addBtn">add</button><button class="linkbtn" id="monthBtn" aria-expanded="${state.month}">month ${ic('down')}</button></div>
+    <div class="month ${state.month ? 'open' : ''}"><div class="mhead">november 2026</div><div class="mgrid">${grid}</div></div>
+    <ul class="agenda">${rows.length ? rows.join('') : '<li class="empty">nothing scheduled. a clear day.</li>'}</ul>`;
+}
+
+/* ---------- dashboard ---------- */
+const GOALS = [
+  ['Land the FAANG internship for next summer', 'interview prep carries the real weight'],
+  ['Keep clean grades for the GT transfer', 'every application depends on them'],
+  ['Millionaire by 25, healthy body and mind', 'lean rent by design, Chicago']
+];
+function upcoming() {
+  const out = [];
+  Object.keys(DAY).map(Number).filter(d => d >= TODAY).sort((a, b) => a - b).forEach(d => {
+    DAY[d].filter(i => i.k === 'task' && TASKS[i.id] && !TASKS[i.id].done).sort((x, y) => (TASKS[x.id].dateOnly ? -1 : TASKS[x.id].due) - (TASKS[y.id].dateOnly ? -1 : TASKS[y.id].due)).forEach(i => out.push([d, i.id]));
+  });
+  return out.slice(0, 3);
+}
+function renderDashboard() {
+  const el = $('#screen-dashboard'); if (!el) return;
+  const goals = GOALS.map(([a, b]) => `<li><span class="ti">${a}</span><span class="tm">${b}</span></li>`).join('');
+  const dl = upcoming().map(([d, id]) => { const t = TASKS[id]; return `<li><button class="ag" data-task="${id}"><span class="ti">${t.t}</span><span class="tm">${WD[wdOf(d)]}, ${t.dateOnly ? 'end of day' : fmt(t.due)}</span></button></li>`; }).join('');
+  el.innerHTML = `
+    <h1 class="big"><span class="dow">Friday</span><span class="dt">November 13</span></h1>
+    <div class="sec"><span class="label">today’s goal</span>${state.todayGoal && !state.editGoal ? '<button class="linkbtn" id="goalEdit">edit</button>' : ''}</div>
+    ${state.todayGoal && !state.editGoal
+      ? `<button class="goal-text" id="goalEdit2">${esc(state.todayGoal)}</button>`
+      : `<div class="goal-field"><input id="goalInput" maxlength="90" placeholder="the one thing that makes today a win" value="${esc(state.todayGoal)}" aria-label="Today’s goal" enterkeyhint="done"><button class="pill sm" id="goalSave">save</button></div>`}
+    <div class="sec"><span class="label">goals</span><button class="linkbtn" data-nav="digest">digest</button></div>
+    <ol class="dg-ol dashgoals">${goals}</ol>
+    <div class="sec"><span class="label">deadlines</span><button class="linkbtn" data-nav="calendar">calendar</button></div>
+    <ol class="dg-ol dashdl">${dl}</ol>`;
+}
+/* ---------- money ---------- */
+function renderMoney() {
+  const on = state.banks.map((v, i) => v ? i : -1).filter(i => i >= 0);
+  const label = on.length === BANKS.length ? 'banks: all' : on.length ? 'banks: ' + on.map(i => BANKS[i].split(' ')[0]).join(', ') : 'banks: none';
+  const list = TX.map((t, ix) => ({ ...t, ix })).filter(t => on.includes(t.b));
+  let out = [], last = null;
+  list.forEach(t => {
+    if (t.d !== last) { out.push(`<li class="period">${t.d === TODAY ? 'today' : t.d === TODAY - 1 ? 'yesterday' : WD[wdOf(t.d)] + ', nov ' + t.d}</li>`); last = t.d; }
+    out.push(`<li><button class="tx" data-tx="${t.ix}"><span class="ti">${t.m}</span><span class="tm">${BANKS[t.b]}, ${t.c}${t.p ? ', pending' : ''}</span><span class="amt ${t.i ? 'in' : ''}">${usd(t.a, t.i)}</span></button></li>`);
+  });
+  $('#screen-money').innerHTML = `
+    <h1 class="big"><span class="dow">Money</span><span class="dt">November</span></h1>
+    <div class="chiplead"><button class="ctxchip" id="bankBtn">${label}</button></div>
+    <ul class="txlist">${out.length ? out.join('') : '<li class="empty" style="color:var(--muted)">no banks selected.</li>'}</ul>
+    <p class="demo">demo data. connect a bank in connectors to see your own.</p>`;
+}
+function bankSheet() {
+  const rows = BANKS.map((b, i) => `<button class="st" data-bank="${i}"><span>${b}<small>via plaid, read only</small></span><span class="r ${state.banks[i] ? 'w' : ''}">${state.banks[i] ? 'on' : 'off'}</span></button>`).join('');
+  openSheet(`<h3>Banks</h3><p>which accounts to show in the list.</p>${rows}<div class="stack" style="margin-top:18px"><button class="pill quiet" data-act="close">done</button></div>`);
+}
+function txSheet(i) {
+  const t = TX[i];
+  openSheet(`<h3>${cap(t.m)}</h3><p>from ${BANKS[t.b]}. read only.</p><dl class="kv"><dt>amount</dt><dd>${usd(t.a, t.i)}</dd><dt>date</dt><dd>${WD[wdOf(t.d)]}, november ${t.d}</dd><dt>bank</dt><dd>${BANKS[t.b]}</dd><dt>category</dt><dd>${t.c}</dd><dt>status</dt><dd>${t.p ? 'pending' : 'posted'}</dd></dl><div class="stack"><button class="pill quiet" data-act="close">close</button></div>`);
+}
+/* ---------- agent ---------- */
+const MODES = ['ask', 'homework'];
+const PH = { ask: 'ask anything', homework: 'tell the agent what to change' };
+const COURSES = [['csc 3210', 'icollege'], ['phys 2212', 'pearson'], ['csc 4320', 'icollege']];
+function digestHtml() {
+  const D = DIGEST;
+  return `<div class="digest">
+    <div class="dg-label" style="margin-top:28px">mantra</div><p class="dg-text">${D.mantra}</p>
+    <div class="dg-label">vision</div><p class="dg-text">${D.vision}</p>
+    <div class="dg-label">why</div><p class="dg-text">${D.why}</p>
+    <div class="dg-label">identity, say it out loud, twice each</div>
+    <ul class="dg-id">${D.identity.map(x => `<li>${x}</li>`).join('')}</ul>
+    <div class="dg-label">deadlines</div>
+    <ol class="dg-ol">${D.deadlines.map(([a, b]) => `<li><span class="ti">${a}</span><span class="tm">${b}</span></li>`).join('')}</ol>
+    <p class="dg-more">${D.more}</p>
+    <p class="dg-warn">${D.warn}</p>
+    <p class="dg-aff">${D.aff}</p>
+    <div class="dg-actions"><button class="pill quiet sm" data-toast="opening everything for today">${ic('open')}open everything for today</button><button class="pill quiet sm" data-toast="rebuilding the digest">refresh</button></div>
+  </div>`;
+}
+function stepRows() {
+  const base = ['opened icollege and your physics course', 'found the homework in pearson', 'answered 8 of 8 questions'];
+  const last = state.approval === 'pending' ? ['wait', 'waiting for your ok to submit'] : state.approval === 'approved' ? ['', 'submitted after your ok'] : ['held', 'held. nothing was submitted'];
+  return base.map(b => `<li>${b}</li>`).join('') + `<li class="${last[0]}">${last[1]}</li>`;
+}
+function modeBody() {
+  if (state.mode === 'ask') {
+    const log = state.chat.ask.map(m => m[0] === 'you' ? `<div class="you">${m[1]}</div>` : `<div class="ai">${m[1]}</div>`).join('');
+    return `<div class="chatlog">${log}</div><div class="chiprow"><button data-q="daily full">daily full</button><button data-q="what’s due this week">what’s due this week</button><button data-q="what did i write about interviews">what did i write about interviews</button></div>`;
+  }
+  if (state.course !== 'phys 2212') {
+    const C = { 'csc 3210': ['CSC 3210', 'lab 10 is due sunday night.', ['csc 3210l lab 10', 'icollege, due sunday', 'start']], 'csc 4320': ['CSC 4320', 'nothing due soon.', ['project 2', 'icollege, due dec 7', 'not yet']] }[state.course];
+    return `<div class="sess"><h2>${C[0]}</h2><span class="status done">no active session</span></div><p class="safety" style="font-size:14px;margin-top:14px">${C[1]}</p><div class="label">assignments</div><ul class="bul"><li><div class="arow"><span class="ti">${C[2][0]}<small>${C[2][1]}</small></span>${C[2][2] === 'start' ? '<button class="pill quiet sm" data-toast="starting ' + C[2][0] + '">start</button>' : '<span class="tag dim">not yet</span>'}</div></li></ul>`;
+  }
+  const paused = state.takeover || state.approval === 'held';
+  const st = paused ? '<span class="status paused">paused</span>' : state.approval === 'approved' ? '<span class="status done">done</span>' : '<span class="status">working</span>';
+  return `<div class="sess"><h2>Physics II homework</h2>${st}</div>
+    <div class="browser"><div class="bar">${ic('lock')}pearson.example.edu/phys2212/homework</div>
+      <div class="page"><h3>Homework 9</h3><div class="pm">8 questions, due monday</div>
+        <div class="ln"></div><div class="ln s"></div>
+        <div class="reply"><div class="ln"></div><div class="ln"></div><div class="ln s"></div><small>8 of 8 answered</small></div>
+        <span class="fake">submit homework</span>
+        <div class="shade ${state.takeover ? 'on' : ''}">you’re in control. the agent waits.</div></div></div>
+    <div class="actions"><button class="pill quiet sm" id="takeBtn">${state.takeover ? 'hand back' : 'take over'}</button><button class="pill quiet sm" id="fullBtn">full screen</button></div>
+    ${state.approval === 'pending' ? `<button class="ask-ok" id="openOk"><i></i><span>ready to submit<small>needs your ok</small></span>${ic('next')}</button>` : ''}
+    <ul class="steps">${stepRows()}</ul>
+    <div class="label">other assignments</div>
+    <ul class="bul"><li><div class="arow"><span class="ti">csc 3210l lab 10<small>icollege, due sunday</small></span><button class="pill quiet sm" data-toast="starting lab 10">start</button></div></li>
+    <li><div class="arow"><span class="ti">csc 4320 project 2<small>icollege, due dec 7</small></span><span class="tag dim">not yet</span></div></li></ul>
+    <p class="safety">it can’t post, submit, send, or pay without your tap.</p>`;
+}
+function updateBadge() { $('#menuDot').style.display = (state.approval === 'pending' || state.digestNew) ? 'block' : 'none'; renderDashboard(); }
+function updateCtx() {
+  const b = $('#ctxBtn'); if (!b) return;
+  if (state.mode === 'ask') { const on = Object.keys(state.ctx).filter(k => state.ctx[k]); b.textContent = 'context: ' + (on.length === 3 ? 'all' : on.length ? on.join(', ') : 'none'); }
+  else b.textContent = 'course: ' + state.course;
+}
+function renderAgent() {
+  const idx = MODES.indexOf(state.mode);
+  $('#screen-agent').innerHTML = `<div class="modes"><div class="switch two" role="tablist" aria-label="Agent mode"><span class="thumb" style="transform:translateX(${idx * 100}%)"></span>${MODES.map(m => `<button role="tab" data-mode="${m}" aria-selected="${m === state.mode}">${m}</button>`).join('')}</div></div>${modeBody()}`;
+  $('#ask').placeholder = PH[state.mode]; updateCtx(); updateBadge();
+}
+
+function renderDigest() {
+  $('#screen-digest').innerHTML = `<h1 class="big"><span class="dow">Digest</span><span class="dt">${DIGEST.date}, daily full ${DIGEST.time}</span></h1>${digestHtml()}`;
+}
+/* ---------- navigation ---------- */
+const TABS = ['dashboard', 'calendar', 'agent', 'money', 'digest'];
+function go(tab, push = true) {
+  if (!TABS.includes(tab)) tab = 'dashboard';
+  state.tab = tab; app.dataset.tab = tab; const i = TABS.indexOf(tab);
+  TABS.forEach((t, k) => { const el = $('#screen-' + t); el.dataset.pos = k === i ? 'active' : k < i ? 'left' : 'right'; el.toggleAttribute('inert', k !== i); });
+  state.tab = tab;
+  if (tab === 'digest') { state.digestNew = false; updateBadge(); }
+  if (push && location.hash !== '#' + tab) history.replaceState(null, '', '#' + tab);
+}
+
+/* ---------- overlays ---------- */
+const drawer = $('#drawer'), scrim = $('#scrim'), sheet = $('#sheet'), panel = $('#panel'), toastEl = $('#toast');
+const drawerHtml = () => {
+  const cur = state.tab; const dg = state.digestNew; const ap = state.approval === 'pending';
+  const item = (nav, icon, label, on, pend) => `<button class="ditem" data-nav="${nav}" ${on ? 'aria-current="page"' : ''}>${ic(icon)}${label}${pend ? '<i class="pend"></i>' : ''}</button>`;
+  return `<div class="dhead"><b>js ai</b></div>
+  <div class="dlist">
+    ${item('dashboard', 'home', 'dashboard', cur === 'dashboard')}
+    ${item('calendar', 'cal', 'calendar', cur === 'calendar')}
+    ${item('agent', 'agent', 'agent', cur === 'agent', ap)}
+    ${item('money', 'coin', 'money', cur === 'money')}
+    ${item('digest', 'mail', 'digest', cur === 'digest', dg)}
+    ${item('settings', 'sliders', 'settings', false)}
+  </div>`;
+};
+function openDrawer() { drawer.innerHTML = drawerHtml(); drawer.classList.add('on'); scrim.classList.add('on'); drawer.setAttribute('aria-hidden', 'false'); $('#menuBtn').setAttribute('aria-expanded', 'true'); drawer.querySelector('.ditem').focus(); }
+function closeDrawer() { drawer.classList.remove('on'); drawer.style.transform = ''; if (!sheet.classList.contains('on')) scrim.classList.remove('on'); drawer.setAttribute('aria-hidden', 'true'); $('#menuBtn').setAttribute('aria-expanded', 'false'); }
+function openSheet(h) { sheet.innerHTML = `<div class="grab"></div>${h}`; sheet.classList.add('on'); scrim.classList.add('on'); sheet.setAttribute('aria-hidden', 'false'); }
+function closeSheet() { sheet.classList.remove('on'); sheet.setAttribute('aria-hidden', 'true'); if (!drawer.classList.contains('on')) scrim.classList.remove('on'); state.arm = false; }
+function toast(t) { toastEl.textContent = t; toastEl.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => toastEl.classList.remove('on'), 2400); }
+function panelHtml(k) {
+  const h = t => `<div class="topbar"><button class="icon-btn" id="panelBack" aria-label="Back">${ic('back')}</button><div class="ptitle">${t}</div><span></span></div>`;
+  const nav = (panelId, a, b, r, w) => `<button class="st" data-panel="${panelId}"><span>${a}<small>${b}</small></span><span class="r ${w ? 'w' : ''}">${r ? r + ' ' : ''}${ic('next')}</span></button>`;
+  if (k === 'settings') return h('Settings') + `<div class="body">
+    ${nav('prefs', 'preferences', 'digest time, deadline cap, approvals', '')}
+    ${nav('connectors', 'connectors', 'gmail, calendar, vault, banks', '1 failing', true)}
+    ${nav('activity', 'agent activity', 'what the agent did and what is waiting', 'waiting', true)}</div>`;
+  if (k === 'prefs') return h('Preferences') + `<div class="body">
+    <div class="st"><span>daily full time</span><span class="r">6:40am</span></div>
+    <div class="st"><span>deadline cap</span><span class="r">7 items</span></div>
+    <div class="st"><span>agent approvals</span><span class="r">always ask first</span></div></div>`;
+  if (k === 'connectors') return h('Connectors') + `<div class="body">
+    ${[['google calendar', 'read only, 4 min ago', 'gcal', 'connected'], ['gmail', 'mcp, read only. mail service not enabled', 'gmail', 'needs fixing'], ['obsidian vault', 'git, read only, 9 min ago', 'vault', 'connected'], ['reminders', 'from your iphone, read only', 'rem', 'connected'], ['chase checking', 'plaid, read only, 12 min ago', 'bank', 'connected'], ['capital one card', 'plaid, read only, 12 min ago', 'bank', 'connected'], ['ally savings', 'plaid, read only, 12 min ago', 'bank', 'connected'], ['outlook calendar', 'waiting on it approval', 'outlook', 'blocked']].map(([a, b, id, r]) => `<button class="st" data-conn="${id}"><span>${a}<small>${b}</small></span><span class="r ${id === 'gmail' ? 'w' : ''}">${r}</span></button>`).join('')}
+    <button class="st" data-toast="pick a connector to add"><span>add a connector<small>mcp servers, read only tools only</small></span><span class="r">+</span></button></div>`;
+  return h('Agent activity') + `<div class="body">
+    <div class="st"><span>submit physics homework</span><span class="r w">waiting on you</span></div>
+    <div class="st"><span>checked the respondus setup page</span><span class="r">yesterday</span></div>
+    <div class="st"><span>collected the lab 10 instructions</span><span class="r">tuesday</span></div></div>`;
+}
+state.panels = [];
+function showPanel() { const k = state.panels[state.panels.length - 1]; panel.innerHTML = panelHtml(k); panel.classList.add('on'); panel.setAttribute('aria-hidden', 'false'); const pb = $('#panelBack'); if (pb) pb.focus(); }
+function openPanel(k) { state.panels.push(k); drawer.classList.remove('on'); scrim.classList.remove('on'); $('#menuBtn').setAttribute('aria-expanded', 'false'); showPanel(); }
+function panelBack() { state.panels.pop(); if (state.panels.length) showPanel(); else closePanel(); }
+function closePanel() { state.panels = []; panel.classList.remove('on'); panel.setAttribute('aria-hidden', 'true'); }
+function navTo(n) {
+  closeDrawer();
+  if (n === 'settings') return openPanel('settings');
+  closePanel();
+  if (n === 'homework') { state.mode = 'homework'; renderAgent(); return go('agent'); }
+  go(n);
+}
+
+function taskSheet(id) {
+  const t = TASKS[id]; if (!t) return;
+  openSheet(`<h3>${cap(t.t)}</h3><p>${t.why}</p><dl class="kv"><dt>due</dt><dd>${t.dueText}</dd><dt>source</dt><dd>${t.src}</dd></dl><div class="stack"><button class="pill" data-act="homework">${ic('spark')}work on it</button>${t.manual ? `<button class="pill quiet" data-del="task:${id}">delete</button>` : ''}<button class="pill quiet" data-act="close">close</button></div>`);
+}
+function eventSheet(v) {
+  const [t, s_, n, mid] = v.split('|');
+  openSheet(`<h3>${cap(t)}</h3><p>${mid ? 'added in the app. saved only here.' : (n || 'from google calendar. read only.')}</p><dl class="kv"><dt>time</dt><dd>${fmt(+s_)}</dd></dl><div class="stack">${mid ? `<button class="pill quiet" data-del="event:${mid}">delete</button>` : ''}<button class="pill quiet" data-act="close">close</button></div>`);
+}
+function connSheet(id) {
+  const D = {
+    gcal: ['Google Calendar', 'read events', 'create, edit, or delete events'],
+    gmail: ['Gmail', 'search mail, read messages and threads', 'send, delete, label, or draft'],
+    vault: ['Obsidian vault', 'pull the repository, read markdown notes', 'write, commit, or push'],
+    rem: ['Reminders', 'read reminder titles, dates, and completion', 'create or change reminders'],
+    bank: ['Bank account', 'read balances and transactions', 'move money, pay bills, or transfer'],
+    outlook: ['Outlook calendar', 'nothing yet. waiting for it approval', 'everything until approved']
+  }[id];
+  openSheet(`<h3>${D[0]}</h3><p>${id === 'gmail' ? 'the mail service isn’t enabled for this connection, so the oa sweep didn’t run today.' : 'the agent can only use tools on this list.'}</p><dl class="kv"><dt>allowed</dt><dd>${D[1]}</dd><dt>blocked</dt><dd>${D[2]}</dd></dl><div class="stack">${id === 'gmail' ? '<button class="pill" data-toast="opening the fix steps">fix connection</button>' : ''}<button class="pill quiet" data-act="close">close</button></div>`);
+}
+function ctxSheet() {
+  const rows = [['vault', 'obsidian notes'], ['email', 'gmail digest'], ['calendar', 'calendar and tasks']].map(([k, a]) => `<button class="st" data-ctx="${k}"><span>${k}<small>${a}, read only</small></span><span class="r ${state.ctx[k] ? 'w' : ''}">${state.ctx[k] ? 'on' : 'off'}</span></button>`).join('');
+  openSheet(`<h3>Context</h3><p>what the agent can read in this chat.</p>${rows}<div class="stack" style="margin-top:18px"><button class="pill quiet" data-act="close">done</button></div>`);
+}
+function courseSheet() {
+  const rows = COURSES.map(([k, a]) => `<button class="st" data-course="${k}"><span>${k}<small>${a}</small></span><span class="r ${state.course === k ? 'w' : ''}">${state.course === k ? 'selected' : ''}</span></button>`).join('');
+  openSheet(`<h3>Course</h3><p>which class the agent works in.</p>${rows}<div class="stack" style="margin-top:18px"><button class="pill quiet" data-act="close">done</button></div>`);
+}
+let nextId = 100;
+const toMin = v => { const [h, m] = v.split(':').map(Number); return h * 60 + m; };
+function syncAdd() { const t = $('#addTitle'), tm = $('#addTime'); if (t) state.add.title = t.value; if (tm) state.add.time = tm.value; }
+function addSheet() {
+  const a = state.add;
+  const days = [13, 14, 15, 16, 17, 18, 19].map(d => `<button data-addday="${d}" aria-pressed="${a.day === d}">${WD[wdOf(d)].slice(0, 3)} ${d}</button>`).join('');
+  openSheet(`<h3>Add</h3>
+    <div class="centerrow"><div class="switch two" role="tablist" aria-label="Type"><span class="thumb" style="transform:translateX(${a.type === 'task' ? 0 : 100}%)"></span><button role="tab" data-addtype="task" aria-selected="${a.type === 'task'}">task</button><button role="tab" data-addtype="event" aria-selected="${a.type === 'event'}">event</button></div></div>
+    <div class="lbl2">what</div><input class="txt" id="addTitle" maxlength="60" placeholder="${a.type === 'task' ? 'what needs doing' : 'what is happening'}" value="${esc(a.title)}" autocomplete="off">
+    <div class="lbl2">day</div><div class="chipsel">${days}</div>
+    <div class="lbl2">${a.type === 'task' ? 'due time, optional' : 'start time'}</div><input class="txt" id="addTime" type="time" value="${a.time}">
+    <p class="small">saved only in this app. it is never sent to your calendar or reminders.</p>
+    <div class="stack"><button class="pill" id="addSave">add</button><button class="pill quiet" data-act="close">cancel</button></div>`);
+}
+function saveAdd() {
+  syncAdd(); const a = state.add; const title = a.title.trim();
+  if (!title) return toast('give it a name first');
+  const id = nextId++;
+  DAY[a.day] = DAY[a.day] || [];
+  if (a.type === 'task') {
+    const has = !!a.time; const due = has ? toMin(a.time) : M(23, 59);
+    TASKS[id] = { t: title.toLowerCase(), due, dateOnly: !has, dueText: `${WD[wdOf(a.day)]}, ${has ? fmt(due) : 'end of day'}`, src: 'added in the app', why: 'you added this here. it is saved only in the app.', manual: true };
+    DAY[a.day].push({ k: 'task', id });
+  } else {
+    DAY[a.day].push({ k: 'event', t: title.toLowerCase(), s: toMin(a.time || '09:00'), note: '', mid: id });
+  }
+  closeSheet(); state.day = a.day; renderCalendar(); renderDashboard(); toast('added');
+}
+function deleteItem(spec) {
+  const [kind, idStr] = spec.split(':'); const id = +idStr;
+  Object.keys(DAY).forEach(d => { DAY[d] = DAY[d].filter(i => kind === 'task' ? !(i.k === 'task' && i.id === id) : !(i.k === 'event' && i.mid === id)); });
+  if (kind === 'task') delete TASKS[id];
+  closeSheet(); renderCalendar(); renderDashboard(); toast('deleted');
+}
+function approvalSheet() {
+  openSheet(`<h3>Submit your homework?</h3><p>all 8 answers are filled in. nothing has been sent yet.</p>
+    <ul class="checks"><li>${ic('check')}<span>read each answer yourself first.</span></li><li>${ic('check')}<span>your college’s rules on ai help still apply.</span></li></ul>
+    <div class="stack"><button class="pill" id="approveBtn">approve and submit</button><button class="pill quiet" data-act="review">check answers first</button><button class="pill quiet" data-act="hold">not yet</button></div>`);
+}
+
+/* ---------- send ---------- */
+function vaultReply() {
+  return `from your vault. read only.<ul class="bul"><li><div class="src"><b>interviews/amazon_oa_notes.md</b><span>solved both coding rounds optimally. review dp patterns before the next oa.</span></div></li><li><div class="src"><b>school/csc3210_cpu_instructions.md</b><span>quiz covers cpu instructions and digital logic.</span></div></li><li><div class="src"><b>journal/2026_11_12.md</b><span>plan: lab 10 saturday, physics homework sunday.</span></div></li></ul><small>prototype sample. real answers show their sources.</small>`;
+}
+function send(q) {
+  q = (q || $('#ask').value).trim(); if (!q) return; $('#ask').value = '';
+  if (state.mode === 'ask') {
+    if (/daily full|digest/i.test(q)) { navTo('digest'); return; }
+    else {
+      const vq = /note|wrote|write|plan|find|interview|idea/i.test(q);
+      const r = vq && !state.ctx.vault ? 'the vault is off for this chat. turn it on in context to search your notes.' : vq ? vaultReply() : 'that’s a sample answer for now. the real one will use your calendar, tasks, and connectors, and say where it looked.';
+      state.chat.ask.push(['you', q], ['ai', r]);
+    }
+  } else toast('sent to the agent');
+  renderAgent(); const sc = $('#screen-agent'); sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' });
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'menuBtn') return openDrawer();
+  if (b.dataset.nav) return navTo(b.dataset.nav);
+  if (b.id === 'addBtn') { state.add = { type: 'task', day: state.day, title: '', time: '' }; return addSheet(); }
+  if (b.dataset.addtype) { syncAdd(); state.add.type = b.dataset.addtype; return addSheet(); }
+  if (b.dataset.addday) { syncAdd(); state.add.day = +b.dataset.addday; return addSheet(); }
+  if (b.id === 'addSave') return saveAdd();
+  if (b.dataset.del) return deleteItem(b.dataset.del);
+  if (b.id === 'goalSave') { const v = ($('#goalInput').value || '').trim(); state.todayGoal = v; state.editGoal = false; renderDashboard(); return toast(v ? 'saved' : 'cleared'); }
+  if (b.id === 'goalEdit' || b.id === 'goalEdit2') { state.editGoal = true; renderDashboard(); const i = $('#goalInput'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } return; }
+  if (b.dataset.mode) { state.mode = b.dataset.mode; return renderAgent(); }
+  if (b.dataset.panel) return openPanel(b.dataset.panel);
+  if (b.id === 'panelBack') return panelBack();
+  if (b.dataset.day) { state.day = +b.dataset.day; state.month = false; return renderCalendar(); }
+  if (b.id === 'monthBtn') { state.month = !state.month; return renderCalendar(); }
+  if (b.dataset.tx) return txSheet(+b.dataset.tx);
+  if (b.id === 'bankBtn') return bankSheet();
+  if (b.dataset.bank) { state.banks[+b.dataset.bank] = !state.banks[+b.dataset.bank]; renderMoney(); return bankSheet(); }
+  if (b.dataset.task) return taskSheet(+b.dataset.task);
+  if (b.dataset.ev) return eventSheet(b.dataset.ev);
+  if (b.dataset.conn) return connSheet(b.dataset.conn);
+  if (b.dataset.toast) return toast(b.dataset.toast);
+  if (b.id === 'ctxBtn') return state.mode === 'ask' ? ctxSheet() : courseSheet();
+  if (b.dataset.ctx) { state.ctx[b.dataset.ctx] = !state.ctx[b.dataset.ctx]; updateCtx(); return ctxSheet(); }
+  if (b.dataset.course) { state.course = b.dataset.course; closeSheet(); renderAgent(); return toast('course: ' + state.course); }
+  if (b.dataset.q) return send(b.dataset.q);
+  if (b.id === 'takeBtn') { state.takeover = !state.takeover; renderAgent(); return toast(state.takeover ? 'you’re in control' : 'handed back'); }
+  if (b.id === 'fullBtn') return toast('full screen opens here');
+  if (b.id === 'openOk') return approvalSheet();
+  if (b.id === 'approveBtn') {
+    if (!state.arm) { state.arm = true; b.textContent = 'tap again to confirm'; b.classList.add('alert'); setTimeout(() => { if (state.arm && sheet.classList.contains('on')) { state.arm = false; b.textContent = 'approve and submit'; b.classList.remove('alert'); } }, 4000); return; }
+    state.approval = 'approved'; closeSheet(); renderAgent(); return toast('approved. submitting.');
+  }
+  if (b.id === 'micBtn') return toast('voice comes later');
+  if (b.id === 'goBtn') return send();
+  const a = b.dataset.act;
+  if (a === 'close') return closeSheet();
+  if (a === 'homework') { closeSheet(); state.mode = 'homework'; renderAgent(); return go('agent'); }
+  if (a === 'review') { closeSheet(); state.mode = 'homework'; renderAgent(); go('agent'); return toast('read the answers in the live view'); }
+  if (a === 'hold') { state.approval = 'held'; closeSheet(); renderAgent(); return toast('held. nothing submitted.'); }
+});
+$('#ask').addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && e.target.id === 'goalInput') { const sv = $('#goalSave'); if (sv) sv.click(); } });
+scrim.addEventListener('click', () => { closeDrawer(); closeSheet(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); closeDrawer(); if (state.panels.length) panelBack(); } });
+
+let sx = 0, sy = 0, mode = null;
+app.addEventListener('touchstart', e => { const t = e.touches[0]; const r = app.getBoundingClientRect(); sx = t.clientX; sy = t.clientY; mode = drawer.classList.contains('on') ? 'close' : (t.clientX - r.left < 22 ? 'open' : null); if (mode) drawer.classList.add('drag'); }, { passive: true });
+app.addEventListener('touchmove', e => {
+  if (!mode) return; const t = e.touches[0]; const dx = t.clientX - sx; if (Math.abs(t.clientY - sy) > Math.abs(dx)) return; const w = drawer.offsetWidth;
+  if (mode === 'open') { drawer.innerHTML = drawerHtml(); drawer.style.transform = `translateX(${Math.min(0, -w + dx)}px)`; scrim.classList.add('on'); scrim.style.opacity = Math.min(1, dx / w); }
+  else drawer.style.transform = `translateX(${Math.min(0, dx)}px)`;
+}, { passive: true });
+app.addEventListener('touchend', e => {
+  if (!mode) return; const dx = e.changedTouches[0].clientX - sx; drawer.classList.remove('drag'); scrim.style.opacity = ''; const m = mode; mode = null; drawer.style.transform = '';
+  if (m === 'open') { if (dx > 70) openDrawer(); else scrim.classList.remove('on'); } else if (dx < -60) closeDrawer();
+});
+
+$('#menuBtn').innerHTML = ic('menu') + '<i class="menu-dot" id="menuDot"></i>';
+$('#micBtn').innerHTML = ic('mic');
+$('#goBtn').innerHTML = ic('up');
+renderCalendar(); renderAgent(); renderMoney(); renderDigest();
+go((location.hash || '#dashboard').slice(1), false);
+window.addEventListener('hashchange', () => go((location.hash || '#dashboard').slice(1), false));
+</script>
+</body>
+</html>
