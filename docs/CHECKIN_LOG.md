@@ -35,3 +35,9 @@ Tests and lint: 52 passed; ruff clean.
 Deviations: added a `scope` column on tasks (spec needs "source scope" for gone-marking but lists no column). Importance: a source only sets it when no value exists, so a local override survives. OutboundCall (spec 17) now uses integer user_id and the tz-aware UTC type to match this spec. Tests written first, shown failing at import.
 Open questions: none.
 Next step: spec 07 priority engine.
+
+### 2026-11-15, spec 07 priority engine
+Acceptance criteria passing: AC7.1 to AC7.14.
+Tests and lint: 73 passed; ruff clean. Mutation checks: loosening at-risk fails tests; flipping importance order fails tests.
+Deviations: none. Open questions answered by default, change if wrong: same working hours every day, 09:00 to 17:00 (Config.work_start/work_end); tentative events block time. `suggested_block` returns the whole free block, not a trimmed slot.
+Next step: spec 08 /today endpoint.
