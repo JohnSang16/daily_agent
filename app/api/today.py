@@ -104,7 +104,9 @@ def today(
             request.app.state.llm,
             st.llm_model,
             st.llm_daily_token_budget,
-            build_payload(items[:5]),
+            build_payload(
+                [{**i, "private": by_id[i["id"]].scope.startswith("cox/")} for i in items[:5]]
+            ),
             now,
             local_midnight,
         )

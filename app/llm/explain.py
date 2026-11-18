@@ -16,7 +16,13 @@ log = logging.getLogger("llm")
 def build_payload(top_items: list[dict]) -> dict:
     """Structured ranking only: titles, due moments, reason codes, at risk flags."""
     keep = ("title", "due_at", "reasons", "at_risk")
-    return {"ranking": [{k: i[k] for k in keep} for i in top_items]}
+    # private (cox/) titles never leave the machine
+    return {
+        "ranking": [
+            {k: ("Cox task" if k == "title" and i.get("private") else i[k]) for k in keep}
+            for i in top_items
+        ]
+    }
 
 
 def build_prompt(payload: dict) -> str:
