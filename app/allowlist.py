@@ -19,6 +19,7 @@ RULES = [
         "GET",
         r"/gmail/v1/users/me/(messages|threads|labels)(/[^/]+)?",
     ),
+    Rule("icollege", "gastate.view.usg.edu", "GET", r"/d2l/le/calendar/feed/.*"),
     # token refresh is a POST but only talks to Google's token endpoint
     Rule("google_oauth", "oauth2.googleapis.com", "POST", r"/token"),
 ]

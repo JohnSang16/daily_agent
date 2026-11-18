@@ -1,5 +1,7 @@
 # 06 Gmail college digest to tasks
 
+> **Superseded 2026-11-18 by `06_icollege_feed.md`.** The digest emails are mostly counts, and iCollege's calendar feed has exact due dates with no LLM. Keep this spec only if the feed ever stops working.
+
 ## Purpose
 My college sends a digest email. Extract deadlines and action items from it into shared `tasks`, safely and cheaply.
 

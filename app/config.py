@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     stale_after_hours: int = 26
     google_client_secrets_path: str = "./secrets/client_secret.json"
     google_token_path: str = "./secrets/google_token.json"
+    icollege_feed_url_path: str = "~/.config/icollege-feed-url"
     calendar_ids: str = "primary"
     obsidian_vault_path: str = ""
     obsidian_ignore_globs: str = "templates/*,archive/*"

@@ -12,12 +12,13 @@ from app.clock import Clock
 from app.config import Settings
 from app.models import SyncRun
 from app.sources.google_calendar import HttpCalendarClient, sync_google_calendar
+from app.sources.icollege import http_feed_fetch, sync_icollege
 from app.sources.obsidian import sync_obsidian
 
 Source = Callable[[Session, datetime], int]
 
 # hours without a success before /today warns (spec 09)
-STALE_HOURS = {"google_calendar": 1, "obsidian": 1, "gmail_digest": 6}
+STALE_HOURS = {"google_calendar": 1, "obsidian": 1, "icollege": 6, "gmail_digest": 6}
 
 
 def stale_hours_for(source: str, default: int) -> int:
@@ -40,7 +41,11 @@ def default_sources(settings: Settings, http) -> dict[str, Source]:
             s, settings.obsidian_vault_path, now, settings.user_timezone, ignore_globs=globs
         )
 
-    return {"google_calendar": calendar, "obsidian": obsidian}
+    def icollege(s, now):
+        fetch = http_feed_fetch(http, settings.icollege_feed_url_path)
+        return sync_icollege(s, fetch, now, settings.user_timezone)
+
+    return {"google_calendar": calendar, "obsidian": obsidian, "icollege": icollege}
 
 
 class Runner:
