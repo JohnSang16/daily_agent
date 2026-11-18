@@ -4,9 +4,9 @@
 Turn checkbox tasks in my Obsidian vault into shared `tasks`, with due dates, so deadlines I write in notes show up in the ranking.
 
 ## Access
-1. The vault lives in a private git repository. The backend gets a **read only deploy key** for that one repository. A personal access token with broad scope is not allowed.
-2. The backend keeps a shallow checkout in `OBSIDIAN_CHECKOUT_DIR` and runs a fetch plus hard sync to the remote default branch on every sync. This directory is disposable and gitignored.
-3. The repository content is untrusted data. The code never executes anything from it, never follows symlinks outside the checkout, and rejects paths that escape the checkout.
+1. v1 (local, laptop): the backend reads the vault folder at `OBSIDIAN_VAULT_PATH` directly. Read only.
+2. Hosted later: a git checkout with a read only deploy key, as first designed (separate spec).
+3. Vault content is untrusted data. The code never executes anything from it, never follows symlinks outside the vault, and rejects paths that escape it.
 
 ## Syntax the parser supports
 Checkbox lines using `*` or the dash list marker, with `[ ]` for open and `[x]` or `[X]` for done. Metadata tokens follow the title in any order:
@@ -24,18 +24,19 @@ Checkbox lines using `*` or the dash list marker, with `[ ]` for open and `[x]` 
 5. Priority emojis from the Tasks plugin are ignored in v1.
 6. Recurrence markers are ignored. The task is treated as a normal single task.
 7. Nested checkboxes are separate tasks. Indented text under a task is ignored.
-8. Tasks with no due date are allowed.
+8. A checkbox with no calendar emoji date is not a task. Undated checklist lines are ignored.
 9. Malformed dates (for example `2026-13-45`) leave the task with no due date and `needs_review` true with a reason.
 
 ## Scope rules
+0. The whole vault is in scope, including `cox/`. Only hidden folders, `node_modules` and `OBSIDIAN_IGNORE_GLOBS` (`templates/*,archive/*`) are skipped.
 1. Only `.md` files. Skip hidden folders and anything matching `OBSIDIAN_IGNORE_GLOBS`.
 2. File size cap of 1 MB per file and a cap on total files. Oversized files are skipped with a logged count.
 3. The fingerprint scope is the relative file path (spec 03).
 4. Completed tasks are recorded as `done`.
 
 ## Behavior
-1. Each sync: update checkout, parse, upsert, mark missing tasks `gone` (only after a fully successful parse of the whole vault).
-2. If git fails, keep old data and record an `error` run.
+1. Each sync: walk the vault, parse, upsert, mark missing tasks `gone` (only after a fully successful parse of the whole vault).
+2. If the vault path is unreadable, keep old data and record an `error` run.
 3. Log only counts and file paths, never task text.
 
 ## Acceptance criteria
@@ -48,9 +49,14 @@ Checkbox lines using `*` or the dash list marker, with `[ ]` for open and `[x]` 
 * AC5.7 A symlink pointing outside the checkout is not followed.
 * AC5.8 A file over the size cap is skipped and counted.
 * AC5.9 Editing a task's due date in the vault updates the same task, and editing its title creates a new task and marks the old one `gone`.
-* AC5.10 A failed git update leaves existing tasks unchanged and records an error run.
+* AC5.10 An unreadable vault path leaves existing tasks unchanged and records an error run.
 * AC5.11 Two identical task lines in one file stay as two tasks.
 * AC5.12 Logs contain no task titles (assert with a log capture).
+
+## Privacy
+Tasks under `cox/` reach the LLM as "Cox task" plus the due date, never the real title.
+* AC5.13 A `cox/` task title never appears in the LLM prompt (assert on the built prompt).
+* AC5.14 A checkbox line with no date yields no task.
 
 ## Fixtures
 `tests/fixtures/vault/` with several small notes covering every rule above. Build the fixture from synthetic text, not from my real notes.
