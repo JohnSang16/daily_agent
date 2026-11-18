@@ -29,7 +29,7 @@ If the code and a spec ever disagree, stop and tell me. Propose spec changes as 
 * Install dependencies: `uv sync`
 * Run tests: `uv run pytest`
 * Lint and format: `uv run ruff check .` and `uv run ruff format .`
-* Run the API locally: `uv run uvicorn app.main:app --reload`
+* Run the API locally: `uv run uvicorn app.main:create_app --factory --reload`
 
 ## Repo layout
 ```
