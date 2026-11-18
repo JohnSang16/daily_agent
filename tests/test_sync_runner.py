@@ -78,6 +78,7 @@ def test_AC9_5_staleness_thresholds():
     assert stale_hours_for("google_calendar", 26) == 1
     assert stale_hours_for("obsidian", 26) == 1
     assert stale_hours_for("gmail_digest", 26) == 6
+    assert stale_hours_for("icollege", 26) == 6
     assert stale_hours_for("something_else", 26) == 26
 
 
@@ -121,6 +122,6 @@ def test_scheduler_loop_runs_repeatedly_until_stopped():
     assert len(calls) == 3
 
 
-def test_default_sources_are_calendar_and_obsidian():
+def test_default_sources_include_icollege():
     s = Settings(_env_file=None, api_token="tok", database_url="sqlite://")
-    assert set(default_sources(s, http=None)) == {"google_calendar", "obsidian"}
+    assert set(default_sources(s, http=None)) == {"google_calendar", "obsidian", "icollege"}
