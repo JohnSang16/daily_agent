@@ -161,7 +161,9 @@ def test_AC4_7_error_keeps_data_and_logs(s):
         sync(s, FakeClient([], fail=RuntimeError("boom")))
     assert [e.status for e in rows(s)] == ["confirmed"]
     last = s.scalars(select(SyncRun).order_by(SyncRun.id.desc())).first()
-    assert last.status == "error" and "boom" in last.error_summary
+    assert (
+        last.status == "error" and last.error_summary == "RuntimeError"
+    )  # class only, no message text
 
 
 def test_AC4_8_rate_limit_backoff_then_ok(s):
