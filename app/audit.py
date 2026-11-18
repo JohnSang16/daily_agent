@@ -25,7 +25,7 @@ class DbAudit:
         self.sf, self.clock = session_factory, clock
 
     def record(self, integration, method, host, path_template, allowed, status=None):
-        ts = self.clock.now().replace(tzinfo=None)
+        ts = self.clock.now()
         with self.sf() as s:
             s.add(
                 OutboundCall(
@@ -44,7 +44,7 @@ class DbAudit:
 
 
 def summarize(session_factory, clock: Clock, days: int = 7) -> dict:
-    since = (clock.now() - timedelta(days=days)).replace(tzinfo=None)
+    since = clock.now() - timedelta(days=days)
     with session_factory() as s:
         rows = (
             s.query(OutboundCall).filter(OutboundCall.ts >= since).order_by(OutboundCall.ts).all()
