@@ -8,10 +8,11 @@ dependencies = [
     "pydantic-settings",
     "sqlalchemy",
     "alembic",
+    "httpx",
 ]
 
 [dependency-groups]
-dev = ["pytest", "httpx", "ruff", "pre-commit"]
+dev = ["pytest", "ruff", "pre-commit"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
