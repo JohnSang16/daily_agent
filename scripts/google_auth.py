@@ -3,11 +3,14 @@ Run: uv run --group auth python scripts/google_auth.py  (weekly in Testing)"""
 
 import json
 import os
+import sys
 from pathlib import Path
 
-from google_auth_oauthlib.flow import InstalledAppFlow
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.scopes import ALLOWED_SCOPES
+from google_auth_oauthlib.flow import InstalledAppFlow  # noqa: E402
+
+from app.scopes import ALLOWED_SCOPES  # noqa: E402
 
 SECRETS = os.environ.get("GOOGLE_CLIENT_SECRETS_PATH", "./secrets/client_secret.json")
 TOKEN = Path(os.environ.get("GOOGLE_TOKEN_PATH", "./secrets/google_token.json"))
