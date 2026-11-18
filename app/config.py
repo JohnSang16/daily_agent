@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     llm_model: str = ""  # never hard coded: set LLM_MODEL when a real client is wired in
     llm_daily_token_budget: int = 20000
     stale_after_hours: int = 26
+    google_client_secrets_path: str = "./secrets/client_secret.json"
+    google_token_path: str = "./secrets/google_token.json"
+    calendar_ids: str = "primary"
+    obsidian_vault_path: str = ""
+    obsidian_ignore_globs: str = "templates/*,archive/*"
+    sync_interval_minutes: int = 0  # 0 = off. Set 15 to sync on a timer while the app runs locally
 
     @field_validator("user_timezone")
     @classmethod

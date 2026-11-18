@@ -221,7 +221,7 @@ def sync_google_calendar(
                 started_at=now,
                 finished_at=now,
                 status="error",
-                error_summary=f"{type(exc).__name__}: {exc}"[:500],
+                error_summary=type(exc).__name__,
             )
         )
         s.commit()

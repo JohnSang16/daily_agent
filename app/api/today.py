@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.auth import require_token
 from app.clock import Clock, get_clock
+from app.jobs.runner import stale_hours_for
 from app.llm.explain import build_payload, explain
 from app.models import Event, SyncRun, Task
 from app.priority.engine import Config, EventView, TaskView, rank
@@ -31,7 +32,7 @@ def _warnings(db, now: datetime, stale_hours: int, review_count: int) -> list[di
             last_ok[r.source] = r
     for src, r in last_ok.items():
         age = now - (r.finished_at or r.started_at)
-        if age > timedelta(hours=stale_hours):
+        if age > timedelta(hours=stale_hours_for(src, stale_hours)):
             out.append(
                 {
                     "code": "SOURCE_STALE",
