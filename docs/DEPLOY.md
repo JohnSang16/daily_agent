@@ -29,6 +29,7 @@ Names are the settings in `app/config.py`, upper case.
 | LLM_MODEL | for AI text | model name, never hard coded |
 | ANTHROPIC_API_KEY | for AI text | secret, without it explanations use a plain template |
 | LLM_DAILY_TOKEN_BUDGET | no | daily token cap, default 20000 |
+| STALE_OVERDUE_DAYS | no | overdue items older than this leave the ranking and show a warning, default 14, 0 keeps them |
 | STALE_AFTER_HOURS | no | fallback stale threshold, default 26 |
 | GOOGLE_CLIENT_SECRETS_PATH | for calendar | OAuth client JSON path, secret |
 | GOOGLE_TOKEN_PATH | for calendar | saved token path, secret, re run `scripts/google_auth.py` weekly while the OAuth app is in Testing |
