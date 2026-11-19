@@ -19,11 +19,11 @@ struct DashboardView: View {
                     BigTitle(text: f("EEEE"))
                     Text(f("MMMM d").lowercased()).font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
                 }
-                if let t = state.today { Text(t.explanation.text).font(.system(size: 14.5)).foregroundStyle(Theme.body).lineSpacing(3) }
-                goalSection
-                deadlines
-                schedule
-                footer
+                if let t = state.today { Text(t.explanation.text).font(.system(size: 14.5)).foregroundStyle(Theme.body).lineSpacing(3).reveal(1) }
+                goalSection.reveal(2)
+                deadlines.reveal(3)
+                schedule.reveal(4)
+                footer.reveal(5)
             }
             .padding(.horizontal, 24).padding(.top, 72).padding(.bottom, 60)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -71,7 +71,7 @@ struct DashboardView: View {
                                 Text(dueLine(r.dueAt)).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading).frame(minHeight: 44)
-                    }.buttonStyle(.plain)
+                    }.buttonStyle(PressStyle())
                 }
             } else {
                 Text("nothing due.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
@@ -146,10 +146,11 @@ struct TaskSheet: View {
                 PillButton(label: o.rawValue) { Task { await state.snooze(task.id, o); dismiss() } }
             }
             PillButton(label: "mark done", primary: true) { Task { await state.done(task.id); dismiss() } }
+                .sensoryFeedback(.success, trigger: task.id)
             Spacer()
         }
         .padding(24).frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface).presentationDetents([.medium, .large])
-        .presentationCornerRadius(24)
+        .presentationBackground(.regularMaterial).presentationDetents([.medium, .large])
+        .presentationCornerRadius(28).presentationDragIndicator(.visible)
     }
 }

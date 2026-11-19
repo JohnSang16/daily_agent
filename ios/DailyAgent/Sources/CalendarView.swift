@@ -4,6 +4,8 @@ struct CalendarView: View {
     @EnvironmentObject var state: AppState
     @State private var selected = weekDays(from: Date())[0]
     @State private var adding = false
+    @Namespace private var pick
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var days: [String] { weekDays(from: Date()) }
 
@@ -57,16 +59,24 @@ struct CalendarView: View {
         HStack(spacing: 0) {
             ForEach(days, id: \.self) { d in
                 let busy = !agenda(d).isEmpty
-                Button { withAnimation(Theme.ease) { selected = d } } label: {
+                Button { withAnimation(reduceMotion ? Theme.ease : Theme.spring) { selected = d } } label: {
                     VStack(spacing: 6) {
                         Text(text(d, "EEE").lowercased().prefix(2)).font(.system(size: 12)).foregroundStyle(Theme.secondary)
-                        Text(text(d, "d")).font(.system(size: 16))
+                        Text(text(d, "d")).font(.system(size: 16, weight: selected == d ? .medium : .regular))
                             .foregroundStyle(selected == d ? Color.black : Theme.title)
                             .frame(width: 34, height: 34)
-                            .background(selected == d ? Color.white : Color.clear, in: Circle())
+                            .background {
+                                // one white disc that glides between the days
+                                if selected == d {
+                                    Circle().fill(LinearGradient(colors: [.white, Color(white: 0.82)], startPoint: .top, endPoint: .bottom))
+                                        .shadow(color: .white.opacity(0.15), radius: 8)
+                                        .matchedGeometryEffect(id: "selected-day", in: pick)
+                                }
+                            }
                         Circle().fill(busy ? Theme.secondary : Color.clear).frame(width: 4, height: 4)
                     }.frame(maxWidth: .infinity, minHeight: 44)
-                }.buttonStyle(.plain)
+                }.buttonStyle(PressStyle())
+                .sensoryFeedback(.selection, trigger: selected)
             }
         }
     }
@@ -76,7 +86,7 @@ struct CalendarView: View {
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
                 sectionLabel(label)
-                ForEach(items) { it in
+                ForEach(Array(items.enumerated()), id: \.element.id) { i, it in
                     HStack(alignment: .top, spacing: 14) {
                         // a filled dot is a task, a ring is an event
                         Circle().fill(it.isTask ? Color.white : Color.clear)
@@ -93,6 +103,7 @@ struct CalendarView: View {
                             Text(it.timeText).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
                         }
                     }
+                    .reveal(i)
                 }
             }
         }
@@ -117,7 +128,7 @@ struct AddItemSheet: View {
                 Text("task").tag("task"); Text("event").tag("event")
             }.pickerStyle(.segmented)
             TextField("title", text: $title).font(.system(size: 16)).foregroundStyle(Theme.title)
-                .padding(.horizontal, 16).frame(minHeight: 48).background(Theme.raised, in: Capsule())
+                .padding(.horizontal, 18).frame(minHeight: 48).glass(Capsule())
             if kind == "task" {
                 Toggle("set a time", isOn: $withTime).tint(.white).foregroundStyle(Theme.body)
                 DatePicker("due", selection: $when, displayedComponents: withTime ? [.date, .hourAndMinute] : [.date])
@@ -133,7 +144,7 @@ struct AddItemSheet: View {
             Spacer()
         }
         .padding(24).frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface).presentationDetents([.large]).presentationCornerRadius(24)
+        .presentationBackground(.regularMaterial).presentationDetents([.large]).presentationCornerRadius(28).presentationDragIndicator(.visible)
         .onAppear { if let d = parseDay(day) { when = d; end = d.addingTimeInterval(3600) } }
     }
 

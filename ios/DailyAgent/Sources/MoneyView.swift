@@ -13,14 +13,13 @@ struct MoneyView: View {
                 }
                 Button { showBanks = true } label: {
                     Text(state.banks?.chip ?? "banks: all").font(.system(size: 13.5)).foregroundStyle(Theme.body)
-                        .padding(.horizontal, 14).frame(minHeight: 44)
-                        .overlay(Capsule().stroke(Theme.tertiary))
-                }.buttonStyle(.plain)
+                        .padding(.horizontal, 16).frame(minHeight: 44).glass(Capsule())
+                }.buttonStyle(PressStyle())
                 if let note = state.page?.note { Text(note).font(.system(size: 12.5)).foregroundStyle(Theme.secondary) }
                 if let page = state.page {
                     ForEach(groupByDay(page.transactions, now: Date()), id: \.heading) { g in
                         VStack(alignment: .leading, spacing: 14) {
-                            sectionLabel(g.heading)
+                            sectionLabel(g.heading).reveal(0)
                             ForEach(g.items) { t in
                                 HStack(alignment: .top) {
                                     VStack(alignment: .leading, spacing: 3) {
@@ -78,6 +77,6 @@ struct BanksSheet: View {
             Spacer()
         }
         .padding(24).frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface).presentationDetents([.medium, .large]).presentationCornerRadius(24)
+        .presentationBackground(.regularMaterial).presentationDetents([.medium, .large]).presentationCornerRadius(28).presentationDragIndicator(.visible)
     }
 }
