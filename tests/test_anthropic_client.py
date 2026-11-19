@@ -42,6 +42,7 @@ def test_sends_prompt_without_tools_and_parses_usage():
     assert seen["body"]["model"] == "model-from-settings"
     assert seen["body"]["messages"] == [{"role": "user", "content": "PROMPT"}]
     assert "tools" not in seen["body"] and seen["body"]["max_tokens"] <= 500
+    assert seen["body"]["thinking"] == {"type": "disabled"}
 
 
 def test_http_error_raises_without_leaking_key():
@@ -70,3 +71,18 @@ def test_wired_only_when_key_and_model_set():
     assert _app().state.llm is None
     assert _app(anthropic_api_key="sk-ant-x").state.llm is None  # no model: stay on template
     assert isinstance(_app(anthropic_api_key="sk-ant-x", llm_model="m").state.llm, AnthropicClient)
+
+
+def test_cut_off_response_is_a_failure():
+    c = client_with(
+        lambda req: httpx.Response(
+            200,
+            json={
+                "stop_reason": "max_tokens",
+                "content": [{"type": "text", "text": "half a sen"}],
+                "usage": {"input_tokens": 1, "output_tokens": 400},
+            },
+        )
+    )
+    with pytest.raises(ValueError):
+        c.complete("x")
