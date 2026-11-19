@@ -64,6 +64,7 @@ class Task(Base):
     importance: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String, default="open")  # open, done, gone
     snoozed_until: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    locally_done: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     needs_review: Mapped[bool] = mapped_column(Boolean, default=False)
     review_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
@@ -134,3 +135,11 @@ class ExplanationCache(Base):
     key: Mapped[str] = mapped_column(String, primary_key=True)
     text: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
+class DailyGoal(Base):
+    __tablename__ = "daily_goal"
+
+    day: Mapped[str] = mapped_column(String, primary_key=True)  # YYYY-MM-DD in my time zone
+    text: Mapped[str] = mapped_column(String)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
