@@ -19,12 +19,14 @@
 		A9C3371D73802F74DD433D7D /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EBA519AFF7BB10DE3A1DEE3 /* CalendarView.swift */; };
 		AE7675784E2CA935814EFCD4 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9A209F71023372B477244F7 /* Models.swift */; };
 		C7741FF755BBC024BE95B816 /* DailyAgentApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2F545371BD6B74701FB8278 /* DailyAgentApp.swift */; };
+		D5AD0FCFD24C2182A5ACDDEF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 146422B9CFCBD65A6E2A92BF /* Assets.xcassets */; };
 		D8920CBD68839EAB182F1983 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4EC9ED575184537CE7C329 /* SettingsView.swift */; };
 		D9352B4F0A938DE01C8A055D /* Cache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7101633DF1B1AA2C0A26EF0B /* Cache.swift */; };
 		FE0F4CBC1A5707FBA8BD0B4B /* DigestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 997C399CBD40B5056BD9B759 /* DigestView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		146422B9CFCBD65A6E2A92BF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1818D1D046F541DEE8563AF5 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		3D59B1E2FD14473D56606A9E /* MoneyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyView.swift; sourceTree = "<group>"; };
 		4ABE0FCE93C6BE7E9367049A /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
@@ -57,6 +59,7 @@
 			children = (
 				4ABE0FCE93C6BE7E9367049A /* APIClient.swift */,
 				F53D0AD650F865B3DD64C3C0 /* AppState.swift */,
+				146422B9CFCBD65A6E2A92BF /* Assets.xcassets */,
 				7101633DF1B1AA2C0A26EF0B /* Cache.swift */,
 				8EBA519AFF7BB10DE3A1DEE3 /* CalendarView.swift */,
 				F2F545371BD6B74701FB8278 /* DailyAgentApp.swift */,
@@ -90,6 +93,7 @@
 			buildConfigurationList = B3F8905DD7125723DF55640A /* Build configuration list for PBXNativeTarget "DailyAgent" */;
 			buildPhases = (
 				0F6115767F2EF260BCEA9849 /* Sources */,
+				44A2F59704166918B6885BA7 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -134,6 +138,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		44A2F59704166918B6885BA7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D5AD0FCFD24C2182A5ACDDEF /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		0F6115767F2EF260BCEA9849 /* Sources */ = {

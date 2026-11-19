@@ -26,6 +26,9 @@ Agent (ask) screen, the calendar month grid, the Geist font (uses the system fon
 6. In the app, Settings: address `http://<the agent Mac's Tailscale 100.x address>:8000` and the token from `daily_agent/.env`, then "save and test". The agent must be started on that address (`--host <100.x address>`), see `personal/personal-projects/daily-agent-tailscale-setup.md` in the vault. The phone and the agent Mac both need Tailscale on.
 7. A free Apple ID signs the app for 7 days. Press Run again from Xcode to refresh it.
 
+## App icon
+The icon lives at `ios/DailyAgent/Sources/Assets.xcassets/AppIcon.appiconset/AppIcon.png` (1024 by 1024, no transparency). The current one is a placeholder. To change it, replace that file with your own 1024 square PNG with the same name, or in Xcode open Assets, then AppIcon, and drag a new image into the slot. iOS rounds the corners itself, so do not round them yourself.
+
 ## Regenerating the Xcode project
 `project.yml` is the source. `brew install xcodegen`, then `cd ios/DailyAgent && xcodegen generate`.
 
