@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     work_start: time = time(9)
     work_end: time = time(17)
     default_effort_minutes: int = 60
+    anthropic_api_key: str = ""
     llm_model: str = ""  # never hard coded: set LLM_MODEL when a real client is wired in
     llm_daily_token_budget: int = 20000
     stale_after_hours: int = 26

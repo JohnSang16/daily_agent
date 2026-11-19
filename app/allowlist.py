@@ -20,6 +20,8 @@ RULES = [
         r"/gmail/v1/users/me/(messages|threads|labels)(/[^/]+)?",
     ),
     Rule("icollege", "gastate.view.usg.edu", "GET", r"/d2l/le/calendar/feed/.*"),
+    # the model call is a POST that only reads: text in, text out, no tools
+    Rule("anthropic", "api.anthropic.com", "POST", r"/v1/messages"),
     # token refresh is a POST but only talks to Google's token endpoint
     Rule("google_oauth", "oauth2.googleapis.com", "POST", r"/token"),
 ]
