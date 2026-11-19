@@ -76,5 +76,20 @@ check(ag.evening.map { $0.title } == ["Dinner"], "evening event")
 check(!ag.allDay.contains { $0.title == "Other day" } && !ag.afternoon.contains { $0.title == "Other day" }, "tasks from another day are left out")
 check(buildAgenda(day: "2026-11-21", events: [], tasks: tks, firstTaskId: nil, tz: ny).isEmpty, "empty day is empty")
 
+// digest
+let digestJSON = """
+{"date":"2026-11-19","generated_at":"2026-11-19T21:00:00Z","mantra":"Keep pushing.","vision":"FAANG next summer.",
+ "why":{"date":"2026-11-18","text":"Because I am tired of almost."},
+ "deadlines":[{"id":4,"title":"OA","due_at":"2026-12-02T22:17:00Z","due_local":"Wed Dec 2 at 5:17 PM"}],
+ "overflow":3,"notes":["google calendar is out of date"]}
+"""
+let dg = try! makeDecoder().decode(Digest.self, from: Data(digestJSON.utf8))
+check(dg.deadlines[0].dueLocal == "Wed Dec 2 at 5:17 PM" && dg.overflow == 3 && dg.why?.date == "2026-11-18", "decodes the digest")
+let bare = """
+{"date":"2026-11-19","generated_at":null,"mantra":null,"vision":null,"why":null,"deadlines":[],"overflow":0,"notes":[]}
+"""
+let dg2 = try! makeDecoder().decode(Digest.self, from: Data(bare.utf8))
+check(dg2.mantra == nil && dg2.why == nil && dg2.deadlines.isEmpty, "decodes an empty digest with null lines")
+
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

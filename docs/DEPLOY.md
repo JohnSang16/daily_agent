@@ -45,5 +45,8 @@ Names are the settings in `app/config.py`, upper case.
 | TOKEN_ENCRYPTION_KEY | for money | Fernet key that encrypts bank tokens at rest, secret, generate with `Fernet.generate_key()`, losing it means reconnecting banks |
 | SYNC_INTERVAL_MINUTES | no | 0 turns the in process timer off |
 
+## The daily brief
+`GET /digest` reads `_meta/digest-lines.md` (MANTRA, VISION) and the newest entry of `personal/reflections.md` from `OBSIDIAN_VAULT_PATH` at request time. Missing files leave those lines out. Nothing personal is stored in this repo.
+
 ## Host choice
 Open (see `specs/09_sync_jobs.md`). Cloud Run plus Cloud Scheduler fits the budget. The Google token and iCollege feed file must exist on the host before calendar and school syncs work.

@@ -15,6 +15,7 @@ final class AppState: ObservableObject {
     @Published var weekEvents: [String: [EventItem]] = [:]
     @Published var weekTasks: [RankedTask] = []
     @Published var firstTaskId: Int?
+    @Published var digest: Digest?
 
     init() {
         if let (t, at) = Cache.load() { today = t; lastUpdated = at }
@@ -94,6 +95,14 @@ final class AppState: ObservableObject {
         do {
             try await c.send("PATCH", "/banks/accounts/\(id)", json: ["enabled": enabled])
             await loadMoney()
+        } catch { fail(error) }
+    }
+
+    func loadDigest() async {
+        guard let c = client else { return }
+        do {
+            digest = try await c.get("/digest")
+            offline = false
         } catch { fail(error) }
     }
 

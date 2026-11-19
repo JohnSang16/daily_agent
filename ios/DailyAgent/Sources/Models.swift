@@ -109,3 +109,28 @@ func makeDecoder() -> JSONDecoder {
     d.keyDecodingStrategy = .convertFromSnakeCase
     return d
 }
+
+// The daily brief: GET /digest
+
+struct DigestWhy: Codable, Equatable {
+    var date: String
+    var text: String
+}
+
+struct DigestDeadline: Codable, Equatable, Identifiable {
+    var id: Int
+    var title: String
+    var dueAt: String?
+    var dueLocal: String?
+}
+
+struct Digest: Codable, Equatable {
+    var date: String
+    var generatedAt: String?
+    var mantra: String?
+    var vision: String?
+    var why: DigestWhy?
+    var deadlines: [DigestDeadline]
+    var overflow: Int
+    var notes: [String]
+}
