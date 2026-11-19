@@ -119,3 +119,48 @@ def test_stale_source_shows_as_a_quiet_note(tmp_path):
 def test_digest_needs_the_token(tmp_path):
     app, c = build(tmp_path)
     assert c.get("/digest").status_code == 401
+
+
+def test_identity_lines_come_from_the_vault_in_order(tmp_path):
+    lines = (
+        "MANTRA: Keep pushing.\n"
+        "IDENTITY: I'm a Googler.\nIDENTITY: I put in the reps.\nIDENTITY: Fear is not real.\n"
+    )
+    app, c = build(tmp_path, {"_meta/digest-lines.md": lines})
+    j = c.get("/digest", headers=H).json()
+    assert j["identity"] == ["I'm a Googler.", "I put in the reps.", "Fear is not real."]
+    assert j["mantra"] == "Keep pushing."
+
+
+def test_identity_is_empty_when_the_file_is_missing(tmp_path):
+    app, c = build(tmp_path)
+    assert c.get("/digest", headers=H).json()["identity"] == []
+
+
+PLAN = (
+    "# Today's plan\n\nOverwritten each day.\n\n"
+    "## 2026-11-19\n\n- [ ] Workout at the climbing gym\n- [x] Do the lab (2 pm)\n"
+)
+
+
+def test_todays_plan_is_read_when_it_is_dated_today(tmp_path):
+    app, c = build(tmp_path, {"personal/today-plan.md": PLAN})
+    plan = c.get("/digest", headers=H).json()["plan"]
+    assert plan["logged"] is True
+    assert plan["items"] == [
+        {"text": "Workout at the climbing gym", "done": False},
+        {"text": "Do the lab (2 pm)", "done": True},
+    ]
+
+
+def test_a_plan_from_another_day_counts_as_not_logged(tmp_path):
+    app, c = build(tmp_path, {"personal/today-plan.md": PLAN.replace("2026-11-19", "2026-11-18")})
+    plan = c.get("/digest", headers=H).json()["plan"]
+    assert plan == {"logged": False, "items": []}
+
+
+def test_overflow_names_the_date_it_runs_past(tmp_path):
+    app, c = build(tmp_path)
+    add(app, [(f"T{i}", date(2026, 11, 20) + timedelta(days=i)) for i in range(10)])
+    j = c.get("/digest", headers=H).json()
+    assert j["overflow"] == 3 and j["overflow_after"] == "Thu Nov 26"  # the 7th deadline's day

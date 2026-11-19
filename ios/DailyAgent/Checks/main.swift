@@ -81,15 +81,18 @@ let digestJSON = """
 {"date":"2026-11-19","generated_at":"2026-11-19T21:00:00Z","mantra":"Keep pushing.","vision":"FAANG next summer.",
  "why":{"date":"2026-11-18","text":"Because I am tired of almost."},
  "deadlines":[{"id":4,"title":"OA","due_at":"2026-12-02T22:17:00Z","due_local":"Wed Dec 2 at 5:17 PM"}],
- "overflow":3,"notes":["google calendar is out of date"]}
+ "identity":["I'm a Googler.","Fear is not real."],"plan":{"logged":true,"items":[{"text":"Do the lab (2 pm)","done":false}]},
+ "overflow":3,"overflow_after":"Thu Nov 26","notes":["google calendar is out of date"]}
 """
 let dg = try! makeDecoder().decode(Digest.self, from: Data(digestJSON.utf8))
 check(dg.deadlines[0].dueLocal == "Wed Dec 2 at 5:17 PM" && dg.overflow == 3 && dg.why?.date == "2026-11-18", "decodes the digest")
+check(dg.identity == ["I'm a Googler.", "Fear is not real."] && dg.plan?.items[0].text == "Do the lab (2 pm)" && dg.overflowAfter == "Thu Nov 26", "decodes identity, plan and overflow date")
 let bare = """
 {"date":"2026-11-19","generated_at":null,"mantra":null,"vision":null,"why":null,"deadlines":[],"overflow":0,"notes":[]}
 """
 let dg2 = try! makeDecoder().decode(Digest.self, from: Data(bare.utf8))
 check(dg2.mantra == nil && dg2.why == nil && dg2.deadlines.isEmpty, "decodes an empty digest with null lines")
+check(dg2.identity == nil && dg2.plan == nil, "an older agent without the new fields still decodes")
 
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

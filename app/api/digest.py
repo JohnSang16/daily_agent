@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.api.today import _warnings, iso
 from app.auth import require_token
 from app.clock import Clock, get_clock
-from app.digest import read_lines, read_why_from_vault
+from app.digest import read_identity, read_lines, read_plan_from_vault, read_why_from_vault
 from app.llm.explain import format_due
 from app.models import Event, Task
 from app.priority.engine import Config, EventView, TaskView, rank
@@ -68,12 +68,16 @@ def digest(request: Request, clock: Clock = Depends(get_clock)):
                 f"{st.stale_overdue_days} days hidden"
             )
     lines = read_lines(st.obsidian_vault_path)
+    today = now.astimezone(tz).date().isoformat()
+    past = dated[CAP - 1].due_at.astimezone(tz) if len(dated) > CAP else None
     return {
-        "date": now.astimezone(tz).date().isoformat(),
+        "date": today,
         "generated_at": iso(now),
         "mantra": lines.get("mantra"),
         "vision": lines.get("vision"),
         "why": read_why_from_vault(st.obsidian_vault_path),
+        "identity": read_identity(st.obsidian_vault_path),
+        "plan": read_plan_from_vault(st.obsidian_vault_path, today),
         "deadlines": [
             {
                 "id": t.id,
@@ -84,5 +88,6 @@ def digest(request: Request, clock: Clock = Depends(get_clock)):
             for t in dated[:CAP]
         ],
         "overflow": max(0, len(dated) - CAP),
+        "overflow_after": f"{past:%a %b} {past.day}" if past else None,
         "notes": notes,
     }
