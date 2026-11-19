@@ -5,6 +5,9 @@ struct SettingsView: View {
     @State private var url = Keychain.get("baseURL") ?? ""
     @State private var token = Keychain.get("token") ?? ""
     @State private var status = ""
+    @State private var checking = false
+    @FocusState private var focused: Field?
+    private enum Field { case url, token }
 
     var body: some View {
         ScrollView {
@@ -12,19 +15,26 @@ struct SettingsView: View {
                 BigTitle(text: "Settings")
                 VStack(alignment: .leading, spacing: 10) {
                     sectionLabel("agent address")
-                    field(TextField("http://100.x.x.x:8000", text: $url))
+                    field(urlField.focused($focused, equals: .url)
+                        .submitLabel(.next).onSubmit { focused = .token })
                     sectionLabel("token")
-                    field(SecureField("bearer token", text: $token))
+                    field(SecureField("bearer token", text: $token).focused($focused, equals: .token).submitLabel(.done))
                     HStack {
-                        PillButton(label: "save and test", primary: true) {
+                        PillButton(label: checking ? "checking" : "save and test", primary: true,
+                                   enabled: !checking && !url.trimmingCharacters(in: .whitespaces).isEmpty && !token.isEmpty) {
+                            focused = nil
                             state.saveConnection(url: url, token: token)
-                            status = "checking."
+                            url = Keychain.get("baseURL") ?? url  // show the cleaned up address
+                            guard state.configured else { status = "that address does not look right."; return }
+                            status = ""; checking = true
                             Task {
                                 await state.refresh()
+                                checking = false
                                 status = state.problem ?? (state.offline ? "could not reach the agent." : "connected.")
                             }
                         }
-                        Text(status).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
+                        if checking { ProgressView().controlSize(.small).tint(Theme.secondary) }
+                        Text(status).font(.system(size: 12.5)).foregroundStyle(Theme.secondary).contentTransition(.opacity)
                     }
                     Text("stored in the keychain on this phone only.").font(.system(size: 12.5)).foregroundStyle(Theme.tertiary)
                 }
@@ -35,10 +45,21 @@ struct SettingsView: View {
                     PillButton(label: "upload reminders") { Task { await state.uploadReminders() } }
                     Text(state.reminderStatus).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
                 }
+                Text("js ai " + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""))
+                    .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
             }
-            .padding(.horizontal, 24).padding(.top, 72).padding(.bottom, 60)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .page()
+            .animation(Theme.ease, value: status)
         }
+        .scrollDismissesKeyboard(.interactively)
+    }
+
+    private var urlField: some View {
+        #if os(iOS)
+        TextField("http://100.x.x.x:8000", text: $url).keyboardType(.URL)
+        #else
+        TextField("http://100.x.x.x:8000", text: $url)
+        #endif
     }
 
     @ViewBuilder

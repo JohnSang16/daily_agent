@@ -48,3 +48,10 @@ Tests and lint: 88 passed; ruff clean. Mutation checks: disabling the cache fail
 Deviations: no real LLM client yet (needs your Anthropic key and spec 06). `create_app(settings, llm=None)` takes any client with `complete(prompt)`; with none, the explanation is the template. `date` only changes the events day and the response date, ranking always uses the real now. Budget is per local day via LLM_DAILY_TOKEN_BUDGET (default 20000). Settings gained work_start, work_end, default_effort_minutes, llm_model, stale_after_hours.
 Open question answered by default: no tomorrow preview (the response shape in the spec has none). Say if you want it.
 Next step: end-to-end test, then spec 04 needs your Google OAuth.
+
+### 2026-11-19, iOS UX pass and triage
+What: a frontend bug and polish pass over every screen of the app, plus a read only backend bug review. Full list in docs/TRIAGE.md.
+Checks: `ios/DailyAgent/Checks/typecheck.sh` (new: typechecks every SwiftUI screen without Xcode, also clean at a macOS 14 target, which roughly matches iOS 17), logic checks all passed (5 new). Backend: 223 passed, ruff clean, no backend code changed.
+Deviations: none from specs. Bank names keep their case (design notes: proper names are not lowercased).
+Open questions: backend bugs 5 and 6 in TRIAGE.md need spec wording changes (transfers, overdue iCollege items).
+Next step: fix backend bugs 1 to 3, then run the app on the phone once.

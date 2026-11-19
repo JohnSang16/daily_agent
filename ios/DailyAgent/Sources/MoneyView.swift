@@ -19,7 +19,8 @@ struct MoneyView: View {
             VStack(alignment: .leading, spacing: 26) {
                 VStack(alignment: .leading, spacing: 4) {
                     BigTitle(text: "Money")
-                    Text(monthLong(state.summary?.thisMonth.month ?? "")).font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
+                    Text(state.summary.map { monthLong($0.thisMonth.month) } ?? " ").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
+                        .contentTransition(.opacity)
                 }
                 tabs
                 Group {
@@ -32,19 +33,13 @@ struct MoneyView: View {
                 }
                 .transition(.opacity)
                 .id(tab)
-                if let p = state.problem { Text(p).font(.system(size: 12.5)).foregroundStyle(Theme.secondary) }
+                if let p = state.problem, state.summary != nil { Text(p).font(.system(size: 12.5)).foregroundStyle(Theme.secondary) }
             }
-            .padding(.horizontal, 24).padding(.top, 72).padding(.bottom, 60)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .page()
         }
-        .refreshable { await loadAll() }
-        .task { await loadAll() }
-    }
-
-    private func loadAll() async {
-        await state.loadOverview()
-        await state.loadMoney()
-        await state.loadIncome()
+        .scrollDismissesKeyboard(.interactively)
+        .refreshable { await state.loadAllMoney() }
+        .task { await state.loadAllMoney() }
     }
 
     private var tabs: some View {
@@ -86,7 +81,7 @@ struct MoneyOverviewView: View {
             .sheet(item: $editing) { g in BudgetSheet(existing: g, categories: s.categories.map(\.category)).environmentObject(state) }
             .sheet(isPresented: $adding) { BudgetSheet(existing: nil, categories: s.categories.map(\.category)).environmentObject(state) }
         } else {
-            Text("loading.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
+            Text(state.waitingText).font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
         }
     }
 
@@ -101,7 +96,7 @@ struct MoneyOverviewView: View {
     private func figure(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             sectionLabel(label)
-            Text(value).font(.system(size: 26, weight: .light)).foregroundStyle(Theme.title)
+            Text(value).font(.system(size: 26, weight: .light)).monospacedDigit().foregroundStyle(Theme.title)
                 .minimumScaleFactor(0.6).lineLimit(1).contentTransition(.numericText())
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -135,7 +130,7 @@ struct MoneyOverviewView: View {
                     HStack {
                         Text(categoryLabel(c.category)).font(.system(size: 15)).foregroundStyle(Theme.title)
                         Spacer()
-                        Text(dollars(c.spendCents)).font(.system(size: 15)).foregroundStyle(Theme.title)
+                        Text(dollars(c.spendCents)).font(.system(size: 15)).monospacedDigit().foregroundStyle(Theme.title)
                     }
                     Bar(fraction: Double(c.spendCents) / Double(top), strong: false)
                 }
@@ -148,7 +143,10 @@ struct MoneyOverviewView: View {
             HStack {
                 sectionLabel("budget goals")
                 Spacer()
-                Button("add goal") { adding = true }.font(.system(size: 14)).foregroundStyle(Theme.body).frame(minHeight: 44)
+                Button { adding = true } label: {
+                    Label("add goal", systemImage: "plus").font(.system(size: 14)).foregroundStyle(Theme.title)
+                        .padding(.horizontal, 14).frame(minHeight: 36).glass(Capsule()).frame(minHeight: 44)
+                }.buttonStyle(PressStyle())
             }
             if state.budgets.isEmpty {
                 Text("no goals yet. add a monthly limit for all spending or for one category.")
@@ -188,6 +186,7 @@ struct Bar: View {
             }
         }
         .frame(height: 6)
+        .animation(Theme.spring, value: fraction)
         .onAppear { withAnimation(Theme.spring.delay(0.1)) { shown = true } }
     }
 }
@@ -230,6 +229,9 @@ struct BudgetSheet: View {
     let categories: [String]
     @State private var category = "TOTAL"
     @State private var amount = ""
+    @FocusState private var amountFocused: Bool
+
+    private var cents: Int? { Int(amount.filter(\.isNumber)).flatMap { $0 > 0 ? $0 * 100 : nil } }
 
     private var choices: [String] {
         let common = ["FOOD_AND_DRINK", "GENERAL_MERCHANDISE", "TRANSPORTATION", "ENTERTAINMENT", "PERSONAL_CARE",
@@ -241,11 +243,11 @@ struct BudgetSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text(existing == nil ? "new goal" : "edit goal").font(.system(size: 26)).foregroundStyle(Theme.title)
+            sheetTitle(existing == nil ? "New goal" : "Edit goal")
             if existing == nil {
                 Picker("", selection: $category) {
                     ForEach(choices, id: \.self) { Text(categoryLabel($0)).tag($0) }
-                }.pickerStyle(.menu).tint(.white)
+                }.pickerStyle(.menu).tint(.white).padding(.leading, -12)
             } else {
                 Text(categoryLabel(existing!.category)).font(.system(size: 18)).foregroundStyle(Theme.body)
             }
@@ -254,20 +256,26 @@ struct BudgetSheet: View {
                 #if os(iOS)
                 .keyboardType(.numberPad)
                 #endif
+                .focused($amountFocused)
                 .padding(.horizontal, 18).frame(minHeight: 48).glass(Capsule())
-            PillButton(label: "save", primary: true) {
-                guard let d = Int(amount.filter(\.isNumber)), d > 0 else { return }
-                Task { await state.saveBudget(existing?.category ?? category, cents: d * 100); dismiss() }
-            }
-            if let e = existing {
-                PillButton(label: "delete goal") { Task { await state.deleteBudget(e.category); dismiss() } }
+            HStack(spacing: 10) {
+                PillButton(label: "save", primary: true, enabled: cents != nil, feedback: .success) {
+                    guard let c = cents else { return }
+                    let cat = existing?.category ?? category
+                    dismiss(); Task { await state.saveBudget(cat, cents: c) }
+                }
+                if let e = existing {
+                    PillButton(label: "delete goal", feedback: .warning) { dismiss(); Task { await state.deleteBudget(e.category) } }
+                }
             }
             Spacer()
         }
-        .padding(24).frame(maxWidth: .infinity, alignment: .leading)
-        .presentationBackground(.regularMaterial).presentationDetents([.medium]).presentationCornerRadius(28)
-        .presentationDragIndicator(.visible)
-        .onAppear { if let e = existing { amount = String(e.limitCents / 100) } }
+        .padding(24).padding(.top, 8).frame(maxWidth: .infinity, alignment: .leading)
+        .sheetChrome([.medium, .large])
+        .onAppear {
+            if let e = existing { amount = String(e.limitCents / 100) }
+            amountFocused = true
+        }
     }
 }
 
@@ -283,9 +291,9 @@ struct BanksView: View {
                 ForEach(Array(groupBanks(accts).enumerated()), id: \.element.bank) { i, g in
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
-                            Text(g.bank.lowercased()).font(.system(size: 18)).foregroundStyle(Theme.title)
+                            Text(g.bank).font(.system(size: 18)).foregroundStyle(Theme.title)
                             Spacer()
-                            Text(dollars(g.totalCents)).font(.system(size: 18)).foregroundStyle(Theme.title)
+                            Text(dollars(g.totalCents)).font(.system(size: 18)).monospacedDigit().foregroundStyle(Theme.title)
                         }
                         ForEach(g.accounts) { a in row(a) }
                     }.reveal(i + 1)
@@ -317,7 +325,7 @@ struct BanksView: View {
         HStack {
             Text(label).font(.system(size: 15)).foregroundStyle(Theme.body)
             Spacer()
-            Text(dollars(cents)).font(.system(size: 15)).foregroundStyle(Theme.title)
+            Text(dollars(cents)).font(.system(size: 15)).monospacedDigit().foregroundStyle(Theme.title)
         }
     }
 
@@ -329,9 +337,9 @@ struct BanksView: View {
                     .font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
             }
             Spacer()
-            Text(a.balanceCents.map(dollars) ?? "-").font(.system(size: 15)).foregroundStyle(a.enabled ? Theme.title : Theme.tertiary)
+            Text(a.balanceCents.map(dollars) ?? "-").font(.system(size: 15)).monospacedDigit().foregroundStyle(a.enabled ? Theme.title : Theme.tertiary)
             Toggle("", isOn: Binding(get: { a.enabled }, set: { v in Task { await state.setAccount(a.id, enabled: v) } }))
-                .labelsHidden().tint(.white).frame(width: 52)
+                .labelsHidden().tint(Theme.toggle).frame(width: 52)
         }.frame(minHeight: 44)
     }
 }
@@ -366,10 +374,10 @@ struct IncomeView: View {
                         HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(t.merchant).font(.system(size: 16)).foregroundStyle(Theme.title)
-                                Text("\(t.date) · \(t.bank.lowercased())").font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
+                                Text("\(t.date) · \(t.bank)").font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
                             }
                             Spacer()
-                            Text(t.amount).font(.system(size: 16)).foregroundStyle(Theme.title)
+                            Text(t.amount).font(.system(size: 16)).monospacedDigit().foregroundStyle(Theme.title)
                         }
                     }
                 }.reveal(i + 1)
@@ -380,7 +388,8 @@ struct IncomeView: View {
     private func figure(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             sectionLabel(label)
-            Text(value).font(.system(size: 26, weight: .light)).foregroundStyle(Theme.title)
+            Text(value).font(.system(size: 26, weight: .light)).monospacedDigit().foregroundStyle(Theme.title)
+                .minimumScaleFactor(0.6).lineLimit(1)
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -409,20 +418,20 @@ struct ActivityView: View {
                                     Text(subline(t)).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
                                 }
                                 Spacer()
-                                Text(t.amount).font(.system(size: 16)).foregroundStyle(Theme.title)
+                                Text(t.amount).font(.system(size: 16)).monospacedDigit().foregroundStyle(Theme.title)
                             }
                         }
                     }
                 }
             } else {
-                Text("loading.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
+                Text(state.waitingText).font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
             }
         }
         .sheet(isPresented: $showBanks) { BanksSheet().environmentObject(state) }
     }
 
     private func subline(_ t: Txn) -> String {
-        var parts = [t.bank.lowercased()]
+        var parts = [t.bank]
         if let c = t.category { parts.append(categoryLabel(c)) }
         if t.pending { parts.append("pending") }
         return parts.joined(separator: " · ")
@@ -432,24 +441,24 @@ struct ActivityView: View {
 struct BanksSheet: View {
     @EnvironmentObject var state: AppState
     var body: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 18) {
-            Text("banks").font(.system(size: 26)).foregroundStyle(Theme.title)
+            sheetTitle("Banks")
             if let accts = state.banks?.accounts, !accts.isEmpty {
                 ForEach(accts) { a in
                     Toggle(isOn: Binding(get: { a.enabled }, set: { v in Task { await state.setAccount(a.id, enabled: v) } })) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(a.nickname.lowercased()).font(.system(size: 16)).foregroundStyle(Theme.title)
-                            Text("\(a.bank.lowercased()) · \(a.mask)").font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
+                            Text("\(a.bank) · \(a.mask)").font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
                         }
-                    }.tint(.white).frame(minHeight: 44)
+                    }.tint(Theme.toggle).frame(minHeight: 44)
                 }
             } else {
                 Text("no bank connected yet.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
             }
-            Spacer()
         }
-        .padding(24).frame(maxWidth: .infinity, alignment: .leading)
-        .presentationBackground(.regularMaterial).presentationDetents([.medium, .large]).presentationCornerRadius(28)
-        .presentationDragIndicator(.visible)
+        .padding(24).padding(.top, 8).frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .sheetChrome()
     }
 }

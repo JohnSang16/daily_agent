@@ -131,5 +131,12 @@ check(oldBank.accounts[0].balanceCents == nil && oldBank.accounts[0].kind == nil
 let newBank = try! makeDecoder().decode(Banks.self, from: Data(#"{"chip":"banks: all","accounts":[{"id":1,"item_id":1,"bank":"B","nickname":"N","mask":"1","enabled":true,"kind":"credit","subtype":"credit card","balance_cents":30000}]}"#.utf8))
 check(newBank.accounts[0].balanceCents == 30000 && newBank.accounts[0].kind == "credit", "decodes balances and kinds")
 
+// settings and warnings
+check(normalizedAddress(" 100.1.2.3:8000/ ") == "http://100.1.2.3:8000", "address gets a scheme and loses the trailing slash")
+check(normalizedAddress("https://mac.ts.net") == "https://mac.ts.net" && normalizedAddress("") == "", "a full address is left alone")
+check(warningLine(Warning(code: "SOURCE_STALE", source: "google_calendar", detail: nil)) == "google calendar is out of date", "stale warning in words")
+check(warningLine(Warning(code: "LLM_BUDGET_EXHAUSTED", source: nil, detail: "Daily token budget reached")) == "daily token budget reached", "other warnings are lowercase detail")
+check(warningLine(Warning(code: "SOME_NEW_CODE", source: nil, detail: nil)) == "some new code", "an unknown code with no detail reads as words")
+
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

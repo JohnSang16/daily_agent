@@ -31,24 +31,31 @@ struct CalendarView: View {
                     HStack {
                         Text(text(selected, "MMMM d").lowercased()).font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
                         Spacer()
-                        Button("add") { adding = true }
-                            .font(.system(size: 14.5)).foregroundStyle(Theme.body).frame(minHeight: 44)
+                        Button { adding = true } label: {
+                            Label("add", systemImage: "plus").font(.system(size: 14)).foregroundStyle(Theme.title)
+                                .padding(.horizontal, 14).frame(minHeight: 36).glass(Capsule())
+                                .frame(minHeight: 44)
+                        }.buttonStyle(PressStyle())
                     }
                 }
                 weekStrip
                 let a = agenda(selected)
-                if a.isEmpty {
-                    Text("nothing on this day.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
-                } else {
-                    section("all day", a.allDay)
-                    section("morning", a.morning)
-                    section("afternoon", a.afternoon)
-                    section("evening", a.evening)
+                VStack(alignment: .leading, spacing: 26) {
+                    if !state.weekLoaded {
+                        Text(state.waitingText).font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
+                    } else if a.isEmpty {
+                        Text("nothing on this day.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary).reveal()
+                    } else {
+                        section("all day", a.allDay)
+                        section("morning", a.morning)
+                        section("afternoon", a.afternoon)
+                        section("evening", a.evening)
+                    }
                 }
-                if let p = state.problem { Text(p).font(.system(size: 12.5)).foregroundStyle(Theme.secondary) }
+                .id(selected)  // a new day's agenda rises in fresh
+                if let p = state.problem, state.weekLoaded { Text(p).font(.system(size: 12.5)).foregroundStyle(Theme.secondary) }
             }
-            .padding(.horizontal, 24).padding(.top, 72).padding(.bottom, 60)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .page()
         }
         .refreshable { await state.loadWeek() }
         .task { await state.loadWeek() }
@@ -76,9 +83,11 @@ struct CalendarView: View {
                         Circle().fill(busy ? Theme.secondary : Color.clear).frame(width: 4, height: 4)
                     }.frame(maxWidth: .infinity, minHeight: 44)
                 }.buttonStyle(PressStyle())
-                .sensoryFeedback(.selection, trigger: selected)
+                .accessibilityLabel(text(d, "EEEE MMMM d") + (busy ? ", busy" : ""))
+                .accessibilityAddTraits(selected == d ? .isSelected : [])
             }
         }
+        .sensoryFeedback(.selection, trigger: selected)
     }
 
     @ViewBuilder
@@ -95,12 +104,9 @@ struct CalendarView: View {
                         VStack(alignment: .leading, spacing: 3) {
                             HStack(spacing: 8) {
                                 Text(it.title).font(.system(size: 16)).foregroundStyle(Theme.title)
-                                if it.isFirst {
-                                    Text("first").font(.system(size: 11)).foregroundStyle(Theme.secondary)
-                                        .padding(.horizontal, 7).padding(.vertical, 2).overlay(Capsule().stroke(Theme.tertiary))
-                                }
+                                if it.isFirst { FirstTag() }
                             }
-                            Text(it.timeText).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
+                            Text(it.timeText).font(.system(size: 12.5)).monospacedDigit().foregroundStyle(Theme.secondary)
                         }
                     }
                     .reveal(i)
@@ -120,17 +126,22 @@ struct AddItemSheet: View {
     @State private var end = Date().addingTimeInterval(3600)
     @State private var withTime = false
     @State private var failed = false
+    @State private var saving = false
+    @FocusState private var titleFocused: Bool
+
+    private var canSave: Bool { !saving && !title.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("add").font(.system(size: 26)).foregroundStyle(Theme.title)
-            Picker("", selection: $kind) {
+            sheetTitle(kind == "task" ? "New task" : "New event").contentTransition(.opacity)
+            Picker("", selection: $kind.animation(Theme.spring)) {
                 Text("task").tag("task"); Text("event").tag("event")
             }.pickerStyle(.segmented)
             TextField("title", text: $title).font(.system(size: 16)).foregroundStyle(Theme.title)
+                .focused($titleFocused).submitLabel(.done)
                 .padding(.horizontal, 18).frame(minHeight: 48).glass(Capsule())
             if kind == "task" {
-                Toggle("set a time", isOn: $withTime).tint(.white).foregroundStyle(Theme.body)
+                Toggle("set a time", isOn: $withTime.animation(Theme.spring)).tint(Theme.toggle).foregroundStyle(Theme.body)
                 DatePicker("due", selection: $when, displayedComponents: withTime ? [.date, .hourAndMinute] : [.date])
                     .foregroundStyle(Theme.body)
             } else {
@@ -140,12 +151,19 @@ struct AddItemSheet: View {
             Text("saved in the agent only. it is never written to google calendar or reminders.")
                 .font(.system(size: 12.5)).foregroundStyle(Theme.tertiary)
             if failed { Text("could not save. check the connection.").font(.system(size: 12.5)).foregroundStyle(Theme.secondary) }
-            PillButton(label: "save", primary: true) { Task { await save() } }
+            PillButton(label: saving ? "saving" : "save", primary: true, enabled: canSave, feedback: .success) { Task { await save() } }
             Spacer()
         }
-        .padding(24).frame(maxWidth: .infinity, alignment: .leading)
-        .presentationBackground(.regularMaterial).presentationDetents([.large]).presentationCornerRadius(28).presentationDragIndicator(.visible)
-        .onAppear { if let d = parseDay(day) { when = d; end = d.addingTimeInterval(3600) } }
+        .padding(24).padding(.top, 8).frame(maxWidth: .infinity, alignment: .leading)
+        .sheetChrome([.large])
+        .onAppear {
+            if let d = parseDay(day) { when = d; end = d.addingTimeInterval(3600) }
+            titleFocused = true
+        }
+        .onChange(of: when) { old, new in
+            // moving the start drags the end along so the event keeps its length
+            if kind == "event" { end = new.addingTimeInterval(max(end.timeIntervalSince(old), 60)) }
+        }
     }
 
     private func parseDay(_ s: String) -> Date? {
@@ -156,7 +174,9 @@ struct AddItemSheet: View {
 
     private func save() async {
         let name = title.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { return }
+        guard canSave else { return }
+        saving = true; failed = false
+        defer { saving = false }
         var body: [String: Any] = ["kind": kind, "title": name]
         if kind == "task" {
             if withTime {
