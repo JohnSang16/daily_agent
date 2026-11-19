@@ -9,7 +9,8 @@ A SwiftUI screen for the daily agent. It only talks to the agent's API, never to
 - Money: four views. Overview (this month's spent, income and net, a spend vs income bar chart for six months, where it went by category, and budget goals you set with a limit and see as bars), Banks (where your money sits: cash, savings, invested, owed on cards and loans, net, then every bank with its accounts, balances and an on/off switch each), Income (the full income log by month with subtotals) and Activity (the plain transaction list).
 - Settings: agent address and token, "save and test", upload open Reminders (title, due, done only, never writes back).
 - Offline: shows the last good response with "offline. last updated ...".
-- Slide out drawer (menu button or edge swipe), pure black and white, dark only.
+- Slide out drawer: the menu button, or pull from the left edge, and it follows your finger. Pure black and white, dark only.
+- Actions feel instant: snooze, done, bank switches, goals and budgets update on screen first, then the agent catches up. A failed call puts things back and says so.
 
 ## Look and motion (added 2026-11-19 at John's request)
 Glass and springs, still monochrome so the design stays black and white. Real Liquid Glass (`glassEffect`) on iOS 26 and later, frosted material with a hairline highlight before that. Spring animations on the drawer (the screen leans back, rounds its corners and slides over), screen switches, the calendar day picker (one white disc glides between days), and sheets. Sections fade and rise in one after another. Buttons shrink slightly when pressed. Light haptics on the drawer, day picks and mark done. Reduce Motion in iOS settings turns the movement down to simple fades.
@@ -33,5 +34,6 @@ The icon lives at `ios/DailyAgent/Sources/Assets.xcassets/AppIcon.appiconset/App
 `project.yml` is the source. `brew install xcodegen`, then `cd ios/DailyAgent && xcodegen generate`.
 
 ## Checks that run without Xcode
+- Screens: `ios/DailyAgent/Checks/typecheck.sh` typechecks every SwiftUI file against the macOS SDK (the command line tools have no SwiftUI macro plugin, so `@State` is swapped for a stand in). It is not a substitute for running the app.
 - Logic: `cd ios/DailyAgent && swiftc -swift-version 5 Sources/Models.swift Sources/Format.swift Checks/main.swift -o /tmp/ios_checks && /tmp/ios_checks`
 - The models decode the real `/today`, `/transactions`, `/banks` and `/goal/today` responses.

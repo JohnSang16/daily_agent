@@ -249,3 +249,25 @@ func goalProgress(spent: Int, limit: Int) -> (fraction: Double, over: Bool) {
     guard limit > 0 else { return (0, false) }
     return (min(1, Double(spent) / Double(limit)), spent > limit)
 }
+
+// MARK: settings
+
+/// "100.1.2.3:8000/" -> "http://100.1.2.3:8000". Adds the scheme people forget, drops the trailing slash.
+func normalizedAddress(_ raw: String) -> String {
+    var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !s.isEmpty else { return s }
+    if !s.contains("://") { s = "http://" + s }
+    while s.hasSuffix("/") { s.removeLast() }
+    return s
+}
+
+/// Plain words for a /today warning.
+func warningLine(_ w: Warning) -> String {
+    let s = (w.source ?? "a source").replacingOccurrences(of: "_", with: " ")
+    switch w.code {
+    case "SOURCE_STALE": return "\(s) is out of date"
+    case "SYNC_ERROR": return "\(s) failed its last sync"
+    case "NEEDS_REVIEW": return w.detail ?? "some items need review"
+    default: return (w.detail ?? w.code.replacingOccurrences(of: "_", with: " ")).lowercased()
+    }
+}
