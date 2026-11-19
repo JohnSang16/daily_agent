@@ -53,7 +53,14 @@ All aggregator calls use a fake client in tests.
 ## Out of scope
 Budgets, charts, totals, bills, subscription cancelling, net worth, moving money, and any write action.
 
+## Decisions (2026-11-19, replacing the open questions)
+1. Aggregator: Plaid, free Trial plan (10 live Items) once Production access is approved. Built and tested against Plaid Sandbox first. Real banks wait for me to read Plaid's terms (security rule 6).
+2. Banks to connect first: chosen by me later, at connect time.
+3. Ask mode: money is a separate context, off by default. Reading transactions from ask is not built yet, so with money on it replies that money questions are not supported yet (AC16.9).
+4. Tables: tokens live on a `bank_items` table (one per bank login) and `bank_accounts` points to it, instead of a token reference on each account.
+5. Connection flow: Plaid Hosted Link (their own screen, opened from a link), then the backend collects the result. Sandbox also has `POST /banks/sandbox`, which creates a fake bank without any screen.
+6. The only Plaid products ever requested are `transactions`. The outbound guard refuses any request body that names another product, and allows only these paths on the Plaid hosts: link token create and get, public token exchange, accounts get, institutions get by id, transactions sync, item remove (disconnects my own link, used by DELETE /banks), plus sandbox public token create on the sandbox host only.
+7. The optional LLM clean up step is skipped.
+
 ## Open questions
-1. Which aggregator, based on current pricing and terms for one personal user.
-2. Which banks and cards to connect first.
-3. Whether to add a money context toggle to ask mode right away or wait until the list is trusted.
+None.

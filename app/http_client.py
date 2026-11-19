@@ -19,6 +19,13 @@ class RequestDenied(Exception):
 ALLOWED_ARGS = {"params", "headers", "json", "data", "content"}
 ANTHROPIC_BODY_KEYS = {"model", "max_tokens", "messages", "thinking", "system"}
 COLLECTIONS = {"messages", "threads", "labels", "drafts", "calendars", "events", "feed", "user"}
+PLAID_PRODUCT_KEYS = (
+    "products",
+    "initial_products",
+    "optional_products",
+    "required_if_supported_products",
+    "additional_consented_products",
+)
 SNEAKY_PATH = re.compile(r"(?i)(^|/)(\.|%2e){1,2}(/|$)|%2f|%5c")
 
 
@@ -70,6 +77,12 @@ class GuardedHttpClient:
                 return set(json.loads(req.content)) <= ANTHROPIC_BODY_KEYS
             except ValueError:
                 return False
+        if integration == "plaid":  # read only: transactions is the only product ever requested
+            try:
+                body = json.loads(req.content)
+            except ValueError:
+                return False
+            return all(set(body.get(k) or []) <= {"transactions"} for k in PLAID_PRODUCT_KEYS)
         return True
 
     def _guard(self, req: httpx.Request) -> None:

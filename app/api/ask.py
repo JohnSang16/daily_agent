@@ -17,6 +17,9 @@ from app.search.query import search
 router = APIRouter(dependencies=[Depends(require_token)])
 
 HOMEWORK = re.compile(r"\b(work on|do my|start|finish)\b.*\b(hw|homework|assignment)\b", re.I)
+MONEY = re.compile(
+    r"\b(spend|spent|spending|transactions?|bank|balance|paid|purchase[sd]?)\b", re.I
+)
 TASKS = re.compile(r"\b(due|deadlines?)\b", re.I)
 NOTE_WORDS = re.compile(r"\b(write|wrote|written|notes?)\b", re.I)
 MAX_CHUNK_CHARS, MAX_PROMPT_CHARS = 800, 3000
@@ -72,6 +75,10 @@ def ask(body: AskIn, request: Request, clock: Clock = Depends(get_clock)):
     st, q, now = request.app.state.settings, body.question, clock.now()
     if HOMEWORK.search(q):
         return reply("That starts the homework agent, which needs your tap in the app.", "homework")
+    if MONEY.search(q):
+        if "money" not in body.context:
+            return reply("Money is off for this chat.", "money")
+        return reply("Money questions are not supported yet.", "money")
     if TASKS.search(q) and not NOTE_WORDS.search(q):
         if "calendar" not in body.context:
             return reply("Calendar and tasks are off for this chat.", "tasks")

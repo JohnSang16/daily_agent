@@ -38,6 +38,10 @@ Names are the settings in `app/config.py`, upper case.
 | OBSIDIAN_IGNORE_GLOBS | no | default templates/*,archive/* |
 | ASK_PRIVATE_GLOBS | no | folders never indexed for ask |
 | ASK_LLM_BLOCKED_GLOBS | no | searchable but never sent to the model, default cox/* |
+| PLAID_CLIENT_ID | for money | Plaid client id |
+| PLAID_SECRET | for money | Plaid secret for the chosen environment, secret |
+| PLAID_ENV | no | sandbox (fake banks, default) or production |
+| TOKEN_ENCRYPTION_KEY | for money | Fernet key that encrypts bank tokens at rest, secret, generate with `Fernet.generate_key()`, losing it means reconnecting banks |
 | SYNC_INTERVAL_MINUTES | no | 0 turns the in process timer off |
 
 ## Host choice
