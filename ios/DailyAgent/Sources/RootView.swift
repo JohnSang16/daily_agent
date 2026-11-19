@@ -33,7 +33,7 @@ struct RootView: View {
 
             if drawerOpen { drawer.transition(.move(edge: .leading)) }
         }
-        .gesture(DragGesture(minimumDistance: 30).onEnded { v in
+        .simultaneousGesture(DragGesture(minimumDistance: 30).onEnded { v in
             if !drawerOpen, v.startLocation.x < 28, v.translation.width > 60 { withAnimation(Theme.ease) { drawerOpen = true } }
             if drawerOpen, v.translation.width < -60 { withAnimation(Theme.ease) { drawerOpen = false } }
         })
