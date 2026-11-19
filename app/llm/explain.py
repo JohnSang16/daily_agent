@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -13,13 +14,24 @@ from app.models import ExplanationCache, LlmUsage
 log = logging.getLogger("llm")
 
 
+def format_due(iso: str | None, tz: str) -> str | None:
+    """A due moment for a person: 'Wed Dec 2 at 5:17 PM', or 'Sun May 24' for date only."""
+    if not iso:
+        return None
+    d = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(ZoneInfo(tz))
+    day = f"{d:%a} {d:%b} {d.day}"
+    if d.hour == 23 and d.minute == 59:
+        return day
+    return f"{day} at {d.hour % 12 or 12}:{d.minute:02d} {'AM' if d.hour < 12 else 'PM'}"
+
+
 def build_payload(top_items: list[dict]) -> dict:
     """Structured ranking only: titles, due moments, reason codes, at risk flags."""
-    keep = ("title", "due_at", "reasons", "at_risk")
+    keep = ("title", "due_local", "reasons", "at_risk")
     # private (cox/) titles never leave the machine
     return {
         "ranking": [
-            {k: ("Cox task" if k == "title" and i.get("private") else i[k]) for k in keep}
+            {k: ("Cox task" if k == "title" and i.get("private") else i.get(k)) for k in keep}
             for i in top_items
         ]
     }
@@ -41,8 +53,9 @@ def template_text(payload: dict) -> str:
         return "You have no open tasks right now."
     top = items[0]
     text = f"Start with {top['title']}."
-    if top["due_at"]:
-        text += f" It is due {top['due_at']}."
+    due = top.get("due_local") or top.get("due_at")
+    if due:
+        text += f" It is due {due}."
     if top["at_risk"]:
         text += " It is at risk, so give it your first free block."
     if len(items) > 1:
