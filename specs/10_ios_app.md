@@ -3,6 +3,8 @@
 ## Gate
 Start only after specs 02 through 09 are done and `/today` is deployed and trustworthy for at least a week of real use.
 
+> **Started early on 2026-11-19 at my request** (the gate below was waived by me). v0.1 is in `ios/`: dashboard, money, settings, offline cache, snooze and done, reminders upload. See `ios/README.md` for what is and is not built.
+
 ## Purpose
 A SwiftUI app that shows `/today`, lets me snooze or mark tasks, and uploads Apple Reminders to the backend (Reminders have no cloud API, so the phone must read and send them).
 

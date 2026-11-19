@@ -1,0 +1,29 @@
+# js ai (iPhone app)
+
+A SwiftUI screen for the daily agent. It only talks to the agent's API, never to Google, Gmail or the vault directly (spec 10, requirement 3). The address and token are kept in the iOS Keychain.
+
+## What is built (v0.1)
+- Dashboard: weekday title, the agent's one paragraph explanation, today's goal (saved to the agent), top three deadlines, today's schedule, warnings in plain words, "updated" or "offline" line. Pull to refresh. Tap a deadline to snooze it or mark it done.
+- Money: transactions grouped by day, bank chip with an on/off sheet per account.
+- Settings: agent address and token, "save and test", upload open Reminders (title, due, done only, never writes back).
+- Offline: shows the last good response with "offline. last updated ...".
+- Slide out drawer (menu button or edge swipe), pure black and white, dark only.
+
+## Not built yet
+Calendar, Agent (ask) and Digest screens, the Geist font (uses the system font), approvals, Sign in with Apple. It has never been run on a device or simulator, only compile checked and logic checked from the command line (see below), so expect small fixes on the first run.
+
+## Run it (on the Mac that has Xcode)
+1. `git pull` this repo, then open `ios/DailyAgent/DailyAgent.xcodeproj`.
+2. Xcode, Settings, Accounts: add your Apple ID.
+3. Click the DailyAgent target, Signing and Capabilities, set Team to your Personal Team. If it says the bundle identifier is not available, change `com.johnsang.dailyagent` to anything unique.
+4. Plug in the iPhone, tap Trust. On the phone turn on Settings, Privacy and Security, Developer Mode (it restarts). Pick the phone at the top of Xcode and press Run.
+5. First launch on the phone: Settings, General, VPN and Device Management, trust your Apple ID.
+6. In the app, Settings: address `http://<the agent Mac's Tailscale 100.x address>:8000` and the token from `daily_agent/.env`, then "save and test". The agent must be started on that address (`--host <100.x address>`), see `personal/personal-projects/daily-agent-tailscale-setup.md` in the vault. The phone and the agent Mac both need Tailscale on.
+7. A free Apple ID signs the app for 7 days. Press Run again from Xcode to refresh it.
+
+## Regenerating the Xcode project
+`project.yml` is the source. `brew install xcodegen`, then `cd ios/DailyAgent && xcodegen generate`.
+
+## Checks that run without Xcode
+- Logic: `cd ios/DailyAgent && swiftc -swift-version 5 Sources/Models.swift Sources/Format.swift Checks/main.swift -o /tmp/ios_checks && /tmp/ios_checks`
+- The models decode the real `/today`, `/transactions`, `/banks` and `/goal/today` responses.
