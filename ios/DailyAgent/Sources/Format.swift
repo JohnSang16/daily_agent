@@ -96,3 +96,68 @@ func reminderDue(_ comps: DateComponents?, tz: TimeZone = .current) -> String? {
     guard let date = c.date else { return nil }
     return isoString(date, tz: tz)
 }
+
+// MARK: calendar agenda
+
+struct AgendaItem: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let timeText: String
+    let isTask: Bool
+    let isFirst: Bool
+    let sort: Date
+}
+
+struct AgendaSections: Equatable {
+    var allDay: [AgendaItem] = []
+    var morning: [AgendaItem] = []
+    var afternoon: [AgendaItem] = []
+    var evening: [AgendaItem] = []
+    var isEmpty: Bool { allDay.isEmpty && morning.isEmpty && afternoon.isEmpty && evening.isEmpty }
+}
+
+/// yyyy-MM-dd of an instant in the given time zone.
+func localDay(_ iso: String?, tz: TimeZone = .current) -> String? {
+    guard let d = parseISO(iso) else { return nil }
+    return fmt("yyyy-MM-dd", tz).string(from: d)
+}
+
+/// The next seven days starting today, as yyyy-MM-dd.
+func weekDays(from now: Date, tz: TimeZone = .current) -> [String] {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    let f = fmt("yyyy-MM-dd", tz)
+    return (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: now) }.map { f.string(from: $0) }
+}
+
+func buildAgenda(day: String, events: [EventItem], tasks: [RankedTask], firstTaskId: Int?,
+                 tz: TimeZone = .current) -> AgendaSections {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    var out = AgendaSections()
+    func place(_ item: AgendaItem) {
+        let h = cal.component(.hour, from: item.sort)
+        if h < 12 { out.morning.append(item) } else if h < 17 { out.afternoon.append(item) } else { out.evening.append(item) }
+    }
+    for e in events {
+        if e.allDay {
+            out.allDay.append(AgendaItem(id: "e-" + e.id, title: e.title, timeText: "all day", isTask: false,
+                                         isFirst: false, sort: parseISO(e.start) ?? .distantPast))
+        } else if let s = parseISO(e.start) {
+            let end = parseISO(e.end) != nil ? " to " + clock(e.end, tz: tz) : ""
+            place(AgendaItem(id: "e-" + e.id, title: e.title, timeText: clock(e.start, tz: tz) + end,
+                             isTask: false, isFirst: false, sort: s))
+        }
+    }
+    for t in tasks where localDay(t.dueAt, tz: tz) == day {
+        guard let due = parseISO(t.dueAt) else { continue }
+        let c = cal.dateComponents([.hour, .minute], from: due)
+        let item = AgendaItem(id: "t-\(t.id)", title: t.title, timeText: "due " + (c.hour == 23 && c.minute == 59 ? "end of day" : clock(t.dueAt!, tz: tz)),
+                              isTask: true, isFirst: t.id == firstTaskId, sort: due)
+        if c.hour == 23 && c.minute == 59 { out.allDay.append(item) } else { place(item) }
+    }
+    out.morning.sort { $0.sort < $1.sort }
+    out.afternoon.sort { $0.sort < $1.sort }
+    out.evening.sort { $0.sort < $1.sort }
+    return out
+}
