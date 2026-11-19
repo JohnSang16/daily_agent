@@ -185,6 +185,9 @@ class BankAccount(Base):
     account_id: Mapped[str] = mapped_column(String)
     nickname: Mapped[str] = mapped_column(String, default="")
     mask: Mapped[str] = mapped_column(String, default="")  # last four digits only
+    type: Mapped[str] = mapped_column(String, default="")  # depository, credit, loan, investment
+    subtype: Mapped[str] = mapped_column(String, default="")  # checking, savings, brokerage ...
+    balance_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -200,5 +203,16 @@ class Transaction(Base):
     amount_cents: Mapped[int] = mapped_column(Integer)  # always positive, see direction
     direction: Mapped[str] = mapped_column(String)  # in, out
     category: Mapped[str | None] = mapped_column(String, nullable=True)
+    category_detail: Mapped[str | None] = mapped_column(String, nullable=True)
     pending: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
+class Budget(Base):
+    """A monthly spending goal. category is a Plaid category, or TOTAL for all spending."""
+
+    __tablename__ = "budgets"
+
+    category: Mapped[str] = mapped_column(String, primary_key=True)
+    limit_cents: Mapped[int] = mapped_column(Integer)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime)

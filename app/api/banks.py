@@ -1,6 +1,7 @@
 """Money endpoints: connect a bank, list accounts, list transactions. Read only."""
 
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -11,6 +12,7 @@ from app.banks import display, store_item
 from app.clock import Clock, get_clock
 from app.crypto import TokenBox
 from app.models import BankAccount, BankItem, Transaction
+from app.money import CARD_PAYMENT, INTERNAL_PRIMARY
 
 router = APIRouter(dependencies=[Depends(require_token)])
 
@@ -91,6 +93,9 @@ def list_banks(request: Request):
                     "nickname": a.nickname,
                     "mask": a.mask,
                     "enabled": a.enabled,
+                    "kind": a.type or "other",
+                    "subtype": a.subtype,
+                    "balance_cents": a.balance_cents,
                 }
                 for a in accts
                 if a.item_id in items
@@ -141,6 +146,7 @@ def transactions(
     bank: int | None = None,
     cursor: str | None = None,
     limit: int = Query(50, ge=1, le=500),
+    kind: Literal["all", "income", "spend"] = "all",
 ):
     with request.app.state.session_factory() as db:
         if db.scalars(select(BankItem.id)).first() is None:
@@ -170,6 +176,17 @@ def transactions(
         )
         if bank is not None:
             q = q.where(BankItem.id == bank)
+        if kind == "income":  # paychecks and other real income, not transfers
+            q = q.where(Transaction.direction == "in", Transaction.category == "INCOME")
+        elif kind == "spend":  # leaves out moves between my accounts and card payments
+            q = q.where(
+                Transaction.direction == "out",
+                or_(Transaction.category.is_(None), Transaction.category.not_in(INTERNAL_PRIMARY)),
+                or_(
+                    Transaction.category_detail.is_(None),
+                    Transaction.category_detail != CARD_PAYMENT,
+                ),
+            )
         if cursor:
             try:
                 d, _, i = cursor.rpartition(":")

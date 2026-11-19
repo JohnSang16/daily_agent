@@ -161,3 +161,91 @@ func buildAgenda(day: String, events: [EventItem], tasks: [RankedTask], firstTas
     out.evening.sort { $0.sort < $1.sort }
     return out
 }
+
+// MARK: money
+
+/// 286100 -> "$2,861". Whole dollars, for totals.
+func dollars(_ cents: Int) -> String {
+    let f = NumberFormatter()
+    f.numberStyle = .decimal
+    f.maximumFractionDigits = 0
+    f.usesGroupingSeparator = true
+    f.locale = Locale(identifier: "en_US")
+    let whole = Int((Double(abs(cents)) / 100).rounded())
+    return (cents < 0 ? "-$" : "$") + (f.string(from: NSNumber(value: whole)) ?? "\(whole)")
+}
+
+/// "2026-11" -> "nov"
+func monthShort(_ key: String) -> String {
+    let names = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+    guard key.count >= 7, let m = Int(key.dropFirst(5).prefix(2)), (1...12).contains(m) else { return key }
+    return names[m - 1]
+}
+
+/// "2026-11" -> "november"
+func monthLong(_ key: String) -> String {
+    let names = ["january", "february", "march", "april", "may", "june", "july", "august",
+                 "september", "october", "november", "december"]
+    guard key.count >= 7, let m = Int(key.dropFirst(5).prefix(2)), (1...12).contains(m) else { return key }
+    return names[m - 1]
+}
+
+/// "FOOD_AND_DRINK" -> "food and drink"
+func categoryLabel(_ c: String) -> String {
+    c == "TOTAL" ? "all spending" : c.replacingOccurrences(of: "_", with: " ").lowercased()
+}
+
+func accountKindLabel(_ a: BankAccountInfo) -> String {
+    switch a.kind ?? "" {
+    case "credit": return "credit card"
+    case "loan": return "loan"
+    case "investment": return (a.subtype ?? "").isEmpty ? "investment" : a.subtype!
+    default: return (a.subtype ?? "").isEmpty ? "account" : a.subtype!
+    }
+}
+
+/// Does this account count against me (card, loan) instead of for me?
+func isOwed(_ a: BankAccountInfo) -> Bool { a.kind == "credit" || a.kind == "loan" }
+
+/// One group per bank, keeping the order the agent returned.
+func groupBanks(_ accounts: [BankAccountInfo]) -> [(bank: String, accounts: [BankAccountInfo], totalCents: Int)] {
+    var out: [(bank: String, accounts: [BankAccountInfo], totalCents: Int)] = []
+    for a in accounts {
+        let signed = (a.enabled ? 1 : 0) * (isOwed(a) ? -(a.balanceCents ?? 0) : (a.balanceCents ?? 0))
+        if let i = out.firstIndex(where: { $0.bank == a.bank }) {
+            out[i].accounts.append(a); out[i].totalCents += signed
+        } else {
+            out.append((a.bank, [a], signed))
+        }
+    }
+    return out
+}
+
+/// "+2100.00" or "12.50" -> cents
+func centsFromDisplay(_ s: String) -> Int {
+    let digits = s.replacingOccurrences(of: "+", with: "").replacingOccurrences(of: ",", with: "")
+    let parts = digits.split(separator: ".", omittingEmptySubsequences: false)
+    let whole = Int(parts.first ?? "0") ?? 0
+    let frac = parts.count > 1 ? Int((String(parts[1]) + "00").prefix(2)) ?? 0 : 0
+    return whole * 100 + frac
+}
+
+/// Income rows grouped by month, newest month first, with a subtotal for each.
+func incomeByMonth(_ txns: [Txn]) -> [(month: String, totalCents: Int, items: [Txn])] {
+    var out: [(month: String, totalCents: Int, items: [Txn])] = []
+    for t in txns {
+        let m = String(t.date.prefix(7))
+        if let i = out.firstIndex(where: { $0.month == m }) {
+            out[i].items.append(t); out[i].totalCents += centsFromDisplay(t.amount)
+        } else {
+            out.append((m, centsFromDisplay(t.amount), [t]))
+        }
+    }
+    return out
+}
+
+/// How far through a goal: 0 to 1 (a goal that is over reads as 1), and whether it is over.
+func goalProgress(spent: Int, limit: Int) -> (fraction: Double, over: Bool) {
+    guard limit > 0 else { return (0, false) }
+    return (min(1, Double(spent) / Double(limit)), spent > limit)
+}

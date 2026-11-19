@@ -6,7 +6,7 @@ A SwiftUI screen for the daily agent. It only talks to the agent's API, never to
 - Dashboard: weekday title, the agent's one paragraph explanation, today's goal (saved to the agent), top three deadlines, today's schedule, warnings in plain words, "updated" or "offline" line. Pull to refresh. Tap a deadline to snooze it or mark it done.
 - Calendar: big weekday title, a seven day strip starting today (dot on busy days), the day's agenda split into all day, morning, afternoon and evening (filled dot is a task, ring is an event, "first" tag on the top priority), and an "add" sheet that saves a task or event in the agent only (never to Google Calendar). Month grid not built yet.
 - Digest: the daily brief from `GET /digest`: the mantra, one vision line and the newest WHY from your reflections (all read from the vault), then up to seven hard deadlines in order with an overflow line, and quiet notes about stale or failed sources.
-- Money: transactions grouped by day, bank chip with an on/off sheet per account.
+- Money: four views. Overview (this month's spent, income and net, a spend vs income bar chart for six months, where it went by category, and budget goals you set with a limit and see as bars), Banks (where your money sits: cash, savings, invested, owed on cards and loans, net, then every bank with its accounts, balances and an on/off switch each), Income (the full income log by month with subtotals) and Activity (the plain transaction list).
 - Settings: agent address and token, "save and test", upload open Reminders (title, due, done only, never writes back).
 - Offline: shows the last good response with "offline. last updated ...".
 - Slide out drawer (menu button or edge swipe), pure black and white, dark only.
