@@ -4,13 +4,14 @@ A SwiftUI screen for the daily agent. It only talks to the agent's API, never to
 
 ## What is built (v0.1)
 - Dashboard: weekday title, the agent's one paragraph explanation, today's goal (saved to the agent), top three deadlines, today's schedule, warnings in plain words, "updated" or "offline" line. Pull to refresh. Tap a deadline to snooze it or mark it done.
+- Calendar: big weekday title, a seven day strip starting today (dot on busy days), the day's agenda split into all day, morning, afternoon and evening (filled dot is a task, ring is an event, "first" tag on the top priority), and an "add" sheet that saves a task or event in the agent only (never to Google Calendar). Month grid not built yet.
 - Money: transactions grouped by day, bank chip with an on/off sheet per account.
 - Settings: agent address and token, "save and test", upload open Reminders (title, due, done only, never writes back).
 - Offline: shows the last good response with "offline. last updated ...".
 - Slide out drawer (menu button or edge swipe), pure black and white, dark only.
 
 ## Not built yet
-Calendar, Agent (ask) and Digest screens, the Geist font (uses the system font), approvals, Sign in with Apple. It has never been run on a device or simulator, only compile checked and logic checked from the command line (see below), so expect small fixes on the first run.
+Agent (ask) and Digest screens, the calendar month grid, the Geist font (uses the system font), approvals, Sign in with Apple. It has never been run on a device or simulator, only compile checked and logic checked from the command line (see below), so expect small fixes on the first run.
 
 ## Run it (on the Mac that has Xcode)
 1. `git pull` this repo, then open `ios/DailyAgent/DailyAgent.xcodeproj`.

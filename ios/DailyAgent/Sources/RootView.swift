@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum Screen: String, CaseIterable, Identifiable {
-    case dashboard, money, settings
+    case dashboard, calendar, money, settings
     var id: String { rawValue }
 }
 
@@ -16,6 +16,7 @@ struct RootView: View {
             Group {
                 switch screen {
                 case .dashboard: DashboardView()
+                case .calendar: CalendarView()
                 case .money: MoneyView()
                 case .settings: SettingsView()
                 }
@@ -23,6 +24,13 @@ struct RootView: View {
             .offset(x: drawerOpen ? 260 : 0)
             .opacity(drawerOpen ? 0.4 : 1)
             .allowsHitTesting(!drawerOpen)
+            .overlay {
+                // tapping the dimmed screen closes the drawer
+                if drawerOpen {
+                    Color.clear.contentShape(Rectangle())
+                        .onTapGesture { withAnimation(Theme.ease) { drawerOpen = false } }
+                }
+            }
 
             Button { withAnimation(Theme.ease) { drawerOpen.toggle() } } label: {
                 Image(systemName: "line.3.horizontal").font(.system(size: 18, weight: .light)).foregroundStyle(Theme.title)
