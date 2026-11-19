@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     calendar_ids: str = "primary"
     obsidian_vault_path: str = ""
     obsidian_ignore_globs: str = "templates/*,archive/*"
+    ask_private_globs: str = ""  # folders kept out of the ask index entirely
+    ask_llm_blocked_globs: str = "cox/*"  # searchable, but text never sent to the LLM
     sync_interval_minutes: int = 0  # 0 = off. Set 15 to sync on a timer while the app runs locally
 
     @field_validator("user_timezone")

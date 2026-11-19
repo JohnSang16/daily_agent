@@ -55,7 +55,13 @@ Keyword search costs nothing extra. Each answer is one small LLM call with a few
 ## Out of scope
 Editing or creating notes, voice input, searching email or the web from this box, embeddings unless the plan proves they are needed.
 
+## Decisions (2026-11-19, replacing the open questions)
+1. Private: `ASK_PRIVATE_GLOBS` (default none) keeps whole folders out of the index, and any note containing the tag `#private` (or `private` in a front matter `tags:` line) is never indexed.
+2. Cox notes: `ASK_LLM_BLOCKED_GLOBS` (default `cox/*`) are searchable and shown as excerpts, but their text is never sent to the LLM. When every match is blocked, the reply is the excerpts with a note saying why. Set it empty to allow Cox notes into answers.
+3. Search is keyword scoring over indexed chunks in plain Python (no embeddings, no FTS table), fast enough for a few thousand notes. Upgrade to database full text search past about 50,000 chunks.
+4. Answers cite both path and heading.
+5. The index is a new source `vault_index` in the sync runner, run after `obsidian`, stale after 1 hour.
+* AC14.15 A note under `ASK_LLM_BLOCKED_GLOBS` is returned as a source but its text is absent from the model prompt.
+
 ## Open questions
-1. Which folders or tags should be excluded as private?
-2. Is keyword search good enough, or do I want meaning based search from the start?
-3. Should answers cite note headings or only file paths?
+None.

@@ -124,4 +124,17 @@ def test_scheduler_loop_runs_repeatedly_until_stopped():
 
 def test_default_sources_include_icollege():
     s = Settings(_env_file=None, api_token="tok", database_url="sqlite://")
-    assert set(default_sources(s, http=None)) == {"google_calendar", "obsidian", "icollege"}
+    assert set(default_sources(s, http=None)) == {
+        "google_calendar",
+        "obsidian",
+        "icollege",
+        "vault_index",
+    }
+
+
+def test_AC9_8_deploy_doc_lists_every_setting():
+    from pathlib import Path
+
+    doc = (Path(__file__).parent.parent / "docs" / "DEPLOY.md").read_text()
+    missing = [n for n in Settings.model_fields if n.upper() not in doc]
+    assert not missing, missing
