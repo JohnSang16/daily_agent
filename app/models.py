@@ -1,8 +1,10 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
+    Index,
     Integer,
     String,
     Text,
@@ -155,4 +157,48 @@ class NoteChunk(Base):
     heading: Mapped[str] = mapped_column(String, default="")
     content_hash: Mapped[str] = mapped_column(String)
     text: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
+class BankItem(Base):
+    """One bank login at the aggregator. The access token is only ever stored encrypted."""
+
+    __tablename__ = "bank_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, default=1)
+    plaid_item_id: Mapped[str] = mapped_column(String)
+    institution_id: Mapped[str] = mapped_column(String, default="")
+    institution_name: Mapped[str] = mapped_column(String, default="")
+    access_token_enc: Mapped[str] = mapped_column(Text)
+    cursor: Mapped[str | None] = mapped_column(String, nullable=True)
+    last_sync_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
+class BankAccount(Base):
+    __tablename__ = "bank_accounts"
+    __table_args__ = (UniqueConstraint("item_id", "account_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(Integer, index=True)
+    account_id: Mapped[str] = mapped_column(String)
+    nickname: Mapped[str] = mapped_column(String, default="")
+    mask: Mapped[str] = mapped_column(String, default="")  # last four digits only
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+    __table_args__ = (Index("ix_transactions_date_id", "posted_date", "id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_id: Mapped[int] = mapped_column(Integer, index=True)  # bank_accounts.id
+    source_id: Mapped[str] = mapped_column(String, unique=True)
+    posted_date: Mapped[date] = mapped_column(Date)
+    merchant: Mapped[str] = mapped_column(Text)
+    amount_cents: Mapped[int] = mapped_column(Integer)  # always positive, see direction
+    direction: Mapped[str] = mapped_column(String)  # in, out
+    category: Mapped[str | None] = mapped_column(String, nullable=True)
+    pending: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime)

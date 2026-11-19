@@ -4,22 +4,30 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 
-from app.api import ask, audit, health, local, sync, today
+from app.api import ask, audit, banks, health, local, sync, today
 from app.audit import DbAudit
 from app.clock import SystemClock
 from app.config import Settings
 from app.db import make_session_factory
 from app.http_client import GuardedHttpClient
-from app.jobs.runner import Runner, default_sources, scheduler_loop
+from app.jobs.runner import Runner, banks_source, default_sources, scheduler_loop
 from app.llm.anthropic_client import AnthropicClient
 from app.logging_config import new_request_id, setup_logging
+from app.sources.plaid import PlaidClient
 
 log = logging.getLogger("app")
 
 
-def create_app(settings: Settings | None = None, llm=None, sources=None) -> FastAPI:
+def create_app(settings: Settings | None = None, llm=None, sources=None, plaid=None) -> FastAPI:
     settings = settings or Settings()
-    setup_logging(secrets=[settings.api_token, settings.anthropic_api_key])
+    setup_logging(
+        secrets=[
+            settings.api_token,
+            settings.anthropic_api_key,
+            settings.plaid_secret,
+            settings.token_encryption_key,
+        ]
+    )
     stop = threading.Event()
 
     @asynccontextmanager
@@ -40,13 +48,19 @@ def create_app(settings: Settings | None = None, llm=None, sources=None) -> Fast
     if llm is None and settings.anthropic_api_key and settings.llm_model:
         llm = AnthropicClient(http, settings.anthropic_api_key, settings.llm_model)
     app.state.llm = llm  # None: explanations use the template
+    if plaid is None and settings.plaid_client_id and settings.plaid_secret:
+        plaid = PlaidClient(http, settings)
+    app.state.plaid = plaid
     if sources is None:
-        sources = default_sources(settings, http)
+        sources = default_sources(settings, http, plaid)
+    elif plaid is not None and "banks" not in sources:
+        sources = {**sources, "banks": banks_source(settings, plaid)}
     app.state.runner = Runner(app.state.session_factory, sources, SystemClock())
     app.include_router(health.router)
     app.include_router(sync.router)
     app.include_router(local.router)
     app.include_router(ask.router)
+    app.include_router(banks.router)
     app.include_router(audit.router)
     app.include_router(today.router)
 

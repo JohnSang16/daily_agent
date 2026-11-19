@@ -8,8 +8,10 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.banks import sync_banks
 from app.clock import Clock
 from app.config import Settings
+from app.crypto import TokenBox
 from app.models import SyncRun
 from app.search.index import index_vault
 from app.sources.google_calendar import HttpCalendarClient, sync_google_calendar
@@ -32,7 +34,14 @@ def stale_hours_for(source: str, default: int) -> int:
     return STALE_HOURS.get(source, default)
 
 
-def default_sources(settings: Settings, http) -> dict[str, Source]:
+def banks_source(settings: Settings, plaid) -> Source:
+    def banks(s, now):
+        return sync_banks(s, TokenBox(settings.token_encryption_key), plaid, now)
+
+    return banks
+
+
+def default_sources(settings: Settings, http, plaid=None) -> dict[str, Source]:
     def calendar(s, now):
         client = HttpCalendarClient(
             http, settings.google_client_secrets_path, settings.google_token_path
@@ -59,12 +68,15 @@ def default_sources(settings: Settings, http) -> dict[str, Source]:
         private = tuple(g.strip() for g in settings.ask_private_globs.split(",") if g.strip())
         return index_vault(s, settings.obsidian_vault_path, now, ignore, private)
 
-    return {
+    out = {
         "google_calendar": calendar,
         "obsidian": obsidian,
         "icollege": icollege,
         "vault_index": vault_index,
     }
+    if plaid is not None:
+        out["banks"] = banks_source(settings, plaid)
+    return out
 
 
 class Runner:

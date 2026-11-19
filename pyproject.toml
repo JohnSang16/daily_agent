@@ -9,6 +9,7 @@ dependencies = [
     "sqlalchemy",
     "alembic",
     "httpx",
+    "cryptography>=50.0.2",
 ]
 
 [dependency-groups]
