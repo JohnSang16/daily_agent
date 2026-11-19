@@ -11,6 +11,7 @@ from app.config import Settings
 from app.db import make_session_factory
 from app.http_client import GuardedHttpClient
 from app.jobs.runner import Runner, default_sources, scheduler_loop
+from app.llm.anthropic_client import AnthropicClient
 from app.logging_config import new_request_id, setup_logging
 
 log = logging.getLogger("app")
@@ -18,7 +19,7 @@ log = logging.getLogger("app")
 
 def create_app(settings: Settings | None = None, llm=None, sources=None) -> FastAPI:
     settings = settings or Settings()
-    setup_logging(secrets=[settings.api_token])
+    setup_logging(secrets=[settings.api_token, settings.anthropic_api_key])
     stop = threading.Event()
 
     @asynccontextmanager
@@ -34,10 +35,12 @@ def create_app(settings: Settings | None = None, llm=None, sources=None) -> Fast
 
     app = FastAPI(lifespan=lifespan)
     app.state.settings = settings
-    app.state.llm = llm  # None until a real client is configured: explanations use the template
     app.state.session_factory = make_session_factory(settings.database_url)
+    http = GuardedHttpClient(DbAudit(app.state.session_factory, SystemClock()))
+    if llm is None and settings.anthropic_api_key and settings.llm_model:
+        llm = AnthropicClient(http, settings.anthropic_api_key, settings.llm_model)
+    app.state.llm = llm  # None: explanations use the template
     if sources is None:
-        http = GuardedHttpClient(DbAudit(app.state.session_factory, SystemClock()))
         sources = default_sources(settings, http)
     app.state.runner = Runner(app.state.session_factory, sources, SystemClock())
     app.include_router(health.router)
