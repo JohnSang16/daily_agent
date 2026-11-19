@@ -58,5 +58,23 @@ var timed = dateOnly; timed.hour = 9; timed.minute = 30
 check(reminderDue(timed, tz: ny) == "2026-11-25T09:30:00-05:00", "reminder with time has an offset (got \(reminderDue(timed, tz: ny) ?? "nil"))")
 check(reminderDue(nil, tz: ny) == nil, "reminder with no due date")
 
+// calendar agenda
+let wk = weekDays(from: now, tz: ny)
+check(wk.count == 7 && wk[0] == "2026-11-19" && wk[6] == "2026-11-25", "week strip starts today and runs seven days (got \(wk.first ?? "") to \(wk.last ?? ""))")
+check(localDay("2026-12-05T04:59:59Z", tz: ny) == "2026-12-04", "date only due belongs to the local day before its UTC date")
+let evs = [EventItem(title: "Class", start: "2026-11-19T16:00:00Z", end: "2026-11-19T17:15:00Z", allDay: false),
+           EventItem(title: "Holiday", start: "2026-11-19T05:00:00Z", end: "2026-11-20T05:00:00Z", allDay: true),
+           EventItem(title: "Dinner", start: "2026-11-19T23:30:00Z", end: "2026-11-20T00:30:00Z", allDay: false)]
+let tks = [RankedTask(id: 4, rank: 1, title: "OA", dueAt: "2026-11-19T20:00:00Z", source: "obsidian", reasons: [], atRisk: false, needsReview: false),
+           RankedTask(id: 9, rank: 2, title: "Project", dueAt: "2026-11-20T04:59:59Z", source: "icollege", reasons: [], atRisk: false, needsReview: false),
+           RankedTask(id: 7, rank: 3, title: "Other day", dueAt: "2026-11-22T20:00:00Z", source: "obsidian", reasons: [], atRisk: false, needsReview: false)]
+let ag = buildAgenda(day: "2026-11-19", events: evs, tasks: tks, firstTaskId: 4, tz: ny)
+check(ag.allDay.map { $0.title } == ["Holiday", "Project"], "all day holds all day events and date only tasks (got \(ag.allDay.map { $0.title }))")
+check(ag.morning.map { $0.title } == ["Class"] && ag.morning[0].timeText == "11:00 am to 12:15 pm", "morning event with a time range (got \(ag.morning.map { $0.timeText }))")
+check(ag.afternoon.map { $0.title } == ["OA"] && ag.afternoon[0].isTask && ag.afternoon[0].isFirst, "afternoon task is marked first")
+check(ag.evening.map { $0.title } == ["Dinner"], "evening event")
+check(!ag.allDay.contains { $0.title == "Other day" } && !ag.afternoon.contains { $0.title == "Other day" }, "tasks from another day are left out")
+check(buildAgenda(day: "2026-11-21", events: [], tasks: tks, firstTaskId: nil, tz: ny).isEmpty, "empty day is empty")
+
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

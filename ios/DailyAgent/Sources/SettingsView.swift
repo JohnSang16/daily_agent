@@ -44,8 +44,7 @@ struct SettingsView: View {
     @ViewBuilder
     private func field<V: View>(_ v: V) -> some View {
         v.font(.system(size: 16)).foregroundStyle(Theme.title)
-            .padding(.horizontal, 16).frame(minHeight: 48)
-            .background(Theme.raised, in: Capsule())
+            .padding(.horizontal, 18).frame(minHeight: 48).glass(Capsule())
             #if os(iOS)
             .textInputAutocapitalization(.never).autocorrectionDisabled()
             #endif

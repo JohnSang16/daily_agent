@@ -12,6 +12,9 @@ final class AppState: ObservableObject {
     @Published var banks: Banks?
     @Published var configured = false
     @Published var reminderStatus = ""
+    @Published var weekEvents: [String: [EventItem]] = [:]
+    @Published var weekTasks: [RankedTask] = []
+    @Published var firstTaskId: Int?
 
     init() {
         if let (t, at) = Cache.load() { today = t; lastUpdated = at }
@@ -92,6 +95,34 @@ final class AppState: ObservableObject {
             try await c.send("PATCH", "/banks/accounts/\(id)", json: ["enabled": enabled])
             await loadMoney()
         } catch { fail(error) }
+    }
+
+    func loadWeek() async {
+        guard let c = client else { return }
+        do {
+            var events: [String: [EventItem]] = [:]
+            var tasks: [RankedTask] = []
+            var first: Int?
+            for (i, d) in weekDays(from: Date()).enumerated() {
+                let t: Today = try await c.get("/today", query: [URLQueryItem(name: "date", value: d),
+                                                                  URLQueryItem(name: "limit", value: "50")])
+                events[d] = t.events
+                if i == 0 { tasks = t.ranked; first = t.topTask?.id }
+            }
+            weekEvents = events; weekTasks = tasks; firstTaskId = first
+            offline = false
+        } catch { fail(error) }
+    }
+
+    /// Saved only in the agent's own database, never to Google Calendar or Reminders.
+    func addItem(_ body: [String: Any]) async -> Bool {
+        guard let c = client else { return false }
+        do {
+            try await c.send("POST", "/items", json: body)
+            await loadWeek()
+            await refresh()
+            return true
+        } catch { fail(error); return false }
     }
 
     func uploadReminders() async {

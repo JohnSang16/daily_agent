@@ -37,3 +37,6 @@ Visible focus, labels on icon buttons, 44 px touch targets, status shown with wo
 
 ## Not yet designed
 Money, voice, notification styles, onboarding, empty states for a new account.
+
+## Update 2026-11-19: glass and springs
+At John's request the iPhone app uses frosted glass surfaces, a soft sheen on the primary button and spring motion. Still no accent colors, and Reduce Motion is respected. The 380 ms ease out above is still used for plain fades.
