@@ -50,8 +50,17 @@ All aggregator calls use a fake client in tests.
 2. `GET /transactions?bank=...&cursor=...` returns a page of transactions, newest first.
 3. `POST /banks/connect` starts the aggregator's connection flow. `DELETE /banks/{id}` removes one and deletes its data.
 
-## Out of scope
-Budgets, charts, totals, bills, subscription cancelling, net worth, moving money, and any write action.
+## Money overview (added 2026-11-19 at John's request, replaces part of Out of scope)
+The screen is now four views: **overview**, **banks**, **income** and **activity** (the plain list above).
+1. `GET /money/summary?months=6` returns income and spend per month, this month's totals and net, spending by category, and holdings (cash, savings, invested, owed on cards, owed on loans, net).
+2. Moves between my own accounts (Plaid transfer categories) and credit card payments are not spending or income. A refund reduces spending. Only the INCOME category counts as income.
+3. Account type, subtype and balance are stored per account. Turning an account off removes it from every total.
+4. Budget goals: `GET /budgets`, `PUT /budgets/{category}` (limit in cents, above 0), `DELETE /budgets/{category}`. A goal is for one category or TOTAL. Each shows this month's spending against its limit.
+5. `GET /transactions?kind=income|spend|all` powers the income log and a spending only list.
+* AC16.13 Totals exclude transfers and card payments, and a refund nets against spending.
+* AC16.14 Holdings group cash, savings, invested, cards owed and loans owed from the latest balances and leave out turned off accounts.
+* AC16.15 Budget limits must be positive, categories must look like Plaid categories, and each goal reports its spending for the current month.
+Still out of scope: bills, subscription cancelling, moving money, and any write action.
 
 ## Decisions (2026-11-19, replacing the open questions)
 1. Aggregator: Plaid, free Trial plan (10 live Items) once Production access is approved. Built and tested against Plaid Sandbox first. Real banks wait for me to read Plaid's terms (security rule 6).

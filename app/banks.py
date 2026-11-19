@@ -14,6 +14,10 @@ def cents(amount) -> int:
     return int((Decimal(str(abs(amount))) * 100).to_integral_value())
 
 
+def signed_cents(amount) -> int:
+    return int((Decimal(str(amount)) * 100).to_integral_value())
+
+
 def display(amount_cents: int, direction: str) -> str:
     s = f"{amount_cents // 100}.{amount_cents % 100:02d}"
     return "+" + s if direction == "in" else s
@@ -31,6 +35,9 @@ def _upsert_accounts(db: Session, item: BankItem, accounts: list[dict]) -> dict[
             db.add(row)
             have[a["account_id"]] = row
         row.nickname, row.mask = a.get("name") or "", a.get("mask") or ""
+        row.type, row.subtype = a.get("type") or "", a.get("subtype") or ""
+        current = (a.get("balances") or {}).get("current")
+        row.balance_cents = signed_cents(current) if current is not None else None
     db.flush()
     return {k: v.id for k, v in have.items()}
 
@@ -74,7 +81,8 @@ def _apply(db: Session, acct_ids: dict[str, int], res: dict, now: datetime) -> i
         row.merchant = t.get("merchant_name") or t.get("name") or "Unknown"
         row.amount_cents = cents(t["amount"])
         row.direction = "in" if Decimal(str(t["amount"])) < 0 else "out"
-        row.category = (t.get("personal_finance_category") or {}).get("primary")
+        pfc = t.get("personal_finance_category") or {}
+        row.category, row.category_detail = pfc.get("primary"), pfc.get("detailed")
         row.pending, row.updated_at = bool(t.get("pending")), now
         db.flush()
         changed += 1

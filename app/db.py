@@ -10,7 +10,7 @@ class Base(DeclarativeBase):
 def make_session_factory(database_url: str):
     kw = {}
     if database_url.startswith("sqlite"):
-        kw["connect_args"] = {"check_same_thread": False}
+        kw["connect_args"] = {"check_same_thread": False, "timeout": 30}  # wait out another writer
         if database_url in ("sqlite://", "sqlite:///:memory:"):
             kw["poolclass"] = StaticPool
     return sessionmaker(create_engine(database_url, **kw))

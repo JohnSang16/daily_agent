@@ -40,3 +40,6 @@ Money, voice, notification styles, onboarding, empty states for a new account.
 
 ## Update 2026-11-19: glass and springs
 At John's request the iPhone app uses frosted glass surfaces, a soft sheen on the primary button and spring motion. Still no accent colors, and Reduce Motion is respected. The 380 ms ease out above is still used for plain fades.
+
+## Update 2026-11-19: money charts and goals
+At John's request Money has an overview with a grouped bar chart (income in white, spend in gray), category bars, budget goal bars, holdings and a bank by bank view. These break the old "no charts, no progress indicators" line on purpose. They stay monochrome: bars are white on a dark track, and over budget is said in words, never in a color.
