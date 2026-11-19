@@ -97,7 +97,7 @@ def sync_tasks(
             due_at=due,
             due_is_date_only=date_only,
             effort_minutes=it.effort_minutes,
-            status=status,
+            status="done" if t.locally_done else status,  # marked done in the app: stays done
             needs_review=it.needs_review,
             review_reason=it.review_reason,
         )
