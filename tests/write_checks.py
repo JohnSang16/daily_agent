@@ -15,7 +15,10 @@ HTTP_LIBS = {
     "urllib.request",
     "googleapiclient",
     "google.auth.transport",
+    "httpcore",
+    "socket",
 }
+HTTP_LEAVES = {"httpx", "requests", "httpcore", "aiohttp"}  # catches `from app.x import httpx`
 WRITE_PATTERNS = [
     r"\.events\(\)\.(insert|patch|update|delete|import_|move|quickAdd)",
     r"\.messages\(\)\.(send|modify|trash|delete|insert|import_)",
@@ -50,7 +53,10 @@ def imports_of(source: str) -> set[str]:
 
 def http_imports(source: str) -> set[str]:
     return {
-        i for i in imports_of(source) if any(i == h or i.startswith(h + ".") for h in HTTP_LIBS)
+        i
+        for i in imports_of(source)
+        if any(i == h or i.startswith(h + ".") for h in HTTP_LIBS)
+        or i.rsplit(".", 1)[-1] in HTTP_LEAVES
     }
 
 

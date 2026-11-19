@@ -1,7 +1,10 @@
-"""The single outbound HTTP client. The only module allowed to import an HTTP library."""
+"""The single outbound HTTP client. The only module allowed to import an HTTP library.
 
+Every request is checked by an httpx request hook against the exact request httpx will send
+(after URL cleanup), so the inner client cannot be used to skip the guard either."""
+
+import json
 import re
-from urllib.parse import urlsplit
 
 import httpx
 
@@ -13,6 +16,12 @@ class RequestDenied(Exception):
     pass
 
 
+ALLOWED_ARGS = {"params", "headers", "json", "data", "content"}
+ANTHROPIC_BODY_KEYS = {"model", "max_tokens", "messages", "thinking", "system"}
+COLLECTIONS = {"messages", "threads", "labels", "drafts", "calendars", "events", "feed", "user"}
+SNEAKY_PATH = re.compile(r"(?i)(^|/)(\.|%2e){1,2}(/|$)|%2f|%5c")
+
+
 def _is_id(seg: str) -> bool:
     if re.fullmatch(r"v\d+", seg):
         return False
@@ -20,32 +29,73 @@ def _is_id(seg: str) -> bool:
 
 
 def templatize(path: str) -> str:
-    """Replace id-like path segments so audit rows carry a template, not content."""
-    return "/".join(":id" if _is_id(seg) else seg for seg in path.split("/"))
+    """Hide ids and any name that follows a collection, so audit rows carry a template only."""
+    out, hide = [], False
+    for seg in path.split("/"):
+        out.append(":id" if seg and (hide or _is_id(seg)) else seg)
+        hide = seg in COLLECTIONS
+    return "/".join(out)
 
 
 class GuardedHttpClient:
     def __init__(self, audit: AuditSink, rules: list[Rule] | None = None, transport=None):
         self.audit, self.rules = audit, RULES if rules is None else rules
         # no redirects: a redirect could hop to a host that is not on the allowlist
-        self._http = httpx.Client(transport=transport, follow_redirects=False, timeout=30)
+        self._http = httpx.Client(
+            transport=transport,
+            follow_redirects=False,
+            timeout=30,
+            event_hooks={"request": [self._guard]},
+        )
+
+    def _permitted(self, integration: str | None, req: httpx.Request) -> bool:
+        if not integration or req.url.scheme != "https":
+            return False
+        if SNEAKY_PATH.search(req.url.raw_path.decode().split("?")[0]):
+            return False
+        if any(k.lower().startswith(("x-http-method", "x-method-override")) for k in req.headers):
+            return False
+        if not any(
+            r.integration == integration
+            and r.host == req.url.host
+            and r.method == req.method
+            and re.fullmatch(r.path_regex, req.url.path)
+            for r in self.rules
+        ):
+            return False
+        if integration == "anthropic":  # text in, text out: no tools, no connectors, no betas
+            if "anthropic-beta" in req.headers:
+                return False
+            try:
+                return set(json.loads(req.content)) <= ANTHROPIC_BODY_KEYS
+            except ValueError:
+                return False
+        return True
+
+    def _guard(self, req: httpx.Request) -> None:
+        if not self._permitted(req.extensions.get("integration"), req):
+            raise RequestDenied(
+                f"{req.method} {req.url.host}{templatize(req.url.path)} not allowed"
+            )
 
     def request(self, integration: str, method: str, url: str, **kwargs) -> httpx.Response:
-        parts = urlsplit(url)
         method = method.upper()
-        tmpl = templatize(parts.path)
-        ok = parts.scheme == "https" and any(
-            r.integration == integration
-            and r.host == parts.hostname
-            and r.method == method
-            and re.fullmatch(r.path_regex, parts.path)
-            for r in self.rules
-        )
-        if not ok:
-            self.audit.record(integration, method, parts.hostname or "", tmpl, False)
-            raise RequestDenied(f"{method} {parts.hostname}{tmpl} not allowed for {integration}")
-        resp = self._http.request(method, url, **kwargs)
-        self.audit.record(integration, method, parts.hostname, tmpl, True, resp.status_code)
+        try:
+            if set(kwargs) - ALLOWED_ARGS:
+                raise RequestDenied("request argument not allowed")
+            req = self._http.build_request(
+                method, url, extensions={"integration": integration}, **kwargs
+            )
+        except (RequestDenied, httpx.InvalidURL):
+            self.audit.record(integration, method, "", "", False)
+            raise RequestDenied(f"{method} request not allowed") from None
+        host, tmpl = req.url.host or "", templatize(req.url.path)
+        try:
+            resp = self._http.send(req)
+        except RequestDenied:
+            self.audit.record(integration, method, host, tmpl, False)
+            raise
+        self.audit.record(integration, method, host, tmpl, True, resp.status_code)
         return resp
 
     def get(self, integration: str, url: str, **kwargs) -> httpx.Response:

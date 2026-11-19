@@ -12,9 +12,15 @@ class RedactionFilter(logging.Filter):
         self.secrets = [s for s in secrets if s]
 
     def filter(self, record: logging.LogRecord) -> bool:
+        if record.exc_info:  # tracebacks carry URLs too: redact them like messages
+            record.exc_text = logging.Formatter().formatException(record.exc_info)
+            record.exc_info = None
         msg = BEARER.sub(r"\1[REDACTED]", record.getMessage())
         for s in self.secrets:
             msg = msg.replace(s, "[REDACTED]")
+        if record.exc_text:
+            for s in self.secrets:
+                record.exc_text = record.exc_text.replace(s, "[REDACTED]")
         record.msg, record.args = msg, None
         return True
 
