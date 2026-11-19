@@ -99,6 +99,7 @@ def sync_banks(db: Session, box: TokenBox, plaid, now: datetime) -> int:
         access = box.decrypt(item.access_token_enc)
         _, _, accounts = plaid.accounts(access)
         acct_ids = _upsert_accounts(db, item, accounts)
+        db.commit()  # release the write lock before the next outbound call's own audit write
         while True:
             res = plaid.transactions_sync(access, item.cursor)
             changed += _apply(db, acct_ids, res, now)
