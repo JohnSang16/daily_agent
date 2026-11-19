@@ -43,3 +43,25 @@ def read_why(text: str | None) -> dict | None:
 
 def read_why_from_vault(vault_path: str) -> dict | None:
     return read_why(_read(vault_path, "personal/reflections.md"))
+
+
+def read_identity(vault_path: str) -> list[str]:
+    """Every `IDENTITY:` line in `_meta/digest-lines.md`, in file order, verbatim."""
+    text = _read(vault_path, "_meta/digest-lines.md")
+    return [m.group(1).strip() for m in re.finditer(r"(?m)^IDENTITY:\s*(.+)$", text or "")]
+
+
+def read_plan(text: str | None, today: str) -> dict:
+    """Items under today's `## YYYY-MM-DD` heading in `personal/today-plan.md`."""
+    items: list[dict] = []
+    for section in re.split(r"(?m)^##\s+", text or "")[1:]:
+        head, _, body = section.partition("\n")
+        if head.strip().startswith(today):
+            for m in re.finditer(r"(?m)^\s*[-*]\s+\[([ xX])\]\s+(.+)$", body):
+                items.append({"text": m.group(2).strip(), "done": m.group(1) in "xX"})
+            break
+    return {"logged": bool(items), "items": items}
+
+
+def read_plan_from_vault(vault_path: str, today: str) -> dict:
+    return read_plan(_read(vault_path, "personal/today-plan.md"), today)

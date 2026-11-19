@@ -117,6 +117,17 @@ struct DigestWhy: Codable, Equatable {
     var text: String
 }
 
+struct PlanItem: Codable, Equatable, Identifiable {
+    var text: String
+    var done: Bool
+    var id: String { text }
+}
+
+struct DigestPlan: Codable, Equatable {
+    var logged: Bool
+    var items: [PlanItem]
+}
+
 struct DigestDeadline: Codable, Equatable, Identifiable {
     var id: Int
     var title: String
@@ -130,7 +141,10 @@ struct Digest: Codable, Equatable {
     var mantra: String?
     var vision: String?
     var why: DigestWhy?
+    var identity: [String]?  // optional so an older agent still decodes
+    var plan: DigestPlan?
     var deadlines: [DigestDeadline]
     var overflow: Int
+    var overflowAfter: String?
     var notes: [String]
 }

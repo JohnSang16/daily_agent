@@ -23,7 +23,9 @@ struct DigestView: View {
                     if let m = d.mantra { line("mantra", m).reveal(1) }
                     if let v = d.vision { line("vision", v).reveal(2) }
                     if let w = d.why { line("why, \(w.date)", w.text).reveal(3) }
-                    deadlines(d).reveal(4)
+                    if let id = d.identity, !id.isEmpty { identity(id).reveal(4) }
+                    plan(d.plan).reveal(5)
+                    deadlines(d).reveal(6)
                     ForEach(d.notes, id: \.self) { n in
                         Text(n).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
                     }
@@ -47,6 +49,33 @@ struct DigestView: View {
         }
     }
 
+    private func identity(_ lines: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("identity, say it out loud, repeat each twice")
+            ForEach(lines, id: \.self) { l in
+                Text(l).font(.system(size: 15)).foregroundStyle(Theme.title)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func plan(_ p: DigestPlan?) -> some View {
+        if let p {
+            VStack(alignment: .leading, spacing: 8) {
+                sectionLabel("today's plan")
+                if p.logged {
+                    ForEach(p.items) { i in
+                        Text("- " + i.text).font(.system(size: 15))
+                            .foregroundStyle(i.done ? Theme.tertiary : Theme.body)
+                            .strikethrough(i.done)
+                    }
+                } else {
+                    Text("no plan logged, what's the schedule today?").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
+                }
+            }
+        }
+    }
+
     private func deadlines(_ d: Digest) -> some View {
         VStack(alignment: .leading, spacing: 18) {
             sectionLabel("deadlines")
@@ -63,7 +92,7 @@ struct DigestView: View {
                 }
             }
             if d.overflow > 0 {
-                Text("and \(d.overflow) more, further out.").font(.system(size: 12.5)).foregroundStyle(Theme.tertiary)
+                Text("+\(d.overflow) more with deadlines past \(d.overflowAfter ?? "this list")").font(.system(size: 12.5)).foregroundStyle(Theme.tertiary)
             }
         }
     }
