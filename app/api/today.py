@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.auth import require_token
 from app.clock import Clock, get_clock
 from app.jobs.runner import stale_hours_for
-from app.llm.explain import build_payload, explain
+from app.llm.explain import build_payload, explain, format_due
 from app.models import Event, SyncRun, Task
 from app.priority.engine import Config, EventView, TaskView, rank
 
@@ -61,7 +61,13 @@ def today(
     day = date_ or now.astimezone(tz).date()
     day_start = datetime.combine(day, time(), tz).astimezone(UTC)
     day_end = datetime.combine(day + timedelta(days=1), time(), tz).astimezone(UTC)
-    cfg = Config(st.user_timezone, st.work_start, st.work_end, st.default_effort_minutes)
+    cfg = Config(
+        st.user_timezone,
+        st.work_start,
+        st.work_end,
+        st.default_effort_minutes,
+        stale_overdue_days=st.stale_overdue_days,
+    )
 
     with request.app.state.session_factory() as db:
         tasks = db.scalars(select(Task).where(Task.status == "open")).all()
@@ -106,12 +112,29 @@ def today(
             st.llm_model,
             st.llm_daily_token_budget,
             build_payload(
-                [{**i, "private": by_id[i["id"]].scope.startswith("cox/")} for i in items[:5]]
+                [
+                    {
+                        **i,
+                        "private": by_id[i["id"]].scope.startswith("cox/"),
+                        "due_local": format_due(i["due_at"], st.user_timezone),
+                    }
+                    for i in items[:5]
+                ]
             ),
             now,
             local_midnight,
         )
         warnings = _warnings(db, now, st.stale_after_hours, review_count)
+        if result.stale_ids:
+            n = len(result.stale_ids)
+            warnings.append(
+                {
+                    "code": "STALE_OVERDUE",
+                    "source": None,
+                    "detail": f"{n} overdue item{'s' if n != 1 else ''} older than "
+                    f"{st.stale_overdue_days} days hidden",
+                }
+            )
         if exhausted:
             warnings.append(
                 {

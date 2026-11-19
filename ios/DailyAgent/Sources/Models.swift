@@ -69,6 +69,12 @@ struct Txn: Codable, Equatable, Identifiable {
 
     enum CodingKeys: String, CodingKey { case id, date, merchant, amount, direction, bank, category, pending }
 
+    init(id: String, date: String, merchant: String, amount: String, direction: String, bank: String,
+         category: String?, pending: Bool) {
+        self.id = id; self.date = date; self.merchant = merchant; self.amount = amount
+        self.direction = direction; self.bank = bank; self.category = category; self.pending = pending
+    }
+
     init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
         // real rows have an integer id, demo rows a string id
@@ -97,6 +103,9 @@ struct BankAccountInfo: Codable, Equatable, Identifiable {
     var nickname: String
     var mask: String
     var enabled: Bool
+    var kind: String?  // depository, credit, loan, investment (optional so an older agent decodes)
+    var subtype: String?
+    var balanceCents: Int?
 }
 
 struct Banks: Codable, Equatable {
@@ -108,4 +117,88 @@ func makeDecoder() -> JSONDecoder {
     let d = JSONDecoder()
     d.keyDecodingStrategy = .convertFromSnakeCase
     return d
+}
+
+// The daily brief: GET /digest
+
+struct DigestWhy: Codable, Equatable {
+    var date: String
+    var text: String
+}
+
+struct PlanItem: Codable, Equatable, Identifiable {
+    var text: String
+    var done: Bool
+    var id: String { text }
+}
+
+struct DigestPlan: Codable, Equatable {
+    var logged: Bool
+    var items: [PlanItem]
+}
+
+struct DigestDeadline: Codable, Equatable, Identifiable {
+    var id: Int
+    var title: String
+    var dueAt: String?
+    var dueLocal: String?
+}
+
+struct Digest: Codable, Equatable {
+    var date: String
+    var generatedAt: String?
+    var mantra: String?
+    var vision: String?
+    var why: DigestWhy?
+    var identity: [String]?  // optional so an older agent still decodes
+    var plan: DigestPlan?
+    var deadlines: [DigestDeadline]
+    var overflow: Int
+    var overflowAfter: String?
+    var notes: [String]
+}
+
+// Money overview: GET /money/summary and /budgets
+
+struct MonthTotal: Codable, Equatable, Identifiable {
+    var month: String
+    var incomeCents: Int
+    var spendCents: Int
+    var id: String { month }
+}
+
+struct ThisMonth: Codable, Equatable {
+    var month: String
+    var incomeCents: Int
+    var spendCents: Int
+    var netCents: Int
+}
+
+struct CategorySpend: Codable, Equatable, Identifiable {
+    var category: String
+    var spendCents: Int
+    var id: String { category }
+}
+
+struct Holdings: Codable, Equatable {
+    var cashCents: Int
+    var savingsCents: Int
+    var investedCents: Int
+    var creditOwedCents: Int
+    var loansOwedCents: Int
+    var netCents: Int
+}
+
+struct MoneySummary: Codable, Equatable {
+    var months: [MonthTotal]
+    var thisMonth: ThisMonth
+    var categories: [CategorySpend]
+    var holdings: Holdings
+}
+
+struct BudgetGoal: Codable, Equatable, Identifiable {
+    var category: String
+    var limitCents: Int
+    var spentCents: Int
+    var id: String { category }
 }

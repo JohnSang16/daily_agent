@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum Screen: String, CaseIterable, Identifiable {
-    case dashboard, calendar, money, settings
+    case dashboard, calendar, money, digest, settings
     var id: String { rawValue }
 }
 
@@ -23,6 +23,7 @@ struct RootView: View {
                 case .dashboard: DashboardView().transition(.opacity.combined(with: .scale(scale: 0.98)))
                 case .calendar: CalendarView().transition(.opacity.combined(with: .scale(scale: 0.98)))
                 case .money: MoneyView().transition(.opacity.combined(with: .scale(scale: 0.98)))
+                case .digest: DigestView().transition(.opacity.combined(with: .scale(scale: 0.98)))
                 case .settings: SettingsView().transition(.opacity.combined(with: .scale(scale: 0.98)))
                 }
             }

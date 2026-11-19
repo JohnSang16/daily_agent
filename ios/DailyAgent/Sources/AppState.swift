@@ -15,6 +15,10 @@ final class AppState: ObservableObject {
     @Published var weekEvents: [String: [EventItem]] = [:]
     @Published var weekTasks: [RankedTask] = []
     @Published var firstTaskId: Int?
+    @Published var digest: Digest?
+    @Published var summary: MoneySummary?
+    @Published var budgets: [BudgetGoal] = []
+    @Published var incomeRows: [Txn] = []
 
     init() {
         if let (t, at) = Cache.load() { today = t; lastUpdated = at }
@@ -89,11 +93,56 @@ final class AppState: ObservableObject {
         } catch { fail(error) }
     }
 
+    func loadOverview() async {
+        guard let c = client else { return }
+        do {
+            summary = try await c.get("/money/summary", query: [URLQueryItem(name: "months", value: "6")])
+            budgets = try await c.get("/budgets")
+            banks = try await c.get("/banks")
+            offline = false
+        } catch { fail(error) }
+    }
+
+    func loadIncome() async {
+        guard let c = client else { return }
+        do {
+            let p: TxnPage = try await c.get("/transactions", query: [URLQueryItem(name: "kind", value: "income"),
+                                                                       URLQueryItem(name: "limit", value: "500")])
+            incomeRows = p.transactions
+            offline = false
+        } catch { fail(error) }
+    }
+
+    func saveBudget(_ category: String, cents: Int) async {
+        guard let c = client else { return }
+        do {
+            try await c.send("PUT", "/budgets/\(category)", json: ["limit_cents": cents])
+            await loadOverview()
+        } catch { fail(error) }
+    }
+
+    func deleteBudget(_ category: String) async {
+        guard let c = client else { return }
+        do {
+            try await c.send("DELETE", "/budgets/\(category)")
+            await loadOverview()
+        } catch { fail(error) }
+    }
+
     func setAccount(_ id: Int, enabled: Bool) async {
         guard let c = client else { return }
         do {
             try await c.send("PATCH", "/banks/accounts/\(id)", json: ["enabled": enabled])
             await loadMoney()
+            await loadOverview()
+        } catch { fail(error) }
+    }
+
+    func loadDigest() async {
+        guard let c = client else { return }
+        do {
+            digest = try await c.get("/digest")
+            offline = false
         } catch { fail(error) }
     }
 

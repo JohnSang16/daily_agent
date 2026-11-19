@@ -18,7 +18,7 @@ Config: `user_timezone`, `work_start`, `work_end` (daily availability window, ap
 
 ## Ordering (nearest deadline first)
 1. Compute the due moment: `due_at` in UTC. Date only values already mean end of the local day (spec 03).
-2. Dated tasks sort by due moment ascending. Overdue tasks therefore come first, with the oldest due first.
+2. Dated tasks sort by due moment ascending. Overdue tasks therefore come first, with the oldest due first. **Exception (2026-11-19, John):** a task overdue by more than `STALE_OVERDUE_DAYS` (default 14, 0 turns it off) leaves the ranking so old leftovers cannot bury today's work. It stays in the database and `/today` adds a `STALE_OVERDUE` warning with the count.
 3. Tie breakers for equal due moments: importance descending (default 3 when missing), then effort ascending (default effort when missing), then `created_at` ascending, then `id` ascending.
 4. Undated tasks come after all dated tasks, sorted by importance descending, then `created_at` ascending, then `id`.
 

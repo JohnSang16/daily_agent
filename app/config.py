@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     llm_model: str = ""  # never hard coded: set LLM_MODEL when a real client is wired in
     llm_daily_token_budget: int = 20000
     stale_after_hours: int = 26
+    stale_overdue_days: int = 14  # overdue longer than this is hidden from /today, 0 shows all
     google_client_secrets_path: str = "./secrets/client_secret.json"
     google_token_path: str = "./secrets/google_token.json"
     icollege_feed_url_path: str = "~/.config/icollege-feed-url"

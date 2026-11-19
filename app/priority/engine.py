@@ -17,6 +17,7 @@ class Config:
     default_effort_minutes: int = 60
     horizon_days: int = 14
     min_block_minutes: int = 15
+    stale_overdue_days: int = 14  # older overdue items drop out of the ranking, 0 keeps them
 
 
 @dataclass
@@ -55,6 +56,7 @@ class RankingResult:
     top_task_id: int | None
     free_blocks_today: list[Block]
     suggested_block: Block | None = None
+    stale_ids: list[int] = field(default_factory=list)  # overdue too long to rank
     _blocks: list[Block] = field(default_factory=list, repr=False, compare=False)
 
 
@@ -117,6 +119,11 @@ def rank(tasks, events, now: datetime, cfg: Config) -> RankingResult:
     live = [
         t for t in tasks if t.status == "open" and not (t.snoozed_until and t.snoozed_until > now)
     ]
+    stale_ids: list[int] = []
+    if cfg.stale_overdue_days > 0:
+        cutoff = now - timedelta(days=cfg.stale_overdue_days)
+        stale_ids = [t.id for t in live if t.due_at and t.due_at < cutoff]
+        live = [t for t in live if t.id not in stale_ids]
     dated = sorted(
         (t for t in live if t.due_at),
         key=lambda t: (t.due_at, -imp(t), eff(t), t.created_at, t.id),
@@ -164,4 +171,6 @@ def rank(tasks, events, now: datetime, cfg: Config) -> RankingResult:
     if top:
         need = timedelta(minutes=eff(top))
         suggested = next((b for b in today_blocks if b[1] - b[0] >= need), None)
-    return RankingResult(items, top.id if top else None, today_blocks, suggested)
+    return RankingResult(
+        items, top.id if top else None, today_blocks, suggested, stale_ids=stale_ids
+    )
