@@ -21,6 +21,7 @@
 		C7741FF755BBC024BE95B816 /* DailyAgentApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2F545371BD6B74701FB8278 /* DailyAgentApp.swift */; };
 		D8920CBD68839EAB182F1983 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4EC9ED575184537CE7C329 /* SettingsView.swift */; };
 		D9352B4F0A938DE01C8A055D /* Cache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7101633DF1B1AA2C0A26EF0B /* Cache.swift */; };
+		FE0F4CBC1A5707FBA8BD0B4B /* DigestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 997C399CBD40B5056BD9B759 /* DigestView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +31,7 @@
 		7101633DF1B1AA2C0A26EF0B /* Cache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cache.swift; sourceTree = "<group>"; };
 		836D6EB271CB10D9AE79ABEB /* RemindersUploader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersUploader.swift; sourceTree = "<group>"; };
 		8EBA519AFF7BB10DE3A1DEE3 /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
+		997C399CBD40B5056BD9B759 /* DigestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigestView.swift; sourceTree = "<group>"; };
 		A9A209F71023372B477244F7 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		AB4EC9ED575184537CE7C329 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B10F81F1AD7DC577DF15F653 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -59,6 +61,7 @@
 				8EBA519AFF7BB10DE3A1DEE3 /* CalendarView.swift */,
 				F2F545371BD6B74701FB8278 /* DailyAgentApp.swift */,
 				1818D1D046F541DEE8563AF5 /* DashboardView.swift */,
+				997C399CBD40B5056BD9B759 /* DigestView.swift */,
 				B4722FE10D5AA2B12A0EE802 /* Format.swift */,
 				DC0F232C5DC203188079E210 /* Keychain.swift */,
 				A9A209F71023372B477244F7 /* Models.swift */,
@@ -143,6 +146,7 @@
 				A9C3371D73802F74DD433D7D /* CalendarView.swift in Sources */,
 				C7741FF755BBC024BE95B816 /* DailyAgentApp.swift in Sources */,
 				5255CF13B62E68819A774CD5 /* DashboardView.swift in Sources */,
+				FE0F4CBC1A5707FBA8BD0B4B /* DigestView.swift in Sources */,
 				96F09CDE26105FE5D5F5CA84 /* Format.swift in Sources */,
 				144FDD279B2A0945030573DC /* Keychain.swift in Sources */,
 				AE7675784E2CA935814EFCD4 /* Models.swift in Sources */,
