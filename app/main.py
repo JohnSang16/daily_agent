@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 
-from app.api import audit, health, local, sync, today
+from app.api import ask, audit, health, local, sync, today
 from app.audit import DbAudit
 from app.clock import SystemClock
 from app.config import Settings
@@ -46,6 +46,7 @@ def create_app(settings: Settings | None = None, llm=None, sources=None) -> Fast
     app.include_router(health.router)
     app.include_router(sync.router)
     app.include_router(local.router)
+    app.include_router(ask.router)
     app.include_router(audit.router)
     app.include_router(today.router)
 

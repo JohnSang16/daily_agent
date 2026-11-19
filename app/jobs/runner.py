@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.clock import Clock
 from app.config import Settings
 from app.models import SyncRun
+from app.search.index import index_vault
 from app.sources.google_calendar import HttpCalendarClient, sync_google_calendar
 from app.sources.icollege import http_feed_fetch, sync_icollege
 from app.sources.obsidian import sync_obsidian
@@ -18,7 +19,13 @@ from app.sources.obsidian import sync_obsidian
 Source = Callable[[Session, datetime], int]
 
 # hours without a success before /today warns (spec 09)
-STALE_HOURS = {"google_calendar": 1, "obsidian": 1, "icollege": 6, "gmail_digest": 6}
+STALE_HOURS = {
+    "google_calendar": 1,
+    "obsidian": 1,
+    "icollege": 6,
+    "vault_index": 1,
+    "gmail_digest": 6,
+}
 
 
 def stale_hours_for(source: str, default: int) -> int:
@@ -45,7 +52,19 @@ def default_sources(settings: Settings, http) -> dict[str, Source]:
         fetch = http_feed_fetch(http, settings.icollege_feed_url_path)
         return sync_icollege(s, fetch, now, settings.user_timezone)
 
-    return {"google_calendar": calendar, "obsidian": obsidian, "icollege": icollege}
+    def vault_index(s, now):
+        if not settings.obsidian_vault_path:
+            raise FileNotFoundError("OBSIDIAN_VAULT_PATH is not set")
+        ignore = tuple(g.strip() for g in settings.obsidian_ignore_globs.split(",") if g.strip())
+        private = tuple(g.strip() for g in settings.ask_private_globs.split(",") if g.strip())
+        return index_vault(s, settings.obsidian_vault_path, now, ignore, private)
+
+    return {
+        "google_calendar": calendar,
+        "obsidian": obsidian,
+        "icollege": icollege,
+        "vault_index": vault_index,
+    }
 
 
 class Runner:

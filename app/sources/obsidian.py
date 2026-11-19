@@ -70,12 +70,11 @@ def parse_line(line: str, scope: str, lineno: int, tz: str) -> TaskIn | None:
     )
 
 
-def parse_vault(root: Path, tz: str, ignore_globs, max_bytes: int) -> tuple[dict, dict]:
-    """Returns ({relative path: [TaskIn]}, counts). Never follows a link out of the vault."""
+def iter_notes(root: Path, ignore_globs, max_bytes: int, counts: dict | None = None):
+    """Yields (relative path, Path) per readable note. Never follows a link out of the vault."""
     root = root.resolve()
     if not root.is_dir():
         raise FileNotFoundError("vault path is not a readable directory")
-    out, counts = {}, {"files": 0, "skipped_large": 0}
     for dirpath, dirs, files in os.walk(root, followlinks=False):
         dirs[:] = [d for d in dirs if not d.startswith(".") and d != "node_modules"]
         for name in files:
@@ -88,14 +87,22 @@ def parse_vault(root: Path, tz: str, ignore_globs, max_bytes: int) -> tuple[dict
             if p.is_symlink() and not p.resolve().is_relative_to(root):
                 continue
             if p.stat().st_size > max_bytes:
-                counts["skipped_large"] += 1
+                if counts is not None:
+                    counts["skipped_large"] += 1
                 continue
-            counts["files"] += 1
-            items = []
-            for n, line in enumerate(p.read_text(errors="replace").splitlines(), 1):
-                if t := parse_line(line, rel, n, tz):
-                    items.append(t)
-            out[rel] = items
+            yield rel, p
+
+
+def parse_vault(root: Path, tz: str, ignore_globs, max_bytes: int) -> tuple[dict, dict]:
+    """Returns ({relative path: [TaskIn]}, counts)."""
+    out, counts = {}, {"files": 0, "skipped_large": 0}
+    for rel, p in iter_notes(root, ignore_globs, max_bytes, counts):
+        counts["files"] += 1
+        items = []
+        for n, line in enumerate(p.read_text(errors="replace").splitlines(), 1):
+            if t := parse_line(line, rel, n, tz):
+                items.append(t)
+        out[rel] = items
     return out, counts
 
 

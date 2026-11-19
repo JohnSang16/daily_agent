@@ -143,3 +143,16 @@ class DailyGoal(Base):
     day: Mapped[str] = mapped_column(String, primary_key=True)  # YYYY-MM-DD in my time zone
     text: Mapped[str] = mapped_column(String)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
+class NoteChunk(Base):
+    __tablename__ = "note_chunks"
+    __table_args__ = (UniqueConstraint("path", "chunk_index"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    path: Mapped[str] = mapped_column(String, index=True)
+    chunk_index: Mapped[int] = mapped_column(Integer)
+    heading: Mapped[str] = mapped_column(String, default="")
+    content_hash: Mapped[str] = mapped_column(String)
+    text: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
