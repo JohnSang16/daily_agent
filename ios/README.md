@@ -10,6 +10,9 @@ A SwiftUI screen for the daily agent. It only talks to the agent's API, never to
 - Offline: shows the last good response with "offline. last updated ...".
 - Slide out drawer (menu button or edge swipe), pure black and white, dark only.
 
+## Look and motion (added 2026-11-19 at John's request)
+Glass and springs, still monochrome so the design stays black and white. Real Liquid Glass (`glassEffect`) on iOS 26 and later, frosted material with a hairline highlight before that. Spring animations on the drawer (the screen leans back, rounds its corners and slides over), screen switches, the calendar day picker (one white disc glides between days), and sheets. Sections fade and rise in one after another. Buttons shrink slightly when pressed. Light haptics on the drawer, day picks and mark done. Reduce Motion in iOS settings turns the movement down to simple fades.
+
 ## Not built yet
 Agent (ask) and Digest screens, the calendar month grid, the Geist font (uses the system font), approvals, Sign in with Apple. It has never been run on a device or simulator, only compile checked and logic checked from the command line (see below), so expect small fixes on the first run.
 
