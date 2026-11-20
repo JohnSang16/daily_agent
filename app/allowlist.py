@@ -19,6 +19,7 @@ def _plaid() -> list[Rule]:
         "/accounts/get",
         "/institutions/get_by_id",
         "/transactions/sync",
+        "/transactions/refresh",
         "/item/remove",
     )
     hosts = ("sandbox.plaid.com", "production.plaid.com")

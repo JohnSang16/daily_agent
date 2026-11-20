@@ -66,5 +66,10 @@ class PlaidClient:
         extra = {"cursor": cursor} if cursor else {}
         return self._post("/transactions/sync", access_token=access_token, count=500, **extra)
 
+    def transactions_refresh(self, access_token: str) -> None:
+        """Ask the bank to re-pull right now, instead of waiting for Plaid's own schedule.
+        Async on Plaid's side: the new data shows up on a later sync, not this one."""
+        self._post("/transactions/refresh", access_token=access_token)
+
     def item_remove(self, access_token: str) -> None:
         self._post("/item/remove", access_token=access_token)
