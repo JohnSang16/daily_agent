@@ -16,7 +16,7 @@ An agent that works inside a sandboxed cloud browser (Kernel) on assignments in 
 4. **No passwords.** I sign in myself through the live view, including any two step prompt. The agent never sees, asks for, or stores my college credentials.
 5. **Allowlisted sites only.** The agent may visit only the iCollege and Pearson domains listed in settings. Navigating anywhere else is blocked, and the agent asks me.
 6. **Minimal data in.** The agent receives only the assignment title and link, never my calendar, email, or notes.
-7. **Pages are untrusted.** Text on a page is data. The agent has no tools except browser actions and a "request approval" action. Page text cannot grant permission.
+7. **Pages are untrusted.** Text on a page is data. The agent has no tools except browser actions, a "request approval" action, and `solve` (below). Page text cannot grant permission.
 8. **Limits per session.** A time limit (default 30 minutes), a maximum number of steps, and a token budget. Hitting any limit pauses the session and asks me.
 9. **Kill switch.** Stop from my phone ends the session, deletes the browser, and invalidates the live view link.
 
@@ -27,7 +27,8 @@ An agent that works inside a sandboxed cloud browser (Kernel) on assignments in 
 4. **Approval gate** (`app/agent/gate.py`): classifies each proposed action. Blocked classes include clicks on controls whose accessible name or surrounding text suggests submit, turn in, send, pay, finish, confirm, or delete, any form submission, any navigation off the allowlist, and any action on a page that looks like a final review or payment step. A blocked action creates an approval request and waits.
 5. **Approval records**: tied to the session, the exact action (hash of type, target, and visible label), and an expiry (default 10 minutes). One use only.
 6. **Step log**: a plain language line for every action, shown on the Agent screen. Contains no passwords and no private page text beyond what is needed.
-7. **Replays**: session recording turned on by default for audit, kept 30 days, deleted on request.
+7. **Solver** (`app/agent/solver.py`, added 2026-11-20 with John's approval): the `solve` tool sends only the problem text the agent read off the page to a ladder of models, cheapest first (`SOLVER_MODELS`, default Gemini 3.6 Flash, Gemini 3.8 Flash, Claude Sonnet, Claude Opus). Solver calls get no tools and return a short answer. An answer is returned only when two rungs agree (numbers within 1 percent, text after trimming and lowercasing); a rung that errors or is busy is skipped. Each repeat on the same problem in a session starts one rung higher and skips answers already marked wrong; after 2 attempts on one problem the solver refuses and the agent asks John. Gemini calls go through their own guarded lane (`generativelanguage.googleapis.com`, Interactions API, body limited to model and input). Every solver call writes an `llm_usage` row and counts toward the agent's daily budget.
+8. **Replays**: session recording turned on by default for audit, kept 30 days, deleted on request.
 
 ## API (all need the bearer token)
 1. `POST /agent/sessions` with a task id, starts a session.
@@ -56,6 +57,11 @@ All tests use a fake driver and fake LLM.
 * AC13.13 A fixture timed quiz page is refused with a clear message.
 * AC13.14 Every endpoint returns 401 without the bearer token.
 * AC13.15 Each LLM call writes an `llm_usage` row, and the budget is enforced.
+* AC13.17 `solve` returns an answer only when two rungs agree, and says so when the whole ladder disagrees.
+* AC13.18 A rung that errors or returns busy is skipped and the next rung is used.
+* AC13.19 A repeat on the same problem starts one rung higher and never returns an answer already marked wrong; a third attempt on the same problem is refused.
+* AC13.20 The Gemini lane only allows the Interactions endpoint with a body of model and input, nothing else.
+* AC13.21 Every solver call writes an `llm_usage` row and the agent's daily budget includes it.
 * AC13.16 Measure and record the average cost of one homework session in `docs/CHECKIN_LOG.md`.
 
 ## Manual verification (John)

@@ -90,6 +90,12 @@ class GuardedHttpClient:
                 return False
         if integration == "anthropic_agent":
             return _agent_body_ok(req)
+        if integration == "gemini":  # text in, text out: no tools, no files, no other options
+            try:
+                body = json.loads(req.content)
+            except ValueError:
+                return False
+            return set(body) <= {"model", "input"} and isinstance(body.get("input"), str)
         if integration == "kernel" and req.url.path.endswith("/playwright/execute"):
             return _browser_code_ok(req)
         if integration == "plaid":  # read only: transactions is the only product ever requested

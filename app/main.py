@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from app.agent.driver import KernelDriver
 from app.agent.llm import AgentLlm
 from app.agent.loop import Agent
+from app.agent.solver import Solver
 from app.api import agent, ask, audit, banks, digest, goals, health, local, money, sync, today
 from app.audit import DbAudit
 from app.clock import SystemClock
@@ -77,7 +78,16 @@ def create_app(
             return KernelDriver(http, settings.kernel_api_key, settings.kernel_profile)
 
     app.state.agent = (
-        Agent(app.state.session_factory, settings, agent_llm, SystemClock(), agent_driver_factory)
+        Agent(
+            app.state.session_factory,
+            settings,
+            agent_llm,
+            SystemClock(),
+            agent_driver_factory,
+            solver=Solver(http, settings, app.state.session_factory, SystemClock())
+            if settings.anthropic_api_key or settings.gemini_api_key
+            else None,
+        )
         if agent_llm is not None and agent_driver_factory is not None
         else None
     )

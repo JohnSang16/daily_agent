@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     agent_max_minutes: int = 30
     agent_session_token_budget: int = 600_000
     agent_daily_token_budget: int = 2_000_000
+    gemini_api_key: str = ""  # free tier, used only by the homework solver
+    # the solver ladder, cheapest first (spec 13 component 7)
+    solver_models: str = "gemini-3.6-flash,gemini-3.8-flash,claude-sonnet-5-5,claude-opus-5-5"
     school_notes_globs: str = "career/school/*"  # what homework mode searches (spec 19)
     ask_llm_blocked_globs: str = "cox/*"  # searchable, but text never sent to the LLM
     sync_interval_minutes: int = 0  # 0 = off. Set 15 to sync on a timer while the app runs locally

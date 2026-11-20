@@ -101,3 +101,12 @@ Tests and lint: 309 passed (17 new, the new gate and link tests failed first), r
 Deviation: no migration, the link lives in `source_ref`, which iCollege tasks set to "feed" before. It is not exposed by any endpoint or log.
 Not verified: the frame and tab logic only runs in a real browser. Check it on the first real session.
 Next step: spec diff for the Gemini solver (a new tool and a new outbound host), then build it.
+
+### 2026-11-20, spec 13 solver (component 7, approved by John)
+Spec change (John said yes): boundary 7 now allows a `solve` tool, new component 7 (solver ladder), AC13.17 to AC13.21.
+What: `app/agent/solver.py`. The agent's `solve` tool sends only the problem text to a ladder of models (SOLVER_MODELS, default gemini-3.6-flash, gemini-3.8-flash, claude-sonnet-5-5, claude-opus-5-5). An answer comes back only when two rungs agree (numbers within 1 percent, text trimmed and lowercased). Busy or failing rungs are skipped. Each repeat of the same problem in a session starts one rung higher and skips answers marked wrong; the third attempt is refused and the agent asks John. Gemini has its own guarded lane (Interactions API, body limited to model and input). Claude rungs reuse the plain `anthropic` lane (no tools). Solver usage rows (purpose homework_solver) count toward the agent's daily budget.
+Acceptance criteria passing: AC13.17 to AC13.21 (14 new tests, all failed first).
+Tests and lint: 323 passed, ruff clean.
+Live check: gemini-3.6-flash answered a real physics problem correctly (4500 N). gemini-3.8-flash returned 503 (busy). Both Claude rungs returned 401: the ANTHROPIC_API_KEY in .env is invalid, which also blocks the agent itself. John needs a new key.
+Open: the solver is text only, diagrams are not sent yet. Answer entry checks (spec step 4) wait for the first real session, they depend on Pearson's real inputs.
+Next step: new Anthropic key, then the first real session.

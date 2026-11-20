@@ -553,3 +553,68 @@ def test_no_safe_link_falls_back_to_icollege_home(tmp_path, ref):
     _set_ref(app, ref)
     start(c)
     assert d.start_url == HOME
+
+
+# ---------- the solve tool (spec 13 component 7) ----------
+
+
+class FakeSolver:
+    def __init__(self, reply="answer: 6 N (2 models agree)"):
+        self.reply, self.calls = reply, []
+
+    def solve(self, problem, attempt, wrong):
+        self.calls.append((problem, attempt, list(wrong)))
+        return self.reply
+
+
+def results_text(llm):
+    return llm.seen[-1]
+
+
+def test_solve_tool_returns_the_solver_answer_to_the_agent(tmp_path):
+    llm = FakeLlm([call("solve", problem="2 kg at 3 m/s^2, net force?")])
+    app, c = build(tmp_path, llm, FakeDriver())
+    app.state.agent.solver = sv = FakeSolver()
+    start(c)
+    assert sv.calls == [("2 kg at 3 m/s^2, net force?", 0, [])]
+    assert "answer: 6 N" in results_text(llm)
+
+
+def test_AC13_19_session_counts_attempts_per_problem(tmp_path):
+    p = "2 kg at 3 m/s^2, net force?"
+    llm = FakeLlm(
+        [call("solve", problem=p)],
+        [call("solve", problem=" 2 KG at 3 m/s^2,  net force? ", wrong=["6 N"])],
+    )
+    app, c = build(tmp_path, llm, FakeDriver())
+    app.state.agent.solver = sv = FakeSolver()
+    start(c)
+    assert [a for _, a, _ in sv.calls] == [0, 1]  # same problem, spacing and case aside
+
+
+def test_solve_without_a_solver_says_so(tmp_path):
+    llm = FakeLlm([call("solve", problem="p")])
+    app, c = build(tmp_path, llm, FakeDriver())
+    app.state.agent.solver = None
+    start(c)
+    assert "solver is not set up" in results_text(llm)
+
+
+def test_AC13_21_solver_usage_counts_toward_the_daily_budget(tmp_path):
+    app, c = build(
+        tmp_path, FakeLlm([call("click", x=5, y=5)]), FakeDriver(), agent_daily_token_budget=1500
+    )
+    with app.state.session_factory() as db:
+        db.add(
+            LlmUsage(
+                at=NOW, purpose="homework_solver", model="g", input_tokens=600, output_tokens=0
+            )
+        )
+        db.commit()
+    s = start(c)
+    # the agent alone (1050 tokens) stays under 1500, the solver row tips it over
+    assert s["status"] == "paused" and "budget" in s["reason"]
+
+
+def test_solve_is_offered_to_the_agent():
+    assert "solve" in {t["name"] for t in TOOLS}

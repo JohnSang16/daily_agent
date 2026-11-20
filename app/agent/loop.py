@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func, select
 
 from app.agent.gate import action_hash, decide, page_checks
+from app.agent.solver import PURPOSE as SOLVER_PURPOSE
 from app.models import AgentSession, AgentStep, Approval, LlmUsage
 
 log = logging.getLogger("agent")
@@ -31,12 +32,14 @@ class Live:
     results: list = field(default_factory=list)  # tool results waiting to go back to the model
     notes: list = field(default_factory=list)  # John's messages waiting to go to the model
     pending: dict | None = None  # the tool call held for approval
+    solves: dict = field(default_factory=dict)  # problem text -> times solved this session
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
 class Agent:
-    def __init__(self, session_factory, settings, llm, clock, driver_factory):
+    def __init__(self, session_factory, settings, llm, clock, driver_factory, solver=None):
         self.sf, self.st, self.llm, self.clock = session_factory, settings, llm, clock
+        self.solver = solver
         self.driver_factory = driver_factory
         self.live: dict[int, Live] = {}
         self.allowed = tuple(
@@ -69,7 +72,7 @@ class Agent:
         return db.scalar(
             select(
                 func.coalesce(func.sum(LlmUsage.input_tokens + LlmUsage.output_tokens), 0)
-            ).where(LlmUsage.at >= midnight, LlmUsage.purpose == PURPOSE)
+            ).where(LlmUsage.at >= midnight, LlmUsage.purpose.in_((PURPOSE, SOLVER_PURPOSE)))
         )
 
     def _limit_hit(self, db, s: AgentSession) -> str | None:
@@ -302,6 +305,9 @@ class Agent:
         if name == "screenshot":
             self._result(live, tid, self._shot(live))
             return True
+        if name == "solve":
+            self._result(live, tid, self._solve(live, args))
+            return True
         if name == "finish":
             self._result(live, tid, "Ended.")
             with self.sf() as db:
@@ -368,6 +374,24 @@ class Agent:
         live.pending = {"approval_id": aid, "tool_use_id": tid, "kind": name, "args": args}
         self.set_status(live.id, "needs_approval", d.reason, kind="approval")
         return False
+
+    def _solve(self, live: Live, args: dict) -> str:
+        if self.solver is None:
+            return "the solver is not set up. ask_john instead."
+        problem = str(args.get("problem") or "")[:4000]
+        key = " ".join(problem.lower().split())
+        attempt = live.solves.get(key, 0)
+        live.solves[key] = attempt + 1
+        wrong = [str(w)[:200] for w in (args.get("wrong") or [])][:2]
+        try:
+            reply = self.solver.solve(problem, attempt=attempt, wrong=wrong)
+        except Exception:
+            log.warning("solver failed")
+            reply = "the solver failed. ask_john instead."
+        with self.sf() as db:
+            self.step_log(db, live.id, "solve", f"solved a problem (attempt {attempt + 1})")
+            db.commit()
+        return reply
 
     # ---------- browser helpers ----------
 
