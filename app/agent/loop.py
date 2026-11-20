@@ -140,13 +140,21 @@ class Agent:
                 )
             self.set_status(sid, "running", "handed back to the agent.")
 
-    def message(self, sid: int, text: str) -> None:
+    def message(self, sid: int, text: str) -> bool:
+        """Returns True if this woke a paused session back up (the caller must kick the runner)."""
         live = self.live.get(sid)
-        if live:
-            live.notes.append("Message from John: " + text[:1000])
-            with self.sf() as db:
-                self.step_log(db, sid, "you", "you sent a message.")
-                db.commit()
+        if not live:
+            return False
+        live.notes.append("Message from John: " + text[:1000])
+        resumed = False
+        with self.sf() as db:
+            self.step_log(db, sid, "you", text[:300])
+            s = db.get(AgentSession, sid)
+            if s.status == "paused":
+                s.status, s.reason = "running", "resumed after your message."
+                resumed = True
+            db.commit()
+        return resumed
 
     # ---------- approvals ----------
 

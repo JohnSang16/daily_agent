@@ -118,7 +118,8 @@ def get_session(sid: int, request: Request):
 
 @router.post("/agent/sessions/{sid}/message")
 def message(sid: int, body: MessageIn, request: Request):
-    _agent(request).message(sid, body.text)
+    if _agent(request).message(sid, body.text):
+        _kick(request, sid)
     return _view(request, sid)
 
 

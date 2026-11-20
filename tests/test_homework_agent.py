@@ -276,6 +276,47 @@ def test_AC13_9_limits_pause_with_a_reason(tmp_path):
     assert s["status"] == "paused" and "step limit" in s["reason"] and s["usage"]["steps"] == 3
 
 
+class FailOnceLlm(FakeLlm):
+    """The first call raises, like a real model-call failure. After that it plays back normally."""
+
+    def __init__(self, *turns):
+        super().__init__(*turns)
+        self.failed = False
+
+    def next(self, messages):
+        if not self.failed:
+            self.failed = True
+            raise RuntimeError("boom")
+        return super().next(messages)
+
+
+def test_message_shows_the_real_text_and_resumes_a_paused_session(tmp_path):
+    d = FakeDriver()
+    llm = FailOnceLlm([call("screenshot")])
+    app, c = build(tmp_path, llm, d)
+    sid = start(c)["id"]
+    s = c.get(f"/agent/sessions/{sid}", headers=H).json()
+    assert s["status"] == "paused" and "model call failed" in s["reason"]
+    calls_before = len(llm.seen)
+
+    r = c.post(f"/agent/sessions/{sid}/message", headers=H, json={"text": "keep going on part 2"}).json()
+
+    assert any(step["summary"] == "keep going on part 2" for step in r["steps"])
+    assert len(llm.seen) > calls_before  # it actually tried the model again, not stuck
+    assert "model call failed" not in (r["reason"] or "")
+
+
+def test_message_to_a_session_awaiting_approval_does_not_resume_it(tmp_path):
+    d = FakeDriver()
+    submit_page(d)
+    app, c = build(tmp_path, FakeLlm([call("click", x=500, y=600)]), d)
+    sid = start(c)["id"]
+    assert c.get(f"/agent/sessions/{sid}", headers=H).json()["status"] == "needs_approval"
+
+    r = c.post(f"/agent/sessions/{sid}/message", headers=H, json={"text": "hold on"}).json()
+    assert r["status"] == "needs_approval"  # still waiting on the approval, not auto-resumed
+
+
 def test_AC13_10_stop_deletes_browser_and_hides_live_view(tmp_path):
     d = FakeDriver()
     app, c = build(tmp_path, FakeLlm(), d)
