@@ -77,6 +77,7 @@ final class AppState: ObservableObject {
             today = t
             lastUpdated = Date()
             if let g: Goal = try? await c.get("/goal/today") { goal = g.text }
+            if let d: Digest = try? await c.get("/digest") { digest = d }
         }
     }
 

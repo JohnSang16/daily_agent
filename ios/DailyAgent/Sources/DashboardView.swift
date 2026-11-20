@@ -19,14 +19,21 @@ struct DashboardView: View {
                     BigTitle(text: f("EEEE"))
                     Text(f("MMMM d").lowercased()).font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
                 }
+                if let d = state.digest {
+                    if let m = d.mantra { line("mantra", m).reveal(1) }
+                    if let v = d.vision { line("vision", v).reveal(2) }
+                    if let w = d.why { line("why, \(w.date)", w.text).reveal(3) }
+                    if let id = d.identity, !id.isEmpty { identity(id).reveal(4) }
+                }
                 if let t = state.today {
                     Text(t.explanation.text).font(.system(size: 14.5)).foregroundStyle(Theme.body).lineSpacing(3)
-                        .contentTransition(.opacity).reveal(1)
+                        .contentTransition(.opacity).reveal(5)
                 }
-                goalSection.reveal(2)
-                deadlines.reveal(3)
-                schedule.reveal(4)
-                footer.reveal(5)
+                goalSection.reveal(6)
+                plan(state.digest?.plan).reveal(7)
+                deadlines.reveal(8)
+                schedule.reveal(9)
+                footer.reveal(10)
             }
             .page()
             .animation(Theme.spring, value: state.today)
@@ -35,6 +42,46 @@ struct DashboardView: View {
         .refreshable { await state.refresh() }
         .task { if state.isStale { await state.refresh() } }
         .sheet(item: $picked) { t in TaskSheet(task: t).environmentObject(state) }
+    }
+
+    private func line(_ label: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel(label)
+            Text(text).font(.system(size: 15)).foregroundStyle(Theme.body).lineSpacing(3)
+        }
+    }
+
+    private func identity(_ lines: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("identity, say it out loud, repeat each twice")
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, l in
+                Text(l).font(.system(size: 15)).foregroundStyle(Theme.title)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func plan(_ p: DigestPlan?) -> some View {
+        if let p {
+            VStack(alignment: .leading, spacing: 8) {
+                sectionLabel("today's plan")
+                if p.logged {
+                    ForEach(Array(p.items.enumerated()), id: \.offset) { _, i in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Image(systemName: i.done ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 13)).foregroundStyle(i.done ? Theme.tertiary : Theme.secondary)
+                            Text(i.text).font(.system(size: 15))
+                                .foregroundStyle(i.done ? Theme.tertiary : Theme.body)
+                                .strikethrough(i.done, color: Theme.tertiary)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityValue(i.done ? "done" : "not done")
+                    }
+                } else {
+                    Text("no plan logged, what's the schedule today?").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
+                }
+            }
+        }
     }
 
     private var goalSection: some View {
@@ -127,6 +174,9 @@ struct DashboardView: View {
                 }
             }
             if let p = state.problem, state.today != nil { Text(p).font(.system(size: 12.5)).foregroundStyle(Theme.secondary) }
+            ForEach(Array((state.digest?.notes ?? []).enumerated()), id: \.offset) { _, n in
+                Text(n).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
+            }
             if let at = state.lastUpdated {
                 Text((state.offline ? "offline. last updated " : "updated ") + timeText(at))
                     .font(.system(size: 12.5)).foregroundStyle(Theme.tertiary)
