@@ -36,6 +36,7 @@ const probe = (pt) => {
       role: t.getAttribute('role') || '', text: clean(t.innerText || t.value || ''),
       aria: clean(t.getAttribute('aria-label') || t.getAttribute('title') || ''),
       in_form: !!t.closest('form'), password: (t.type || '') === 'password',
+      value: (t.type || '') === 'password' ? '' : String(t.value || '').slice(0, 200),
     } : null,
     text: document.body ? document.body.innerText.slice(0, 20000) : '',
     heads: [document.title, ...[...document.querySelectorAll('h1,h2')].slice(0, 4).map(h => h.innerText)].join(' '),

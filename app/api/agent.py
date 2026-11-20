@@ -2,9 +2,11 @@
 session is active and is never logged."""
 
 import logging
+import re
+from datetime import timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -152,3 +154,28 @@ def approval(sid: int, aid: int, body: DecisionIn, request: Request):
     if result == "used":
         _kick(request, sid)
     return {**_view(request, sid), "result": result}
+
+
+# step kinds that mean something went wrong or needed John. Successful solves are left out.
+PROBLEM_KINDS = ("gate", "limit", "blocked", "ask", "stop")
+
+
+@router.get("/agent/report")
+def report(request: Request, days: int = Query(3, ge=1, le=30)):
+    """What went wrong in the last few days, most common first, for John's review."""
+    since = (
+        request.app.state.agent.clock.now() - timedelta(days=days)
+        if request.app.state.agent
+        else None
+    )
+    if since is None:
+        raise HTTPException(503, "the homework agent is not configured")
+    with request.app.state.session_factory() as db:
+        steps = db.scalars(select(AgentStep).where(AgentStep.at >= since))
+        counts: dict[str, int] = {}
+        for st in steps:
+            if st.kind in PROBLEM_KINDS or (st.kind == "solve" and "agreed" not in st.summary):
+                what = re.sub(r"\d+", "N", st.summary)
+                counts[what] = counts.get(what, 0) + 1
+    items = sorted(counts.items(), key=lambda kv: -kv[1])[:15]
+    return {"days": days, "items": [{"what": w, "count": n} for w, n in items]}

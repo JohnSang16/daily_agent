@@ -27,8 +27,9 @@ An agent that works inside a sandboxed cloud browser (Kernel) on assignments in 
 4. **Approval gate** (`app/agent/gate.py`): classifies each proposed action. Blocked classes include clicks on controls whose accessible name or surrounding text suggests submit, turn in, send, pay, finish, confirm, or delete, any form submission, any navigation off the allowlist, and any action on a page that looks like a final review or payment step. A blocked action creates an approval request and waits.
 5. **Approval records**: tied to the session, the exact action (hash of type, target, and visible label), and an expiry (default 10 minutes). One use only.
 6. **Step log**: a plain language line for every action, shown on the Agent screen. Contains no passwords and no private page text beyond what is needed.
-7. **Solver** (`app/agent/solver.py`, added 2026-11-20 with John's approval): the `solve` tool sends only the problem text the agent read off the page to a ladder of models, cheapest first (`SOLVER_MODELS`, default Gemini 3.6 Flash, Gemini 3.8 Flash, Claude Sonnet, Claude Opus). Solver calls get no tools and return a short answer. An answer is returned only when two rungs agree (numbers within 1 percent, text after trimming and lowercasing); a rung that errors or is busy is skipped. Each repeat on the same problem in a session starts one rung higher and skips answers already marked wrong; after 2 attempts on one problem the solver refuses and the agent asks John. Gemini calls go through their own guarded lane (`generativelanguage.googleapis.com`, Interactions API, body limited to model and input). Every solver call writes an `llm_usage` row and counts toward the agent's daily budget.
-8. **Replays**: session recording turned on by default for audit, kept 30 days, deleted on request.
+7. **Solver** (`app/agent/solver.py`, added 2026-11-20 with John's approval): the `solve` tool sends only the problem text the agent read off the page to a ladder of models, cheapest first (`SOLVER_MODELS`, default Gemini 3.6 Flash, Gemini 3.8 Flash, Claude Sonnet, Claude Opus). Solver calls get no tools and return a short answer. An answer is returned only when two rungs agree (numbers within 1 percent, text after trimming and lowercasing); a rung that errors or is busy is skipped. Each repeat on the same problem in a session starts one rung higher and skips answers already marked wrong; after 2 attempts on one problem the solver refuses and the agent asks John. Gemini calls go through their own guarded lane (`generativelanguage.googleapis.com`, Interactions API, body limited to model and input). Every solver call writes an `llm_usage` row and counts toward the agent's daily budget. When the agent marks a problem as having a figure, the current screenshot goes to every rung as a PNG (Gemini lane allows only inline text and PNG blocks, never URLs or files).
+8. **Read back**: after the agent types into a plain input or textarea, the gate reads the field back from the browser. If it does not hold what was typed, the agent is told what it shows and to clear and retype. Password fields are never read.
+9. **Replays**: session recording turned on by default for audit, kept 30 days, deleted on request.
 
 ## API (all need the bearer token)
 1. `POST /agent/sessions` with a task id, starts a session.
@@ -36,6 +37,7 @@ An agent that works inside a sandboxed cloud browser (Kernel) on assignments in 
 3. `POST /agent/sessions/{id}/message` sends me instructions to the agent.
 4. `POST /agent/sessions/{id}/pause`, `takeover`, `handback`, and `stop`.
 5. `POST /agent/sessions/{id}/approvals/{approval_id}` with `approve` or `deny`.
+6. `GET /agent/report?days=3` lists what went wrong in the last days (gate pauses, limits, blocks, questions, stops, and solves that did not agree), most common first, with numbers folded to N. Successful steps are left out.
 
 ## Data
 `agent_sessions` (id, task_id, status, started_at, ended_at, limits, token usage), `agent_steps` (session_id, at, kind, summary), `approvals` (id, session_id, action_hash, label, status, expires_at, decided_at). Live view URLs are held in memory or encrypted and never written to logs.
@@ -62,6 +64,9 @@ All tests use a fake driver and fake LLM.
 * AC13.19 A repeat on the same problem starts one rung higher and never returns an answer already marked wrong; a third attempt on the same problem is refused.
 * AC13.20 The Gemini lane only allows the Interactions endpoint with a body of model and input, nothing else.
 * AC13.21 Every solver call writes an `llm_usage` row and the agent's daily budget includes it.
+* AC13.22 A solve marked as having a figure sends the screenshot to the solver, and every rung gets it as an image.
+* AC13.23 Text typed into a plain field that does not show up in the field is flagged back to the agent; a match is a plain "Done."
+* AC13.24 The report ranks problems by count over the chosen days, leaves out successes, ordinary actions and older steps, and needs the bearer token.
 * AC13.16 Measure and record the average cost of one homework session in `docs/CHECKIN_LOG.md`.
 
 ## Manual verification (John)

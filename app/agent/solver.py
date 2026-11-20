@@ -2,6 +2,7 @@
 first. An answer comes back only when two rungs agree. Solver calls get no tools: the problem text
 is page data, never instructions."""
 
+import base64
 import logging
 import math
 import re
@@ -45,7 +46,9 @@ class Solver:
         self.http, self.st, self.sf, self.clock = http, settings, session_factory, clock
         self.models = [m.strip() for m in settings.solver_models.split(",") if m.strip()]
 
-    def solve(self, problem: str, attempt: int, wrong: list[str]) -> str:
+    def solve(
+        self, problem: str, attempt: int, wrong: list[str], image: bytes | None = None
+    ) -> str:
         """attempt is how many times this problem was solved before in the session."""
         if attempt >= MAX_ATTEMPTS:
             return f"stop: this problem already had {MAX_ATTEMPTS} attempts. {ASK}"
@@ -55,7 +58,7 @@ class Solver:
         prompt = PROMPT.format(avoid=avoid, problem=problem[:4000])
         answers: list[str] = []
         for model in self.models[attempt:]:
-            a = self._ask(model, prompt)
+            a = self._ask(model, prompt, image)
             if not a or any(same(a, w) for w in wrong):
                 continue
             match = next((b for b in answers if same(a, b)), None)
@@ -64,8 +67,9 @@ class Solver:
             answers.append(a)
         return f"no agreement (got: {'; '.join(answers) or 'nothing'}). {ASK}"
 
-    def _ask(self, model: str, prompt: str) -> str | None:
+    def _ask(self, model: str, prompt: str, image: bytes | None = None) -> str | None:
         gemini = model.startswith("gemini")
+        img = base64.b64encode(image).decode() if image else None
         if gemini and not self.st.gemini_api_key:
             return None
         try:
@@ -75,7 +79,15 @@ class Solver:
                     "POST",
                     GEMINI_URL,
                     headers={"x-goog-api-key": self.st.gemini_api_key},
-                    json={"model": model, "input": prompt},
+                    json={
+                        "model": model,
+                        "input": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image", "data": img, "mime_type": "image/png"},
+                        ]
+                        if img
+                        else prompt,
+                    },
                     timeout=60,
                 )
             else:
@@ -90,7 +102,24 @@ class Solver:
                     json={
                         "model": model,
                         "max_tokens": 2000,
-                        "messages": [{"role": "user", "content": prompt}],
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "image",
+                                        "source": {
+                                            "type": "base64",
+                                            "media_type": "image/png",
+                                            "data": img,
+                                        },
+                                    },
+                                    {"type": "text", "text": prompt},
+                                ]
+                                if img
+                                else prompt,
+                            }
+                        ],
                     },
                     timeout=120,
                 )
@@ -128,7 +157,12 @@ class Solver:
             parts = [
                 b.get("text", "") for b in data.get("content") or [] if b.get("type") == "text"
             ]
-        # models sometimes show working anyway: the answer is the last line, markdown stripped
-        lines = [ln.strip().strip("*_` ").strip() for ln in "\n".join(parts).splitlines()]
-        last = next((ln for ln in reversed(lines) if ln), "")
-        return last[:200] or None
+        # models sometimes show working anyway: the answer is the last line, and on that line
+        # the last bold part, or else what follows the last "="
+        last = next((ln for ln in reversed("\n".join(parts).splitlines()) if ln.strip()), "")
+        if "**" in last:
+            bold = last.split("**")[1::2]
+            last = next((b for b in reversed(bold) if b.strip()), last)
+        elif "=" in last:
+            last = last.rsplit("=", 1)[1]
+        return last.strip().strip("*_` ").strip()[:200] or None

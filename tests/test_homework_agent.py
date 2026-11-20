@@ -562,7 +562,7 @@ class FakeSolver:
     def __init__(self, reply="answer: 6 N (2 models agree)"):
         self.reply, self.calls = reply, []
 
-    def solve(self, problem, attempt, wrong):
+    def solve(self, problem, attempt, wrong, image=None):
         self.calls.append((problem, attempt, list(wrong)))
         return self.reply
 
@@ -618,3 +618,71 @@ def test_AC13_21_solver_usage_counts_toward_the_daily_budget(tmp_path):
 
 def test_solve_is_offered_to_the_agent():
     assert "solve" in {t["name"] for t in TOOLS}
+
+
+def test_AC13_22_diagram_flag_sends_the_screenshot(tmp_path):
+    llm = FakeLlm([call("solve", problem="current in the circuit shown?", diagram=True)])
+    app, c = build(tmp_path, llm, FakeDriver())
+
+    class ImgSolver(FakeSolver):
+        def solve(self, problem, attempt, wrong, image=None):
+            self.image = image
+            return self.reply
+
+    app.state.agent.solver = sv = ImgSolver()
+    start(c)
+    assert sv.image == b"\x89PNG fake"
+
+
+# ---------- reading the field back after typing ----------
+
+
+def test_AC13_23_typed_answer_that_does_not_stick_is_flagged(tmp_path):
+    d = FakeDriver()
+    d.page = {**d.page, "element": {**el(tag="input", type_="text"), "value": "45"}}
+    llm = FakeLlm([call("type_text", text="4500")])
+    app, c = build(tmp_path, llm, d)
+    start(c)
+    assert d.typed == ["4500"] and 'now shows \\"45\\"' in results_text(llm)
+
+
+def test_AC13_23_typed_answer_that_sticks_is_plain_done(tmp_path):
+    d = FakeDriver()
+    d.page = {**d.page, "element": {**el(tag="input", type_="text"), "value": "4500"}}
+    llm = FakeLlm([call("type_text", text="4500")])
+    app, c = build(tmp_path, llm, d)
+    start(c)
+    assert "now shows" not in results_text(llm)
+
+
+# ---------- the review report ----------
+
+
+def test_AC13_24_report_ranks_what_went_wrong(tmp_path):
+    from app.models import AgentStep
+
+    app, c = build(tmp_path, FakeLlm(), FakeDriver())
+    rows = [
+        ("solve", "solve no agreement (attempt 1)"),
+        ("solve", "solve no agreement (attempt 2)"),
+        ("solve", "solve agreed (attempt 1)"),
+        ("gate", "the page is outside the allowed sites (often a sign in page)."),
+        ("click", 'clicked "Part A" on mlm.pearson.com'),
+        ("solve", "solve no agreement (attempt 1)"),
+    ]
+    with app.state.session_factory() as db:
+        for k, s in rows:
+            db.add(AgentStep(session_id=1, at=NOW, kind=k, summary=s))
+        db.add(AgentStep(session_id=1, at=NOW - timedelta(days=9), kind="gate", summary="old"))
+        db.commit()
+    r = c.get("/agent/report?days=3", headers=H)
+    assert r.status_code == 200
+    items = r.json()["items"]
+    assert items[0] == {"what": "solve no agreement (attempt N)", "count": 3}
+    assert {
+        "what": "the page is outside the allowed sites (often a sign in page).",
+        "count": 1,
+    } in items
+    assert all("agreed" != i["what"].split()[1] for i in items)  # successes are not problems
+    assert not any("clicked" in i["what"] or i["what"] == "old" for i in items)
+    assert c.get("/agent/report").status_code == 401

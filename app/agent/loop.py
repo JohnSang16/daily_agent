@@ -332,7 +332,7 @@ class Agent:
         if d.verdict == "run":
             self._do(live, name, args)
             after = self._inspect(live, "page", {})
-            self._result(live, tid, "Done.")
+            self._result(live, tid, self._readback(name, args, after))
             self._log_action(live.id, name, args, d.label, info)
             stop = page_checks(
                 after, self.allowed
@@ -375,6 +375,20 @@ class Agent:
         self.set_status(live.id, "needs_approval", d.reason, kind="approval")
         return False
 
+    @staticmethod
+    def _readback(kind: str, args: dict, after: dict) -> str:
+        """After typing into a plain field, check the field really holds the text."""
+        el = after.get("element") or {}
+        if kind != "type_text" or el.get("tag") not in ("input", "textarea") or el.get("password"):
+            return "Done."
+        typed, shown = str(args.get("text") or "").strip(), str(el.get("value") or "").strip()
+        if shown == typed:
+            return "Done."
+        return (
+            f'Typed, but the field now shows "{shown[:200]}", not what you typed. '
+            "Click it, press ctrl+a, and type the answer again."
+        )
+
     def _solve(self, live: Live, args: dict) -> str:
         if self.solver is None:
             return "the solver is not set up. ask_john instead."
@@ -384,12 +398,15 @@ class Agent:
         live.solves[key] = attempt + 1
         wrong = [str(w)[:200] for w in (args.get("wrong") or [])][:2]
         try:
-            reply = self.solver.solve(problem, attempt=attempt, wrong=wrong)
+            image = live.driver.screenshot() if args.get("diagram") else None
+            reply = self.solver.solve(problem, attempt=attempt, wrong=wrong, image=image)
         except Exception:
             log.warning("solver failed")
             reply = "the solver failed. ask_john instead."
         with self.sf() as db:
-            self.step_log(db, live.id, "solve", f"solved a problem (attempt {attempt + 1})")
+            outcome = reply.split(":")[0].split(" (")[0] if ":" in reply else "failed"
+            outcome = {"answer": "agreed", "stop": "refused"}.get(outcome, outcome)
+            self.step_log(db, live.id, "solve", f"solve {outcome} (attempt {attempt + 1})")
             db.commit()
         return reply
 

@@ -161,3 +161,50 @@ def test_a_reply_with_working_is_judged_on_its_final_line(sf):
     )
     s, _ = solver(sf, {"gemini-a": worked, "gemini-b": "4500 N"})
     assert s.solve("p", attempt=0, wrong=[]) == "answer: 4500 N (4.5 × 10³ N) (2 models agree)"
+
+
+# ---------- diagrams ----------
+
+
+def test_AC13_22_diagram_goes_to_every_rung_as_an_image(sf):
+    s, http = solver(
+        sf,
+        {"gemini-a": "4 A", "claude-c": "4 A"},
+    )
+    s.models = ["gemini-a", "claude-c"]
+    s.solve("current in the circuit shown?", attempt=0, wrong=[], image=b"\x89PNG")
+    g, c = json.loads(http.calls[0][2]), json.loads(http.calls[1][2])
+    assert g["input"][0]["type"] == "text" and g["input"][1] == {
+        "type": "image",
+        "data": "iVBORw==",
+        "mime_type": "image/png",
+    }
+    blocks = c["messages"][0]["content"]
+    assert [b["type"] for b in blocks] == ["image", "text"]
+
+
+def test_AC13_20_gemini_lane_allows_text_and_png_blocks_only(guard):
+    g, sent = guard
+    url = "https://generativelanguage.googleapis.com/v1beta/interactions"
+    ok = [
+        {"type": "text", "text": "p"},
+        {"type": "image", "data": "AA==", "mime_type": "image/png"},
+    ]
+    g.request("gemini", "POST", url, json={"model": "m", "input": ok})
+    for bad in [
+        [{"type": "image", "uri": "https://evil.example/x.png", "mime_type": "image/png"}],
+        [{"type": "document", "data": "AA==", "mime_type": "application/pdf"}],
+        [{"type": "text", "text": "p", "extra": 1}],
+        [{"type": "user_input", "content": []}],
+    ]:
+        with pytest.raises(RequestDenied):
+            g.request("gemini", "POST", url, json={"model": "m", "input": bad})
+    assert len(sent) == 1
+
+
+@pytest.mark.parametrize(
+    "reply", ["I = V/R = 12 V / 6 Ω = **2 A**", "I = V/R = 12 V / 6 Ω = **2 A", "I = 12/6 = 2 A"]
+)
+def test_working_on_the_answer_line_is_cut_to_the_answer(sf, reply):
+    s, _ = solver(sf, {"gemini-a": reply, "gemini-b": "2 A"})
+    assert s.solve("p", attempt=0, wrong=[]) == "answer: 2 A (2 models agree)"

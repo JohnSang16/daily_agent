@@ -110,3 +110,12 @@ Tests and lint: 323 passed, ruff clean.
 Live check: gemini-3.6-flash answered a real physics problem correctly (4500 N). gemini-3.8-flash returned 503 (busy). Both Claude rungs returned 401: the ANTHROPIC_API_KEY in .env is invalid, which also blocks the agent itself. John needs a new key.
 Open: the solver is text only, diagrams are not sent yet. Answer entry checks (spec step 4) wait for the first real session, they depend on Pearson's real inputs.
 Next step: new Anthropic key, then the first real session.
+
+### 2026-11-20, spec 13 diagrams, read back and review report (John: "can't you do this now")
+What: `solve` takes `diagram: true` and sends the current screenshot to every rung as a PNG (Gemini lane allows inline text and PNG blocks only). After typing into a plain field the agent is told if the field doesn't hold what it typed (password fields never read). The system prompt says to ctrl+a before typing an answer. `GET /agent/report?days=3` ranks what went wrong (gate pauses, limits, blocks, questions, stops, solves that didn't agree). Solver replies are judged on the final line, the last bold part or what follows the last "=", because Sonnet shows working even when told not to.
+Acceptance criteria passing: AC13.22 to AC13.24 (all failed first), plus the answer line parsing tests.
+Tests and lint: 337 passed, ruff clean, page script passes `node --check`.
+Live: Gemini 3.6 Flash and Claude Sonnet agree on a car force problem (4500 N) and on a drawn circuit diagram (2 A).
+Merged: feat/cli-llm-backend (the text only Claude CLI backend). Do not set LLM_BACKEND=cli on the Cox Mac: its claude login is the Cox enterprise account.
+Not done: sign in push (needs APNs and a notifications spec, principles list it as later). Pearson specific answer entry (equation editor, units, drag and drop) waits for the first real session.
+Next step: first real session on a practice assignment, then record AC13.16 cost.

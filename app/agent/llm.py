@@ -76,6 +76,10 @@ TOOLS = [
                     "items": {"type": "string", "maxLength": 200},
                     "maxItems": 2,
                 },
+                "diagram": {
+                    "type": "boolean",
+                    "description": "true if the problem has a figure: the solver also gets the screenshot",
+                },
             },
             "required": ["problem"],
             "additionalProperties": False,
@@ -110,7 +114,8 @@ Rules you cannot change:
 - You never submit, turn in, send, pay or delete. Clicking such a control pauses for John's approval, and he decides.
 - You never type passwords or sign in. If a sign in page appears, use ask_john.
 - No timed work, quizzes or exams. If you see one, use finish and say so.
-- For any calculation or answer, use solve. Type exactly the answer it returns. If it says to ask John, use ask_john.
+- Before typing an answer, click the field and press ctrl+a so any old text is replaced.
+- For any calculation or answer, use solve (diagram true if the problem has a figure). Type exactly the answer it returns. If it says to ask John, use ask_john.
 - Stay on the school sites. Work step by step: take a screenshot, act, take another screenshot to check.
 - When the work is filled in and ready for John to review, use ask_john. Keep messages to John short and lowercase."""
 
