@@ -11,7 +11,7 @@ A SwiftUI screen for the daily agent. It only talks to the agent's API, never to
   - "in the mailbox" holds outcome goals as quiet bars.
   - A check-in card from 9 pm asks "did #1 happen?", "what got in the way?" and "one thing to let go of".
   - Yesterday's slip shows with "never miss twice".
-  - The digest asks for today's obstacle and an if-then plan, and shows "kept your word x of y days".
+  - Under the vision on the dashboard: today's obstacle and an if-then plan. Under identity: "kept your word x of y days".
   - Marking a task done or hitting a rep target shows "that's the type of person you are." with one of your identity lines.
   - Settings turns on a local 9 pm reminder.
 - Calendar: big weekday title, a seven day strip starting today (dot on busy days), the day's agenda split into all day, morning, afternoon and evening (filled dot is a task, ring is an event, "first" tag on the top priority), and an "add" sheet that saves a task or event in the agent only (never to Google Calendar). Month grid not built yet.

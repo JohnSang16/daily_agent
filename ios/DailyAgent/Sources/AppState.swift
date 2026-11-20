@@ -91,9 +91,10 @@ final class AppState: ObservableObject {
             if let g: Goal = try? await c.get("/goal/today") { goal = g.text }
             async let ck: CheckinDay? = try? c.get("/checkin/today")
             async let gs: [GoalItem]? = try? c.get("/goals")
+            async let dg: Digest? = try? c.get("/digest")  // also feeds the win toast's identity lines
             if let v = await ck { checkin = v }
             if let v = await gs { goals = v }
-            if digest == nil { digest = try? await c.get("/digest") }  // identity lines for the win toast
+            if let v = await dg { digest = v }
         }
     }
 
@@ -256,10 +257,6 @@ final class AppState: ObservableObject {
             return
         }
         await loadAllMoney()
-    }
-
-    func loadDigest() async {
-        await call { c in digest = try await c.get("/digest") }
     }
 
     /// Today first (it warms the agent's explanation cache), then the other six days side by side.
