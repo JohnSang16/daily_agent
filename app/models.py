@@ -218,6 +218,17 @@ class Budget(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
 
 
+class EodEntry(Base):
+    """The nightly bullets from PUT /eod/today. Written verbatim into the vault's
+    daily-agent-logs/ folder too, this table just tracks whether today's been answered."""
+
+    __tablename__ = "eod_entries"
+
+    day: Mapped[str] = mapped_column(String, primary_key=True)  # YYYY-MM-DD in my time zone
+    bullets: Mapped[str] = mapped_column(Text)
+    logged_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
 class DailyCheckin(Base):
     """Spec 18: the morning obstacle and if-then plan, and the nightly answer about #1."""
 

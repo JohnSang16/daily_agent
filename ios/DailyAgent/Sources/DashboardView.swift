@@ -5,6 +5,7 @@ struct DashboardView: View {
     @State private var editingGoal = false
     @State private var draft = ""
     @State private var picked: RankedTask?
+    @State private var eodForced = false
     @FocusState private var goalFocused: Bool
 
     private func f(_ p: String) -> String {
@@ -43,16 +44,31 @@ struct DashboardView: View {
                 RepsSection().reveal(9)
                 schedule.reveal(10)
                 MailboxSection().reveal(11)
-                footer.reveal(12)
+                eodSection.reveal(12)
+                footer.reveal(13)
             }
             .page()
             .animation(Theme.spring, value: state.today)
             .animation(Theme.spring, value: state.checkin)
+            .animation(Theme.spring, value: eodForced)
         }
         .scrollDismissesKeyboard(.interactively)
         .refreshable { await state.refresh() }
         .task { if state.isStale { await state.refresh() } }
         .sheet(item: $picked) { t in TaskSheet(task: t).environmentObject(state) }
+    }
+
+    /// Pops open by itself from 9 pm until answered. Before that, a quiet manual trigger.
+    @ViewBuilder
+    private var eodSection: some View {
+        if let e = state.eod, !e.answered {
+            if checkinDue(Date(), answered: false) || eodForced {
+                EodCard(eod: e)
+            } else {
+                Button("log today") { eodForced = true }
+                    .font(.system(size: 13)).foregroundStyle(Theme.secondary).frame(minHeight: 44)
+            }
+        }
     }
 
     private func line(_ label: String, _ text: String) -> some View {
@@ -340,6 +356,36 @@ struct CheckinCard: View {
         if !letGo.isEmpty { body["let_go"] = letGo }
         if a { state.celebrate("you did what you said.") }
         Task { await state.saveCheckin(body) }
+    }
+}
+
+/// Closes the day: a few bullets in my own words, written into the vault alongside
+/// what the app already knows (tasks finished, today's goal).
+struct EodCard: View {
+    @EnvironmentObject var state: AppState
+    let eod: Eod
+    @State private var bullets = ""
+    @State private var saving = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionLabel("log today")
+            Text("how'd it go?").font(.system(size: 22)).tracking(-0.3).foregroundStyle(Theme.title)
+            Text("\(eod.tasksDoneToday) task\(eod.tasksDoneToday == 1 ? "" : "s") done" + (eod.goal.map { ", goal: \($0)" } ?? ""))
+                .font(.system(size: 13)).foregroundStyle(Theme.secondary)
+            TextField("a few bullets, high level", text: $bullets, axis: .vertical)
+                .font(.system(size: 15)).foregroundStyle(Theme.title)
+                .lineLimit(3...8).padding(.horizontal, 16).padding(.vertical, 12)
+                .glass(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .onChange(of: bullets) { _, v in if v.count > 4000 { bullets = String(v.prefix(4000)) } }
+            PillButton(label: saving ? "logging" : "log it", primary: true,
+                       enabled: !saving && !bullets.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+                saving = true
+                Task { await state.saveEod(bullets); saving = false }
+            }
+        }
+        .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+        .glass(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 }
 

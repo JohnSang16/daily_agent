@@ -18,6 +18,16 @@ def resolved_vault_path(settings) -> str:
     )
 
 
+def write_eod_log(vault_path: str, day: str, content: str) -> None:
+    """The one write this app makes into the vault: one file a day, a fixed folder, a fixed
+    name. Always the real vault_path, never the read-only checkout, writes don't go through git."""
+    if not vault_path:
+        raise FileNotFoundError("OBSIDIAN_VAULT_PATH is not set")
+    p = Path(vault_path) / "daily-agent-logs" / f"{day}.md"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content)
+
+
 def ensure_checkout(repo_url: str, deploy_key_path: str, checkout_dir: str) -> str:
     # absolute: git fetch runs inside the checkout, where a relative key path points nowhere
     key = shlex.quote(str(Path(deploy_key_path).expanduser().resolve()))

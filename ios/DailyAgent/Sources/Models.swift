@@ -239,6 +239,15 @@ struct CheckinDay: Codable, Equatable {
     var sayDo: SayDo
 }
 
+/// The nightly wrap: what the agent already knows, plus my own bullets once logged.
+struct Eod: Codable, Equatable {
+    var date: String
+    var answered: Bool
+    var bullets: String?
+    var tasksDoneToday: Int
+    var goal: String?
+}
+
 struct GoalItem: Codable, Equatable, Identifiable {
     var id: Int
     var name: String

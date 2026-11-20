@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request
 from app.agent.driver import KernelDriver
 from app.agent.llm import AgentLlm
 from app.agent.loop import Agent
-from app.api import agent, ask, audit, banks, digest, goals, health, local, money, sync, today
+from app.api import agent, ask, audit, banks, digest, eod, goals, health, local, money, sync, today
 from app.audit import DbAudit
 from app.clock import SystemClock
 from app.config import Settings
@@ -88,6 +88,7 @@ def create_app(
     app.include_router(sync.router)
     app.include_router(local.router)
     app.include_router(goals.router)
+    app.include_router(eod.router)
     app.include_router(agent.router)
     app.include_router(ask.router)
     app.include_router(digest.router)

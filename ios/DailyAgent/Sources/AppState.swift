@@ -29,6 +29,7 @@ final class AppState: ObservableObject {
     @Published var budgets: [BudgetGoal] = []
     @Published var incomeRows: [Txn] = []
     @Published var checkin: CheckinDay?
+    @Published var eod: Eod?
     @Published var goals: [GoalItem] = []
     @Published var toast: Toast?
     @Published var courses: [Course] = []
@@ -93,9 +94,11 @@ final class AppState: ObservableObject {
             async let ck: CheckinDay? = try? c.get("/checkin/today")
             async let gs: [GoalItem]? = try? c.get("/goals")
             async let dg: Digest? = try? c.get("/digest")  // also feeds the win toast's identity lines
+            async let eo: Eod? = try? c.get("/eod/today")
             if let v = await ck { checkin = v }
             if let v = await gs { goals = v }
             if let v = await dg { digest = v }
+            if let v = await eo { eod = v }
         }
     }
 
@@ -178,6 +181,17 @@ final class AppState: ObservableObject {
         }
         await call { c in try await c.send("PUT", "/checkin/today", json: fields) }
         await loadCheckin()
+    }
+
+    func loadEod() async {
+        await call { c in eod = try await c.get("/eod/today") }
+    }
+
+    /// Closes the day: one write, both the DB and the vault's daily-agent-logs/ file.
+    func saveEod(_ bullets: String) async {
+        let ok = await call { c in try await c.send("PUT", "/eod/today", json: ["bullets": bullets]) }
+        if ok { celebrate("day logged.") }
+        await loadEod()
     }
 
     func loadGoals() async {
