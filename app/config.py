@@ -34,6 +34,18 @@ class Settings(BaseSettings):
     plaid_env: str = "sandbox"  # sandbox (fake banks) or production
     token_encryption_key: str = ""
     ask_private_globs: str = ""  # folders kept out of the ask index entirely
+    # spec 13 homework agent
+    kernel_api_key: str = ""
+    kernel_profile: str = "school"  # a browser profile used only for school sites
+    agent_model: str = "claude-opus-5-5"
+    agent_effort: str = "medium"
+    agent_allowed_hosts: str = (
+        "gastate.view.usg.edu,gsu.edu,pearson.com,pearsoncmg.com,pearsoned.com"
+    )
+    agent_max_steps: int = 60
+    agent_max_minutes: int = 30
+    agent_session_token_budget: int = 600_000
+    agent_daily_token_budget: int = 2_000_000
     school_notes_globs: str = "career/school/*"  # what homework mode searches (spec 19)
     ask_llm_blocked_globs: str = "cox/*"  # searchable, but text never sent to the LLM
     sync_interval_minutes: int = 0  # 0 = off. Set 15 to sync on a timer while the app runs locally

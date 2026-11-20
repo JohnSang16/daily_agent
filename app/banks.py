@@ -108,7 +108,8 @@ def sync_banks(db: Session, box: TokenBox, plaid, now: datetime) -> int:
         item = db.get(BankItem, item_id)
         try:  # one expired login must not stop the banks after it
             access = box.decrypt(item.access_token_enc)
-            try:  # not every institution supports an on demand refresh, and the new data lands on a later sync either way
+            # not every institution supports an on demand refresh, new data lands on a later sync
+            try:
                 plaid.transactions_refresh(access)
             except Exception:
                 pass

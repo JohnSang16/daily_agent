@@ -75,3 +75,22 @@ Acceptance criteria passing: AC19.1 to AC19.6 (written first, all 5 failed for t
 Tests and lint: 268 passed, ruff clean. iOS typecheck clean at macOS 26 and 14, logic checks pass (5 new). The Xcode project was regenerated with xcodegen: the only changes are AgentView.swift plus the microphone and speech usage strings.
 Deviations: email context stays off (spec 06 isn't built). The homework mode is a study helper on purpose (John's pick). Spec 13 stays gated.
 Next step: run on the phone and try dictation (it needs on device recognition, which is iOS 17 or later on recent iPhones).
+
+### 2026-11-20, spec 13 homework browser agent
+Gate, in John's words (2026-11-20):
+- College AI policy: "yea its allowed". AI help on homework is allowed. Recorded as John's statement. He is responsible for following each course's syllabus.
+- Pearson terms: "Pearson fully, I accept it". Pearson is on the allowlist with the same approval rules as iCollege.
+- Gate 1 (`/today` trustworthy for a week): waived by John, the same way as the iOS gate.
+- Gate 2 (live view in the app): built in this change (HomeworkSessionView).
+Still out of scope per the spec, whatever the policy says: exams, quizzes, timed work, auto submit. The gate refuses those pages.
+Acceptance criteria passing: AC13.1 to AC13.15 (24 tests in tests/test_homework_agent.py). AC13.16 (average cost of one session) is still open: measure it on the first real session from `agent_sessions.input_tokens/output_tokens`.
+Tests and lint: 292 passed, ruff clean. Migration 0009 runs up and down. iOS typecheck clean at macOS 26 and 14.
+Deviation: the code was written before its tests. To prove the tests bite, I broke the gate on purpose: removing the submit check failed 7 tests, removing the allowlist check failed 2, and making approvals reusable failed 1.
+Live check against real Kernel: started a browser, took a screenshot, read the page on gastate.view.usg.edu, then deleted the browser. No Claude call and no sign in.
+Open questions answered:
+1. Profiles: a "school" profile with save_changes, so you sign in once in the live view and later sessions reuse it. Kernel's managed auth is not used.
+2. Two step sign in: not tested yet. The gate pauses on any page outside the allowed sites, so you sign in yourself.
+4. Blocking submissions at the network level as a second safety net: not done. Kernel's Playwright execution is per call, so a route block would not persist reliably. The gate checks the real element under every click, and pressing Enter inside a form needs approval.
+5. Driver: screenshots for the model, plus a fixed page script that reads the real element under each click for the gate.
+6. Cost: see AC13.16.
+Model: claude-opus-5-5 at effort medium, with server side refusal fallbacks (`fallbacks: "default"`). AGENT_MODEL and AGENT_EFFORT change it.

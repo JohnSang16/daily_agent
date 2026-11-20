@@ -8,7 +8,7 @@ Asked for by John on 2026-11-20, with the study helper picked over the full brow
 3. `POST /ask` also answers "daily full", "daily brief", "digest" and "brief" with the digest deadlines (up to seven, in order, with the overflow line), straight from the database with no LLM call (route `digest`).
 4. **Homework** shows a course chip filled from `GET /courses`, which groups open iCollege tasks by course (the text in the last parentheses of the title, not counting "(closes)"). It also shows that course's upcoming assignments, soonest first. Tapping one fills the bar with "what does <assignment> cover?".
 5. In homework mode `POST /ask` takes `course`. Search is limited to notes matching `SCHOOL_NOTES_GLOBS` (default `career/school/*`), and the course name is added to the search words. Every other ask rule applies: sources are shown, notes are untrusted data, there are no tools, the budget is enforced, and no logs are written.
-6. A request to do the homework ("work on hw 6") still never starts anything. The reply says the homework agent is off and suggests asking what the assignment covers instead.
+6. A request to do the homework typed into the ask box ("work on hw 6") never starts anything by itself. The homework agent (spec 13) starts only from the "work on it" button on an assignment.
 7. Dictation runs on the device (the Speech framework, with on device recognition required) and fills the bar. Nothing is sent until you tap send.
 
 ## Acceptance criteria

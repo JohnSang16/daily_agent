@@ -4,7 +4,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 
-from app.api import ask, audit, banks, digest, goals, health, local, money, sync, today
+from app.agent.driver import KernelDriver
+from app.agent.llm import AgentLlm
+from app.agent.loop import Agent
+from app.api import agent, ask, audit, banks, digest, goals, health, local, money, sync, today
 from app.audit import DbAudit
 from app.clock import SystemClock
 from app.config import Settings
@@ -18,7 +21,14 @@ from app.sources.plaid import PlaidClient
 log = logging.getLogger("app")
 
 
-def create_app(settings: Settings | None = None, llm=None, sources=None, plaid=None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    llm=None,
+    sources=None,
+    plaid=None,
+    agent_llm=None,
+    agent_driver_factory=None,
+) -> FastAPI:
     settings = settings or Settings()
     setup_logging(
         secrets=[
@@ -56,10 +66,29 @@ def create_app(settings: Settings | None = None, llm=None, sources=None, plaid=N
     elif plaid is not None and "banks" not in sources:
         sources = {**sources, "banks": banks_source(settings, plaid)}
     app.state.runner = Runner(app.state.session_factory, sources, SystemClock())
+    # spec 13: the homework agent exists only with both keys (or test fakes)
+    if agent_llm is None and settings.anthropic_api_key and settings.kernel_api_key:
+        agent_llm = AgentLlm(
+            http, settings.anthropic_api_key, settings.agent_model, settings.agent_effort
+        )
+    if agent_driver_factory is None and settings.kernel_api_key:
+
+        def agent_driver_factory():
+            return KernelDriver(http, settings.kernel_api_key, settings.kernel_profile)
+
+    app.state.agent = (
+        Agent(app.state.session_factory, settings, agent_llm, SystemClock(), agent_driver_factory)
+        if agent_llm is not None and agent_driver_factory is not None
+        else None
+    )
+    app.state.agent_runner = lambda sid: threading.Thread(
+        target=app.state.agent.run_until_idle, args=(sid,), daemon=True
+    ).start()
     app.include_router(health.router)
     app.include_router(sync.router)
     app.include_router(local.router)
     app.include_router(goals.router)
+    app.include_router(agent.router)
     app.include_router(ask.router)
     app.include_router(digest.router)
     app.include_router(banks.router)

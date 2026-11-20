@@ -30,6 +30,10 @@ struct AgentView: View {
     @State private var hwTurns: [ChatTurn] = []
     @FocusState private var typing: Bool
     @Namespace private var pick
+    @State private var session: HomeworkSession?  // the open homework agent session
+    @State private var starting: Int?  // assignment id while its browser starts
+    @State private var startNote: String?
+    @State private var showing = false
 
     private var turns: [ChatTurn] { mode == .ask ? askTurns : hwTurns }
     private var waiting: Bool { turns.last.map { $0.reply == nil && !$0.failed } ?? false }
@@ -70,6 +74,18 @@ struct AgentView: View {
         }
         .onChange(of: state.courses) { _, cs in if course == nil { course = cs.first?.course } }
         .onChange(of: dictation.text) { _, t in if dictation.listening { draft = t } }
+        .onChange(of: showing) { _, open in
+            if !open, let s = session { Task { if let fresh = await state.homeworkSession(s.id) { session = fresh } } }
+        }
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showing) {
+            if let s = session { HomeworkSessionView(session: s).environmentObject(state) }
+        }
+        #else
+        .sheet(isPresented: $showing) {
+            if let s = session { HomeworkSessionView(session: s).environmentObject(state) }
+        }
+        #endif
     }
 
     // MARK: pieces
@@ -118,19 +134,36 @@ struct AgentView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     sectionLabel("coming up")
                     ForEach(c.assignments.prefix(5)) { a in
-                        Button { draft = "what does \(a.title) cover?"; typing = true } label: {
-                            HStack(alignment: .top) {
+                        HStack(alignment: .center, spacing: 10) {
+                            Button { draft = "what does \(a.title) cover?"; typing = true } label: {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(a.title).font(.system(size: 16)).foregroundStyle(Theme.title).multilineTextAlignment(.leading)
                                     Text(dueLine(a.dueAt)).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
                                 }
-                                Spacer(minLength: 0)
-                                Image(systemName: "arrow.up.left").font(.system(size: 12)).foregroundStyle(Theme.tertiary).padding(.top, 4)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
                             }
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
+                            .buttonStyle(PressStyle())
+                            .accessibilityHint("asks what it covers")
+                            Menu {
+                                Button("on iCollege") { work(a, site: "icollege") }
+                                Button("on Pearson") { work(a, site: "pearson") }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    if starting == a.id { WorkingDot() }
+                                    Text(starting == a.id ? "starting" : "work on it")
+                                }
+                                .font(.system(size: 13.5)).foregroundStyle(Theme.title)
+                                .padding(.horizontal, 14).frame(minHeight: 36).glass(Capsule()).frame(minHeight: 44)
+                            }
+                            .disabled(starting != nil)
                         }
-                        .buttonStyle(PressStyle())
-                        .accessibilityHint("asks what it covers")
+                    }
+                    if let n = startNote { Text(n).font(.system(size: 13)).foregroundStyle(Theme.secondary) }
+                    if let s = session, s.isActive {
+                        Button { showing = true } label: {
+                            Label("back to \(s.title)", systemImage: "play.circle").font(.system(size: 14)).foregroundStyle(Theme.title)
+                                .padding(.horizontal, 14).frame(minHeight: 40).glass(Capsule())
+                        }.buttonStyle(PressStyle())
                     }
                 }
             } else {
@@ -216,6 +249,22 @@ struct AgentView: View {
             .frame(minHeight: 44)
         }
         .sensoryFeedback(.selection, trigger: context)
+    }
+
+    // MARK: homework agent
+
+    private func work(_ a: CourseAssignment, site: String) {
+        starting = a.id
+        startNote = nil
+        Task {
+            if let s = await state.startHomework(taskId: a.id, site: site) {
+                session = s
+                showing = true
+            } else {
+                startNote = state.problem ?? (state.offline ? "offline. can't reach the agent." : "the browser couldn't start.")
+            }
+            starting = nil
+        }
     }
 
     // MARK: sending

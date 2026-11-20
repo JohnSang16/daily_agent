@@ -77,7 +77,8 @@ def explain(
         return cached.text, "llm", False
     used = db.scalar(
         select(func.coalesce(func.sum(LlmUsage.input_tokens + LlmUsage.output_tokens), 0)).where(
-            LlmUsage.at >= day_start
+            LlmUsage.at >= day_start,
+            LlmUsage.purpose != "homework_agent",  # its own budget
         )
     )
     if used >= budget:
