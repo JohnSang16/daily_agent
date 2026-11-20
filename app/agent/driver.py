@@ -8,15 +8,28 @@ from typing import Protocol
 API = "https://api.onkernel.com"
 VIEWPORT = {"width": 1280, "height": 800}
 
-# reads the page and the element under a point (or the focused element) straight from the browser
-INSPECT = """
+# picks the tab on screen (an iCollege link to Pearson often opens a new one), newest first
+PICK_TAB = """
+const tabs = page.context().pages();
+let pg = tabs[tabs.length - 1] || page;
+for (const t of [...tabs].reverse()) {
+  try { if (await t.evaluate(() => document.visibilityState === 'visible')) { pg = t; break; } } catch (e) {}
+}
+"""
+
+# reads the page and the element under a point (or the focused element) straight from the browser.
+# A point inside a frame is followed down into that frame, so the gate sees the real button. If
+# it can't get inside, the element comes back marked opaque and the gate asks John.
+INSPECT = (
+    """
 const pt = %s;
-const r = await page.evaluate((pt) => {
+"""
+    + PICK_TAB
+    + """
+const probe = (pt) => {
   const el = pt ? document.elementFromPoint(pt[0], pt[1]) : document.activeElement;
-  const t = (el && el.closest('button,a,input,select,textarea,[role=button],[role=link]')) || el;
+  const t = (el && el.closest('button,a,input,select,textarea,iframe,frame,[role=button],[role=link]')) || el;
   const clean = s => (s || '').replace(/\\s+/g, ' ').trim().slice(0, 120);
-  const body = document.body ? document.body.innerText.slice(0, 20000) : '';
-  const heads = [document.title, ...[...document.querySelectorAll('h1,h2')].slice(0, 4).map(h => h.innerText)].join(' ');
   return {
     element: t ? {
       tag: t.tagName.toLowerCase(), type: (t.getAttribute('type') || '').toLowerCase(),
@@ -24,15 +37,47 @@ const r = await page.evaluate((pt) => {
       aria: clean(t.getAttribute('aria-label') || t.getAttribute('title') || ''),
       in_form: !!t.closest('form'), password: (t.type || '') === 'password',
     } : null,
-    timed: /time remaining|time limit|timer|proctor|lockdown browser|respondus/i.test(body)
-        || /\\b(quiz|quizzes|exam|midterm|final exam|test)\\b/i.test(heads),
+    text: document.body ? document.body.innerText.slice(0, 20000) : '',
+    heads: [document.title, ...[...document.querySelectorAll('h1,h2')].slice(0, 4).map(h => h.innerText)].join(' '),
     captcha: !!document.querySelector('iframe[src*=recaptcha],iframe[src*=hcaptcha],iframe[src*=turnstile],.g-recaptcha,.h-captcha,.cf-turnstile')
-        || /verify you are human|i'?m not a robot/i.test(body),
+      || /verify you are human|i'?m not a robot/i.test(document.body ? document.body.innerText : ''),
+    focused: document.hasFocus(),
   };
-}, pt);
-return { ...r, url: page.url() };
+};
+let frame = pg.mainFrame();
+let r = await frame.evaluate(probe, pt);
+for (let depth = 0; depth < 4 && r.element && ['iframe', 'frame'].includes(r.element.tag); depth++) {
+  let next = null;
+  for (const f of frame.childFrames()) {
+    try {
+      if (pt) {
+        const box = await (await f.frameElement()).boundingBox();
+        if (box && pt[0] >= box.x && pt[0] < box.x + box.width && pt[1] >= box.y && pt[1] < box.y + box.height) {
+          next = [f, [Math.round(pt[0] - box.x), Math.round(pt[1] - box.y)]]; break;
+        }
+      } else if (await f.evaluate(() => document.hasFocus())) { next = [f, null]; break; }
+    } catch (e) {}
+  }
+  if (!next) break;
+  frame = next[0];
+  try { r = await frame.evaluate(probe, next[1]); } catch (e) { break; }
+}
+const element = r.element && ['iframe', 'frame'].includes(r.element.tag) ? { ...r.element, opaque: true } : r.element;
+let text = '', heads = '', captcha = false;
+for (const f of pg.frames()) {
+  try { const x = await f.evaluate(probe, null); text += ' ' + x.text; heads += ' ' + x.heads; captcha = captcha || x.captcha; } catch (e) {}
+}
+return {
+  element, heads: heads.slice(0, 2000), captcha, url: pg.url(), frame_url: frame.url(),
+  timer: /time remaining|time limit|timer|proctor|lockdown browser|respondus/i.test(text),
+};
 """
-GOTO = "await page.goto(%s, { waitUntil: 'domcontentloaded', timeout: 30000 }); return page.url();"
+)
+GOTO = (
+    PICK_TAB
+    + """
+await pg.goto(%s, { waitUntil: 'domcontentloaded', timeout: 30000 }); return pg.url();"""
+)
 
 
 class Driver(Protocol):

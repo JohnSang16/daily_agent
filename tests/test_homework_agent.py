@@ -46,7 +46,7 @@ class FakeDriver:
         self.page = page or {
             "url": HOME,
             "element": el("Homework 3"),
-            "timed": False,
+            "timer": False,
             "captcha": False,
         }
         self.clicks, self.typed, self.keys, self.urls, self.stopped = [], [], [], [], False
@@ -308,14 +308,6 @@ def test_AC13_12_captcha_hands_off(tmp_path):
     assert s["status"] == "takeover" and "bot check" in s["reason"] and d.clicks == []
 
 
-def test_AC13_13_timed_quiz_refused(tmp_path):
-    d = FakeDriver()
-    d.page = {**d.page, "timed": True}
-    app, c = build(tmp_path, FakeLlm([call("click", x=5, y=5)]), d)
-    s = start(c)
-    assert s["status"] == "ended" and "quiz or exam" in s["reason"] and d.clicks == [] and d.stopped
-
-
 def test_password_fields_are_never_typed_into(tmp_path):
     d = FakeDriver()
     d.page = {**d.page, "element": el(tag="input", type_="password", password=True)}
@@ -475,3 +467,57 @@ def test_approvals_are_tied_to_one_session(tmp_path):
     ).status_code in (404,)
     with app.state.session_factory() as db:
         assert db.get(Approval, s["approval"]["id"]).status == "pending"
+
+
+# ---------- gate hardening: frames, tabs and quiz detection ----------
+
+
+def test_click_the_gate_cannot_see_inside_needs_approval(tmp_path):
+    """A click that lands on a frame the page script could not look inside fails closed."""
+    d = FakeDriver()
+    d.page = {**d.page, "element": {**el(tag="iframe"), "opaque": True}}
+    app, c = build(tmp_path, FakeLlm([call("click", x=400, y=300)]), d)
+    s = start(c)
+    assert s["status"] == "needs_approval" and d.clicks == []
+
+
+def test_submit_inside_a_frame_still_needs_approval(tmp_path):
+    """The page script reports the real button inside the frame, so the submit check sees it."""
+    d = FakeDriver()
+    d.page = {**d.page, "element": el("Submit", tag="button", type_="submit", in_form=True)}
+    d.page["frame_url"] = "https://mlm.pearson.com/player"
+    app, c = build(tmp_path, FakeLlm([call("click", x=400, y=300)]), d)
+    assert start(c)["status"] == "needs_approval" and d.clicks == []
+
+
+def test_homework_named_test_prep_is_not_refused(tmp_path):
+    d = FakeDriver()
+    d.page = {**d.page, "heads": "Test 2 Prepration - Homework"}
+    app, c = build(tmp_path, FakeLlm([call("click", x=5, y=5)]), d)
+    start(c)
+    assert d.clicks == [(5, 5)] and not d.stopped
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        {"timer": True},
+        {"heads": "Quiz 4 - Circuits"},
+        {"heads": "Midterm Review Exam"},
+        {"url": "https://gastate.view.usg.edu/d2l/lms/quizzing/user/attempt/quiz_start_frame.d2l"},
+    ],
+)
+def test_AC13_13_timer_quiz_or_exam_pages_are_refused(tmp_path, page):
+    d = FakeDriver()
+    d.page = {**d.page, **page}
+    app, c = build(tmp_path, FakeLlm([call("click", x=5, y=5)]), d)
+    s = start(c)
+    assert s["status"] == "ended" and "quiz or exam" in s["reason"] and d.clicks == []
+
+
+def test_page_script_follows_frames_and_the_visible_tab():
+    """The browser script itself cannot run in tests, so pin the parts the gate depends on."""
+    assert "childFrames" in INSPECT and "frameElement" in INSPECT
+    assert "visibilityState" in INSPECT and "pages()" in INSPECT
+    assert "pages()" in GOTO
+    assert "opaque" in INSPECT

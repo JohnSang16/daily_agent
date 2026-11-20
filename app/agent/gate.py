@@ -15,6 +15,10 @@ SUBMIT = re.compile(
     re.I,
 )
 ENTER_KEYS = {"return", "enter", "kp_enter"}
+# quiz and exam pages, judged from the page title and top headings. Bare "test" is left out on
+# purpose: homework like "Test 2 Prepration" is not a test. Timed tests are caught by the timer.
+QUIZ_HEADS = re.compile(r"\b(quiz|exam|midterm)\b", re.I)
+QUIZ_PATH = re.compile(r"/(quizzing|quiz|exam)s?(/|$)", re.I)
 
 
 @dataclass(frozen=True)
@@ -49,7 +53,11 @@ def action_hash(kind: str, page_url: str, label: str, args: dict) -> str:
 
 def page_checks(info: dict, allowed: tuple[str, ...]) -> Decision | None:
     """Stops that apply to any action, whatever the element."""
-    if info.get("timed"):
+    if (
+        info.get("timer")
+        or QUIZ_HEADS.search(info.get("heads") or "")
+        or QUIZ_PATH.search(urlsplit(info.get("url") or "").path)
+    ):
         return Decision(
             "refuse", "this looks like a timed, quiz or exam page. the agent never works on those."
         )
@@ -79,6 +87,10 @@ def decide(kind: str, args: dict, info: dict, allowed: tuple[str, ...]) -> Decis
         return stop
     el = info.get("element") or {}
     label = label_of(el)
+    if el.get("opaque") and kind in ("click", "type_text", "press_key"):
+        return Decision(
+            "approve", "this is inside a part of the page the gate can't see into. check it.", label
+        )
     if kind == "click":
         is_submit_button = el.get("in_form") and (
             el.get("type") == "submit"
