@@ -152,3 +152,12 @@ def test_AC13_20_gemini_lane_allows_only_model_and_input(guard):
         with pytest.raises(RequestDenied):
             g.request("gemini", "POST", bad_url, json=body)
     assert len(sent) == 1
+
+
+def test_a_reply_with_working_is_judged_on_its_final_line(sf):
+    worked = (
+        "Acceleration a = 27 m/s ÷ 9.0 s = 3.0 m/s², so F = ma = 1500 kg × 3.0 m/s² = 4500 N.\n\n"
+        "**4500 N (4.5 × 10³ N)**"
+    )
+    s, _ = solver(sf, {"gemini-a": worked, "gemini-b": "4500 N"})
+    assert s.solve("p", attempt=0, wrong=[]) == "answer: 4500 N (4.5 × 10³ N) (2 models agree)"

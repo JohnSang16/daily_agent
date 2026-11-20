@@ -128,5 +128,7 @@ class Solver:
             parts = [
                 b.get("text", "") for b in data.get("content") or [] if b.get("type") == "text"
             ]
-        text = " ".join(p.strip() for p in parts).strip()
-        return text[:200] or None
+        # models sometimes show working anyway: the answer is the last line, markdown stripped
+        lines = [ln.strip().strip("*_` ").strip() for ln in "\n".join(parts).splitlines()]
+        last = next((ln for ln in reversed(lines) if ln), "")
+        return last[:200] or None
