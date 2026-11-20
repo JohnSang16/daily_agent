@@ -53,7 +53,7 @@ All aggregator calls use a fake client in tests.
 ## Money overview (added 2026-11-19 at John's request, replaces part of Out of scope)
 The screen is now four views: **overview**, **banks**, **income** and **activity** (the plain list above).
 1. `GET /money/summary?months=6` returns income and spend per month, this month's totals and net, spending by category, and holdings (cash, savings, invested, owed on cards, owed on loans, net).
-2. Moves between my own accounts (Plaid transfer categories) and credit card payments are not spending or income. A refund reduces spending. Only the INCOME category counts as income.
+2. Moves between my own accounts (Plaid transfer categories) and credit card payments are not spending or income, except cash withdrawals (`TRANSFER_OUT_WITHDRAWAL`), which are spending. A refund reduces spending. Only the INCOME category counts as income.
 3. Account type, subtype and balance are stored per account. Turning an account off removes it from every total.
 4. Budget goals: `GET /budgets`, `PUT /budgets/{category}` (limit in cents, above 0), `DELETE /budgets/{category}`. A goal is for one category or TOTAL. Each shows this month's spending against its limit.
 5. `GET /transactions?kind=income|spend|all` powers the income log and a spending only list.

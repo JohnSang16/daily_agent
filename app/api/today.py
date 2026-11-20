@@ -1,8 +1,9 @@
 from datetime import UTC, date, datetime, time, timedelta
+from fnmatch import fnmatch
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.auth import require_token
 from app.clock import Clock, get_clock
@@ -24,12 +25,12 @@ def _block(b):
 
 def _warnings(db, now: datetime, stale_hours: int, review_count: int) -> list[dict]:
     out = []
-    runs = db.scalars(select(SyncRun).order_by(SyncRun.started_at)).all()
-    latest, last_ok = {}, {}
-    for r in runs:
-        latest[r.source] = r
-        if r.status == "ok":
-            last_ok[r.source] = r
+
+    def newest(*where):  # the newest run per source, not the whole history
+        ids = select(func.max(SyncRun.id)).where(*where).group_by(SyncRun.source)
+        return {r.source: r for r in db.scalars(select(SyncRun).where(SyncRun.id.in_(ids)))}
+
+    latest, last_ok = newest(), newest(SyncRun.status == "ok")
     for src, r in last_ok.items():
         age = now - (r.finished_at or r.started_at)
         if age > timedelta(hours=stale_hours_for(src, stale_hours)):
@@ -52,7 +53,7 @@ def _warnings(db, now: datetime, stale_hours: int, review_count: int) -> list[di
 def today(
     request: Request,
     date_: date | None = Query(None, alias="date"),
-    limit: int = Query(10, ge=1, le=50),
+    limit: int = Query(10, ge=1, le=500),
     clock: Clock = Depends(get_clock),
 ):
     st = request.app.state.settings
@@ -69,6 +70,7 @@ def today(
         stale_overdue_days=st.stale_overdue_days,
     )
 
+    blocked = [g.strip() for g in st.ask_llm_blocked_globs.split(",") if g.strip()]
     with request.app.state.session_factory() as db:
         tasks = db.scalars(select(Task).where(Task.status == "open")).all()
         events = db.scalars(select(Event).where(Event.status != "cancelled")).all()
@@ -115,7 +117,7 @@ def today(
                 [
                     {
                         **i,
-                        "private": by_id[i["id"]].scope.startswith("cox/"),
+                        "private": any(fnmatch(by_id[i["id"]].scope, g) for g in blocked),
                         "due_local": format_due(i["due_at"], st.user_timezone),
                     }
                     for i in items[:5]

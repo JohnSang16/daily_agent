@@ -1,6 +1,6 @@
 # Triage, 2026-11-19
 
-The iOS pass on branch `ios_ux_pass` fixed the frontend bugs below. The backend bugs are listed for triage only and have not been fixed. Each one was found by reading the code, and the ones marked "proved" were reproduced with a throwaway script against in memory data. None of them is caught by the current 223 tests.
+The iOS pass on branch `ios_ux_pass` fixed the frontend bugs below. Update, later on 2026-11-19: all 14 backend bugs below are now fixed on branch `backend_bug_fixes`, each with a test in `tests/test_triage_fixes.py` that failed before its fix. Each one was found by reading the code, and the ones marked "proved" were reproduced with a throwaway script against in memory data. None of them is caught by the current 223 tests.
 
 ## Frontend fixes shipped (ios_ux_pass)
 - Haptics never fired on pill buttons or "mark done", because the trigger was the label or id, which never changes. Each tap now drives the trigger.
@@ -42,8 +42,13 @@ P0 means data loss, wrong money, or a crash on a normal path. P1 is a wrong resu
 
 Also noted, and allowed by the spec: reminders are matched by title, so two reminders with the same title can swap their done and snooze state.
 
+## Fixed, and how
+- 1: existing rows are matched by any overlap with the window, not by start. 2: a bare 📅 now goes to review. 3: each bank syncs on its own, and a failed one is reported by id once the rest finish. 4: a bank that is already connected is refused with a 409, and the new login is closed at Plaid. 5: cash withdrawals count as spending (spec 16 wording updated). Other transfer categories are still treated as moves between your own accounts, because Plaid can't tell a Venmo payment to a friend from a move to your own account. 6: missed items are kept for 14 days (spec 06 updated). 7: deleting a task from the source clears "done in the app". 8: a lost cache race is ignored, and the usage row is still logged. 9: calendar ids are fully escaped. 10: `/today` uses `ASK_LLM_BLOCKED_GLOBS`. 11: `limit` max is now 500 (spec 08 updated), and the app asks for 500. 12: `/items` validates title, effort and importance. 13: warnings read only the newest run for each source. A source with old history still warns, as AC8.5 requires. 14: deleting a bank no longer needs the key.
+- Also found and fixed while doing this: the vault git checkout (it landed on main during the work) passed a relative deploy key path, so every `git fetch` after the first clone failed. Each failed fetch broke the Obsidian and vault index syncs. It also replaced git's whole environment, `PATH` and `HOME` included.
+- Data left for you: this Mac's database still has the duplicate Marcus login (bank id 6) from before fix 4. Run `DELETE /banks/6` to remove it. Its transfers are counted twice until then.
+
 ## What to build next, in order
-1. Fix backend bugs 1 to 3 (calendar crash, vault crash, bank loop). These are small diffs, and each one stops a whole source from going dark.
+1. Done: backend bugs 1 to 14.
 2. Run the app on the phone from Xcode once. It has only been compile checked and logic checked, so run every screen against `docs/TRIAGE.md` and the README.
 3. Week endpoint `GET /week?start=&days=7`: one ranking, one explanation, no 50 item cutoff. It replaces the app's 7 calls and closes bugs 8 and 11.
 4. Agent (ask) screen in the app. `POST /ask` already exists, so this is a frontend only build: a pill message bar and a context chip, per the design notes.

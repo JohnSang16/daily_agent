@@ -4,7 +4,7 @@
 `GET /today` returns the top task, ranked tasks, schedule, free blocks (used for the suggested start time and not shown in the app), warnings, and a short plain language explanation.
 
 ## Request
-`GET /today` with optional query `date` (ISO date, default today in my time zone) and `limit` (default 10, max 50). Bearer token required.
+`GET /today` with optional query `date` (ISO date, default today in my time zone) and `limit` (default 10, max 500, so the calendar week can see every open task). Bearer token required.
 
 ## Response (JSON)
 ```
