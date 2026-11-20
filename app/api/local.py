@@ -35,10 +35,10 @@ def _due(v: str | None) -> tuple[datetime | None, date | None]:
 
 class ItemIn(BaseModel):
     kind: Literal["task", "event"]
-    title: str
+    title: str = Field(min_length=1, max_length=300)
     due: str | None = None
-    effort_minutes: int | None = None
-    importance: int | None = None
+    effort_minutes: int | None = Field(None, ge=1, le=1440)
+    importance: int | None = Field(None, ge=1, le=5)
     start: datetime | None = None
     end: datetime | None = None
     all_day: bool = False

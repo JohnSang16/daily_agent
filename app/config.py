@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     calendar_ids: str = "primary"
     obsidian_vault_path: str = ""
     obsidian_ignore_globs: str = "templates/*,archive/*"
-    obsidian_repo_url: str = ""  # set to sync from a local git checkout instead of obsidian_vault_path
+    # set to sync from a local git checkout instead of obsidian_vault_path
+    obsidian_repo_url: str = ""
     obsidian_deploy_key_path: str = "./secrets/vault_deploy_key"
     obsidian_checkout_dir: str = "./vault_checkout"
     plaid_client_id: str = ""

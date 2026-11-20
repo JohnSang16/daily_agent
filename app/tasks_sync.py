@@ -111,7 +111,8 @@ def sync_tasks(
         t.last_seen_at = now
     for fp, t in existing.items():
         if fp not in seen and t.status != "gone":
-            t.status, t.updated_at = "gone", now
+            # deleted from the source: "done in the app" ends here too (spec 10a)
+            t.status, t.locally_done, t.updated_at = "gone", False, now
             changed += 1
     s.commit()
     return changed

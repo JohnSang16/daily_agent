@@ -132,7 +132,7 @@ def test_AC8_3_params(tmp_path):
     app = build(tmp_path, FakeLlm())
     seed(app)
     assert len(get(app, "/today?limit=1").json()["ranked"]) == 1
-    for bad in ["limit=0", "limit=51", "limit=x", "date=notadate"]:
+    for bad in ["limit=0", "limit=501", "limit=x", "date=notadate"]:
         assert get(app, f"/today?{bad}").status_code == 422, bad
     assert get(app, "/today?date=2026-11-17").json()["date"] == "2026-11-17"
 

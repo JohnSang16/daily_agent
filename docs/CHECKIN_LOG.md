@@ -55,3 +55,10 @@ Checks: `ios/DailyAgent/Checks/typecheck.sh` (new: typechecks every SwiftUI scre
 Deviations: none from specs. Bank names keep their case (design notes: proper names are not lowercased).
 Open questions: backend bugs 5 and 6 in TRIAGE.md need spec wording changes (transfers, overdue iCollege items).
 Next step: fix backend bugs 1 to 3, then run the app on the phone once.
+
+### 2026-11-19, backend triage fixes
+What: fixed all 14 bugs in docs/TRIAGE.md, plus the vault checkout deploy key path (a relative path broke every fetch after the first clone).
+Tests and lint: 244 passed (21 new in tests/test_triage_fixes.py, each failed first), ruff clean. iOS typecheck clean.
+Spec changes (asked for by "fix all the backend bugs"): spec 06 keeps missed iCollege items 14 days, spec 08 limit max 500, spec 16 cash withdrawals count as spending.
+Open: Venmo or Zelle payments to other people still read as transfers. Plaid gives no reliable way to tell them apart from moves between your own accounts. Duplicate Marcus (bank id 6) still needs DELETE /banks/6.
+Next step: run the app on the phone, then the week endpoint.

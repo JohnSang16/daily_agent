@@ -10,7 +10,7 @@ Turn my college course due dates into shared `tasks`. iCollege (D2L) publishes a
 
 ## Behavior
 1. Fetch the feed, unfold continuation lines, split into events.
-2. Keep an event only if its summary ends in `- Due` or `- Availability Ends` and its start moment is in the future. Everything else (lectures, announcements, past items) is ignored.
+2. Keep an event only if its summary ends in `- Due` or `- Availability Ends` and its start moment is in the future or passed within the last 14 days (so a missed one shows as overdue instead of vanishing). Everything else (lectures, announcements, older items) is ignored.
 3. Each kept event becomes a task: source `icollege`, scope `feed`, title is the summary without the suffix (`(closes)` appended for Availability Ends) plus the course location when present, due at the event's exact start moment (UTC).
 4. Idempotent. A task whose event disappears from the feed (past, removed, or changed title) becomes `gone` after a successful fetch only.
 5. On any failure keep the old tasks and record an `error` sync run with the exception class only. Never put the URL in a log, a run summary, or an audit row.

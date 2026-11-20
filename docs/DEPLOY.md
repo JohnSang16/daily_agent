@@ -37,6 +37,9 @@ Names are the settings in `app/config.py`, upper case.
 | ICOLLEGE_FEED_URL_PATH | for school | file holding the private feed URL, secret |
 | OBSIDIAN_VAULT_PATH | for notes | local vault folder, hosted use needs a git checkout (separate spec) |
 | OBSIDIAN_IGNORE_GLOBS | no | default templates/*,archive/* |
+| OBSIDIAN_REPO_URL | no | git URL of the vault. When set, notes are read from a local checkout instead of OBSIDIAN_VAULT_PATH |
+| OBSIDIAN_DEPLOY_KEY_PATH | with a repo URL | read only deploy key for that repo, kept outside the repo |
+| OBSIDIAN_CHECKOUT_DIR | no | where the checkout lives |
 | ASK_PRIVATE_GLOBS | no | folders never indexed for ask |
 | ASK_LLM_BLOCKED_GLOBS | no | searchable but never sent to the model, default cox/* |
 | PLAID_CLIENT_ID | for money | Plaid client id |

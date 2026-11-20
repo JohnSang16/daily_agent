@@ -165,7 +165,7 @@ final class AppState: ObservableObject {
     func loadWeek() async {
         await call { c in
             let days = weekDays(from: Date())
-            let limit = URLQueryItem(name: "limit", value: "50")
+            let limit = URLQueryItem(name: "limit", value: "500")
             let first: Today = try await c.get("/today", query: [URLQueryItem(name: "date", value: days[0]), limit])
             var events: [String: [EventItem]] = [days[0]: first.events]
             try await withThrowingTaskGroup(of: (String, [EventItem]).self) { group in

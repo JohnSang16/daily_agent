@@ -12,7 +12,7 @@ from app.banks import display, store_item
 from app.clock import Clock, get_clock
 from app.crypto import TokenBox
 from app.models import BankAccount, BankItem, Transaction
-from app.money import CARD_PAYMENT, INTERNAL_PRIMARY
+from app.money import CARD_PAYMENT, INTERNAL_PRIMARY, SPEND_TRANSFERS
 
 router = APIRouter(dependencies=[Depends(require_token)])
 
@@ -54,7 +54,10 @@ def connect_complete(body: CompleteIn, request: Request, clock: Clock = Depends(
     if public is None:
         raise HTTPException(409, "the bank screen is not finished yet")
     with request.app.state.session_factory() as db:
-        item = store_item(db, box, plaid, public, clock.now())
+        try:
+            item = store_item(db, box, plaid, public, clock.now())
+        except ValueError as e:
+            raise HTTPException(409, f"{e}. delete it first to reconnect it.") from None
         return {"id": item.id, "bank": item.institution_name}
 
 
@@ -120,14 +123,13 @@ def set_enabled(account_id: int, body: EnabledIn, request: Request):
 
 @router.delete("/banks/{item_id}")
 def delete_bank(item_id: int, request: Request):
-    box = _box(request)
     with request.app.state.session_factory() as db:
         item = db.get(BankItem, item_id)
         if item is None:
             raise HTTPException(404, "not found")
         remote = True
         try:  # disconnect my own link at the aggregator, local data goes either way
-            _plaid(request).item_remove(box.decrypt(item.access_token_enc))
+            _plaid(request).item_remove(_box(request).decrypt(item.access_token_enc))
         except Exception:
             remote = False
         ids = [a.id for a in db.scalars(select(BankAccount).where(BankAccount.item_id == item_id))]
@@ -181,7 +183,11 @@ def transactions(
         elif kind == "spend":  # leaves out moves between my accounts and card payments
             q = q.where(
                 Transaction.direction == "out",
-                or_(Transaction.category.is_(None), Transaction.category.not_in(INTERNAL_PRIMARY)),
+                or_(
+                    Transaction.category.is_(None),
+                    Transaction.category.not_in(INTERNAL_PRIMARY),
+                    Transaction.category_detail.in_(SPEND_TRANSFERS),
+                ),
                 or_(
                     Transaction.category_detail.is_(None),
                     Transaction.category_detail != CARD_PAYMENT,

@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from datetime import time as dtime
 from pathlib import Path
 from typing import Protocol
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -72,7 +73,7 @@ class HttpCalendarClient:
         }
         if page_token:
             params["pageToken"] = page_token
-        url = f"{API}/{calendar_id.replace('@', '%40')}/events"
+        url = f"{API}/{quote(calendar_id, safe='')}/events"
         for attempt in (0, 1):
             h = {"Authorization": f"Bearer {self.token.get('access_token', '')}"}
             r = self.http.get(SOURCE, url, params=params, headers=h)
@@ -170,7 +171,7 @@ def sync_google_calendar(
                     Event.user_id == user_id,
                     Event.source == SOURCE,
                     Event.calendar_id.in_(calendar_ids),
-                    Event.start_at >= tmin,
+                    Event.end_at > tmin,  # also events that began before the window
                     Event.start_at < tmax,
                 )
             )
