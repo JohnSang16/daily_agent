@@ -157,10 +157,6 @@ final class AppState: ObservableObject {
         await loadAllMoney()
     }
 
-    func loadDigest() async {
-        await call { c in digest = try await c.get("/digest") }
-    }
-
     /// Today first (it warms the agent's explanation cache), then the other six days side by side.
     func loadWeek() async {
         await call { c in
