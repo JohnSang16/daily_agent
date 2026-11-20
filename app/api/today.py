@@ -146,6 +146,13 @@ def today(
                 }
             )
         todays = [e for e in events if e.start_at < day_end and e.end_at > day_start]
+        done_today = db.scalar(
+            select(func.count(Task.id)).where(
+                Task.locally_done.is_(True),
+                Task.status == "done",
+                Task.updated_at >= local_midnight,
+            )
+        )
 
     top = None
     if items:
@@ -165,4 +172,5 @@ def today(
         "explanation": {"text": text, "source": source},
         "warnings": warnings,
         "needs_review_count": review_count,
+        "done_today": done_today,
     }
