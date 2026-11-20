@@ -7,6 +7,13 @@ import subprocess
 from pathlib import Path
 
 
+def resolved_vault_path(settings) -> str:
+    """Where to read the vault from right now: the checkout (kept fresh by the
+    periodic sync job) when configured, else the raw vault_path. No I/O here,
+    callers that need it current should run a sync first or call ensure_checkout."""
+    return settings.obsidian_checkout_dir if settings.obsidian_repo_url else settings.obsidian_vault_path
+
+
 def ensure_checkout(repo_url: str, deploy_key_path: str, checkout_dir: str) -> str:
     # absolute: git fetch runs inside the checkout, where a relative key path points nowhere
     key = shlex.quote(str(Path(deploy_key_path).expanduser().resolve()))
