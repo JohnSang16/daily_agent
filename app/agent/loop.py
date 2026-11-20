@@ -247,8 +247,8 @@ class Agent:
                 live.results, live.notes = [], []
             try:
                 resp = self.llm.next(live.messages)
-            except Exception:
-                log.warning("agent model call failed")
+            except Exception as exc:
+                log.warning("agent model call failed: %s", type(exc).__name__)
                 self.set_status(sid, "paused", "the model call failed. hand back to retry.")
                 return False
             usage = resp.get("usage") or {}
