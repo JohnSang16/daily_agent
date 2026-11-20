@@ -157,5 +157,14 @@ check(gl[0].missedTwice == true && gl[1].current == 1450 && !gl[1].isInput, "dec
 let td = try! makeDecoder().decode(Today.self, from: Data(todayJSON.utf8))
 check(td.doneToday == nil && td.topTask?.suggestedBlock == nil, "an older /today without done_today still decodes")
 
+// agent screen (spec 19)
+check(AskContext.all.sources == ["vault", "calendar"] && AskContext.notes.sources == ["vault"] && AskContext.tasks.sources == ["calendar"], "context chip maps to what ask may read")
+check(noteName("career/school/os-lecture-notes.md") == "os lecture notes" && noteName("a_b") == "a b", "note names for sources")
+check(courseLabel("OPERATING SYSTEMS") == "operating systems" && courseLabel(String(repeating: "A", count: 40)).count == 28, "course chip label")
+let ar = try! makeDecoder().decode(AskReply.self, from: Data(#"{"answer":"x","sources":[{"path":"a.md","heading":"H","excerpt":"e"}],"used_llm":true,"route":"vault"}"#.utf8))
+check(ar.usedLlm && ar.sources[0].id == "a.md#H", "decodes an ask reply")
+let cs = try! makeDecoder().decode([Course].self, from: Data(#"[{"course":"OS","assignments":[{"id":1,"title":"HW 3","due_at":"2026-11-22T04:59:00+00:00"}]}]"#.utf8))
+check(cs[0].assignments[0].title == "HW 3" && parseISO(cs[0].assignments[0].dueAt) != nil, "decodes courses and their due dates parse")
+
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

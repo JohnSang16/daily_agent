@@ -6,7 +6,7 @@ from fnmatch import fnmatch
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from app.auth import require_token
@@ -16,6 +16,8 @@ from app.search.query import search
 
 router = APIRouter(dependencies=[Depends(require_token)])
 
+DIGEST = re.compile(r"^\s*(daily full|daily brief|digest|brief)\W*$", re.I)
+COURSE = re.compile(r"\s*\(([^()]*)\)\s*$")
 HOMEWORK = re.compile(r"\b(work on|do my|start|finish)\b.*\b(hw|homework|assignment)\b", re.I)
 MONEY = re.compile(
     r"\b(spend|spent|spending|transactions?|bank|balance|paid|purchase[sd]?)\b", re.I
@@ -26,8 +28,51 @@ MAX_CHUNK_CHARS, MAX_PROMPT_CHARS = 800, 3000
 
 
 class AskIn(BaseModel):
-    question: str
+    question: str = Field(min_length=1, max_length=500)
     context: list[str] = ["vault", "email", "calendar"]
+    course: str | None = Field(None, max_length=80)  # homework mode: search only school notes
+
+
+def split_course(title: str) -> tuple[str, str | None]:
+    """'Homework 3 (closes) (OPERATING SYSTEMS)' -> ('Homework 3 (closes)', 'OPERATING SYSTEMS')."""
+    m = COURSE.search(title)
+    if not m or m.group(1).strip().lower() == "closes":
+        return title, None
+    return title[: m.start()].strip(), m.group(1).strip()
+
+
+@router.get("/courses")
+def courses(request: Request, clock: Clock = Depends(get_clock)):
+    """Open iCollege tasks grouped by course, soonest first, for the homework course chip."""
+    now = clock.now()
+    with request.app.state.session_factory() as db:
+        rows = db.scalars(
+            select(Task)
+            .where(Task.source == "icollege", Task.status == "open", Task.due_at.is_not(None))
+            .order_by(Task.due_at)
+        ).all()
+    out: dict[str, list] = {}
+    for t in rows:
+        if t.snoozed_until and t.snoozed_until > now:
+            continue
+        title, course = split_course(t.title)
+        if course:
+            out.setdefault(course, []).append(
+                {"id": t.id, "title": title, "due_at": t.due_at.astimezone(UTC).isoformat()}
+            )
+    return [{"course": c, "assignments": a} for c, a in out.items()]
+
+
+def _digest_answer(request: Request, clock: Clock) -> dict:
+    from app.api.digest import digest  # same ranking as the brief, no LLM
+
+    d = digest(request, clock)
+    if not d["deadlines"]:
+        return reply("Nothing has a hard deadline right now.", "digest")
+    lines = [f"{i}. {x['title']}, {x['due_local']}" for i, x in enumerate(d["deadlines"], 1)]
+    if d["overflow"]:
+        lines.append(f"+{d['overflow']} more past {d['overflow_after']}")
+    return reply("\n".join(lines), "digest")
 
 
 def reply(answer, route, sources=(), used_llm=False):
@@ -74,7 +119,15 @@ def _prompt(question: str, chunks) -> str:
 def ask(body: AskIn, request: Request, clock: Clock = Depends(get_clock)):
     st, q, now = request.app.state.settings, body.question, clock.now()
     if HOMEWORK.search(q):
-        return reply("That starts the homework agent, which needs your tap in the app.", "homework")
+        return reply(
+            "The homework agent is off, and it would need your tap anyway. Try asking what the "
+            "assignment covers, or what your notes say about it.",
+            "homework",
+        )
+    if DIGEST.search(q):
+        if "calendar" not in body.context:
+            return reply("Calendar and tasks are off for this chat.", "digest")
+        return _digest_answer(request, clock)
     if MONEY.search(q):
         if "money" not in body.context:
             return reply("Money is off for this chat.", "money")
@@ -87,7 +140,12 @@ def ask(body: AskIn, request: Request, clock: Clock = Depends(get_clock)):
         return reply("The vault is off for this chat.", "vault")
 
     with request.app.state.session_factory() as db:
-        chunks = search(db, q)
+        if body.course:  # homework mode: school notes only, the course name joins the search
+            school = [g.strip() for g in st.school_notes_globs.split(",") if g.strip()]
+            pool = search(db, f"{q} {body.course}", k=50)
+            chunks = [c for c in pool if any(fnmatch(c.path, g) for g in school)][:5]
+        else:
+            chunks = search(db, q)
         sources = [{"path": c.path, "heading": c.heading, "excerpt": c.text[:300]} for c in chunks]
         if not chunks:
             return reply("Nothing found in your notes.", "vault")

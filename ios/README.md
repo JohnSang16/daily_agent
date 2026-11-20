@@ -14,6 +14,7 @@ A SwiftUI screen for the daily agent. It only talks to the agent's API, never to
   - Under the vision on the dashboard: today's obstacle and an if-then plan. Under identity: "kept your word x of y days".
   - Marking a task done or hitting a rep target shows "that's the type of person you are." with one of your identity lines.
   - Settings turns on a local 9 pm reminder.
+- Agent (spec 19): a switch between ask and homework, suggestion chips, a context chip, and a message bar with on device dictation and send. Ask answers from your notes, deadlines and schedule with sources, and "daily full" returns the brief. Homework picks a course from iCollege, lists what's coming up (tap one to ask what it covers), and answers only from your school notes. It never drives a browser or submits anything, and spec 13 stays gated.
 - Calendar: big weekday title, a seven day strip starting today (dot on busy days), the day's agenda split into all day, morning, afternoon and evening (filled dot is a task, ring is an event, "first" tag on the top priority), and an "add" sheet that saves a task or event in the agent only (never to Google Calendar). Month grid not built yet.
 - Digest: the daily brief from `GET /digest`: the mantra, one vision line and the newest WHY from your reflections (all read from the vault), then up to seven hard deadlines in order with an overflow line, and quiet notes about stale or failed sources.
 - Money: four views. Overview (this month's spent, income and net, a spend vs income bar chart for six months, where it went by category, and budget goals you set with a limit and see as bars), Banks (where your money sits: cash, savings, invested, owed on cards and loans, net, then every bank with its accounts, balances and an on/off switch each), Income (the full income log by month with subtotals) and Activity (the plain transaction list).
@@ -26,7 +27,7 @@ A SwiftUI screen for the daily agent. It only talks to the agent's API, never to
 Glass and springs, still monochrome so the design stays black and white. Real Liquid Glass (`glassEffect`) on iOS 26 and later, frosted material with a hairline highlight before that. Spring animations on the drawer (the screen leans back, rounds its corners and slides over), screen switches, the calendar day picker (one white disc glides between days), and sheets. Sections fade and rise in one after another. Buttons shrink slightly when pressed. Light haptics on the drawer, day picks and mark done. Reduce Motion in iOS settings turns the movement down to simple fades.
 
 ## Not built yet
-Agent (ask) screen, the calendar month grid, the Geist font (uses the system font), approvals, Sign in with Apple. It has never been run on a device or simulator, only compile checked and logic checked from the command line (see below), so expect small fixes on the first run.
+the calendar month grid, the Geist font (uses the system font), approvals, Sign in with Apple. It has never been run on a device or simulator, only compile checked and logic checked from the command line (see below), so expect small fixes on the first run.
 
 ## Run it (on the Mac that has Xcode)
 1. `git pull` this repo, then open `ios/DailyAgent/DailyAgent.xcodeproj`.

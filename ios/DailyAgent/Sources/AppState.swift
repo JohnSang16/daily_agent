@@ -31,6 +31,7 @@ final class AppState: ObservableObject {
     @Published var checkin: CheckinDay?
     @Published var goals: [GoalItem] = []
     @Published var toast: Toast?
+    @Published var courses: [Course] = []
     private var wins = 0
 
     init() {
@@ -96,6 +97,21 @@ final class AppState: ObservableObject {
             if let v = await gs { goals = v }
             if let v = await dg { digest = v }
         }
+    }
+
+    // MARK: agent screen (spec 19)
+
+    /// One question to POST /ask. Returns nil on failure, with the problem line set.
+    func ask(_ question: String, context: AskContext, course: String?) async -> AskReply? {
+        var out: AskReply?
+        var body: [String: Any] = ["question": String(question.prefix(500)), "context": context.sources]
+        if let course { body["course"] = course; body["context"] = ["vault"] }
+        await call { c in out = try await c.post("/ask", json: body) }
+        return out
+    }
+
+    func loadCourses() async {
+        await call { c in courses = try await c.get("/courses") }
     }
 
     // MARK: follow through (spec 18)

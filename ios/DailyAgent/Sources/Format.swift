@@ -311,3 +311,31 @@ func outcomeFraction(_ g: GoalItem) -> Double {
     guard g.target > 0 else { return 0 }
     return min(1, Double(g.current ?? 0) / Double(g.target))
 }
+
+// MARK: agent screen (spec 19)
+
+enum AskContext: String, CaseIterable, Identifiable {
+    case all, notes, tasks
+    var id: String { rawValue }
+    /// What POST /ask may read. Email stays off until spec 06 exists.
+    var sources: [String] {
+        switch self {
+        case .all: return ["vault", "calendar"]
+        case .notes: return ["vault"]
+        case .tasks: return ["calendar"]
+        }
+    }
+}
+
+/// "career/school/os-lecture-notes.md" -> "os lecture notes"
+func noteName(_ path: String) -> String {
+    let file = path.split(separator: "/").last.map(String.init) ?? path
+    let base = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
+    return base.replacingOccurrences(of: "-", with: " ").replacingOccurrences(of: "_", with: " ")
+}
+
+/// "OPERATING SYSTEMS XLS Group ACS37 Fall S" -> "operating systems xls group acs37 fall s", trimmed to fit a chip.
+func courseLabel(_ c: String, max: Int = 28) -> String {
+    let l = c.lowercased().trimmingCharacters(in: .whitespaces)
+    return l.count > max ? String(l.prefix(max - 1)).trimmingCharacters(in: .whitespaces) + "…" : l
+}

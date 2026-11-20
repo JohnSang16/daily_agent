@@ -69,3 +69,9 @@ Tests and lint: 263 passed, ruff clean. Migration 0008 runs up and down on a scr
 Deviations: none. The widget is out of scope on purpose (see spec 18, it needs a call on App Groups or where the token is stored).
 Open questions: widget. Also suggested: make the identity lines process based ("I'm the type of person that ...") instead of outcome based ("I'm a Googler"). That is John's call, in `_meta/digest-lines.md`.
 Next step: `uv run alembic upgrade head` on the agent Mac, restart the agent, then run the app.
+
+### 2026-11-20, spec 19 agent screen (ask and homework study helper)
+Acceptance criteria passing: AC19.1 to AC19.6 (written first, all 5 failed for the right reason).
+Tests and lint: 268 passed, ruff clean. iOS typecheck clean at macOS 26 and 14, logic checks pass (5 new). The Xcode project was regenerated with xcodegen: the only changes are AgentView.swift plus the microphone and speech usage strings.
+Deviations: email context stays off (spec 06 isn't built). The homework mode is a study helper on purpose (John's pick). Spec 13 stays gated.
+Next step: run on the phone and try dictation (it needs on device recognition, which is iOS 17 or later on recent iPhones).

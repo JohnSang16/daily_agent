@@ -27,6 +27,8 @@ targets:
         UILaunchScreen: {}
         UIUserInterfaceStyle: Dark
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSMicrophoneUsageDescription: Lets you dictate a question to your agent. Audio stays on this phone.
+        NSSpeechRecognitionUsageDescription: Turns your dictated question into text on this phone. Nothing is sent until you tap send.
         NSRemindersFullAccessUsageDescription: Sends the title, due date and done state of your open reminders to your own agent. Nothing is changed in Reminders.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
