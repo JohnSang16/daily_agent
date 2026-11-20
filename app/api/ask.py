@@ -163,7 +163,7 @@ def ask(body: AskIn, request: Request, clock: Clock = Depends(get_clock)):
         used = db.scalar(
             select(
                 func.coalesce(func.sum(LlmUsage.input_tokens + LlmUsage.output_tokens), 0)
-            ).where(LlmUsage.at >= midnight)
+            ).where(LlmUsage.at >= midnight, LlmUsage.purpose != "homework_agent")
         )
         if used >= st.llm_daily_token_budget:
             return reply(

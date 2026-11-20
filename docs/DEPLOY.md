@@ -38,6 +38,15 @@ Names are the settings in `app/config.py`, upper case.
 | OBSIDIAN_VAULT_PATH | for notes | local vault folder, hosted use needs a git checkout (separate spec) |
 | OBSIDIAN_IGNORE_GLOBS | no | default templates/*,archive/* |
 | SCHOOL_NOTES_GLOBS | no | default career/school/*, the notes homework mode searches (spec 19) |
+| KERNEL_API_KEY | for homework | Kernel cloud browser key (spec 13). The agent is off without it |
+| KERNEL_PROFILE | no | default school, the browser profile that keeps you signed in |
+| AGENT_MODEL | no | default claude-opus-5-5 |
+| AGENT_EFFORT | no | default medium (low, medium, high, xhigh, max) |
+| AGENT_ALLOWED_HOSTS | no | domains the agent may visit, subdomains included |
+| AGENT_MAX_STEPS | no | default 60 model turns before it pauses |
+| AGENT_MAX_MINUTES | no | default 30 |
+| AGENT_SESSION_TOKEN_BUDGET | no | default 600000 |
+| AGENT_DAILY_TOKEN_BUDGET | no | default 2000000, separate from LLM_DAILY_TOKEN_BUDGET |
 | OBSIDIAN_REPO_URL | no | git URL of the vault. When set, notes are read from a local checkout instead of OBSIDIAN_VAULT_PATH |
 | OBSIDIAN_DEPLOY_KEY_PATH | with a repo URL | read only deploy key for that repo, kept outside the repo |
 | OBSIDIAN_CHECKOUT_DIR | no | where the checkout lives |

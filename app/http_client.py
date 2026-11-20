@@ -16,7 +16,18 @@ class RequestDenied(Exception):
     pass
 
 
-ALLOWED_ARGS = {"params", "headers", "json", "data", "content"}
+ALLOWED_ARGS = {"params", "headers", "json", "data", "content", "timeout"}
+AGENT_BODY_KEYS = {
+    "model",
+    "max_tokens",
+    "system",
+    "tools",
+    "tool_choice",
+    "messages",
+    "output_config",
+    "fallbacks",
+    "cache_control",
+}
 ANTHROPIC_BODY_KEYS = {"model", "max_tokens", "messages", "thinking", "system"}
 COLLECTIONS = {"messages", "threads", "labels", "drafts", "calendars", "events", "feed", "user"}
 PLAID_PRODUCT_KEYS = (
@@ -77,6 +88,10 @@ class GuardedHttpClient:
                 return set(json.loads(req.content)) <= ANTHROPIC_BODY_KEYS
             except ValueError:
                 return False
+        if integration == "anthropic_agent":
+            return _agent_body_ok(req)
+        if integration == "kernel" and req.url.path.endswith("/playwright/execute"):
+            return _browser_code_ok(req)
         if integration == "plaid":  # read only: transactions is the only product ever requested
             try:
                 body = json.loads(req.content)
@@ -113,3 +128,43 @@ class GuardedHttpClient:
 
     def get(self, integration: str, url: str, **kwargs) -> httpx.Response:
         return self.request(integration, "GET", url, **kwargs)
+
+
+def _agent_body_ok(req: httpx.Request) -> bool:
+    """Spec 13: the agent may offer only its own fixed tools: no server tools, MCP or betas."""
+    from app.agent.llm import FALLBACK_BETA, TOOL_NAMES
+
+    if req.headers.get("anthropic-beta", FALLBACK_BETA) != FALLBACK_BETA:
+        return False
+    try:
+        body = json.loads(req.content)
+    except ValueError:
+        return False
+    if not set(body) <= AGENT_BODY_KEYS:
+        return False
+    tools = body.get("tools") or []
+    if not tools or any("type" in t or t.get("name") not in TOOL_NAMES for t in tools):
+        return False
+    return (body.get("tool_choice") or {"type": "auto"}).get("type") in ("auto", "none")
+
+
+def _browser_code_ok(req: httpx.Request) -> bool:
+    """Only the two fixed page scripts may run in the browser, never code from the model."""
+    from app.agent.driver import GOTO, INSPECT
+
+    try:
+        code = json.loads(req.content).get("code", "")
+    except (ValueError, AttributeError):
+        return False
+    for tmpl, middle in (
+        (INSPECT, r"null|\[\d{1,5}, \d{1,5}\]"),
+        (GOTO, r'"https://[^"\\]{1,500}"'),
+    ):
+        head, tail = tmpl.split("%s")
+        if (
+            code.startswith(head)
+            and code.endswith(tail)
+            and re.fullmatch(middle, code[len(head) : len(code) - len(tail)])
+        ):
+            return True
+    return False

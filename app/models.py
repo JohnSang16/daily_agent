@@ -254,3 +254,45 @@ class GoalLog(Base):
     goal_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     day: Mapped[str] = mapped_column(String, primary_key=True)  # YYYY-MM-DD in my time zone
     count: Mapped[int] = mapped_column(Integer)
+
+
+class AgentSession(Base):
+    """Spec 13: one homework session. The live view URL is never stored, it lives in memory."""
+
+    __tablename__ = "agent_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    task_id: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(Text)
+    site: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String)  # running, paused, takeover, needs_approval, ended
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    steps: Mapped[int] = mapped_column(Integer, default=0)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AgentStep(Base):
+    __tablename__ = "agent_steps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(Integer, index=True)
+    at: Mapped[datetime] = mapped_column(UTCDateTime)
+    kind: Mapped[str] = mapped_column(String)
+    summary: Mapped[str] = mapped_column(Text)
+
+
+class Approval(Base):
+    """One use only, tied to the exact action and page, expires after ten minutes."""
+
+    __tablename__ = "approvals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(Integer, index=True)
+    action_hash: Mapped[str] = mapped_column(String)
+    label: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String)  # pending, approved, denied, used, expired
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    decided_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
