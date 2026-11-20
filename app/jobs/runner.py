@@ -17,6 +17,7 @@ from app.search.index import index_vault
 from app.sources.google_calendar import HttpCalendarClient, sync_google_calendar
 from app.sources.icollege import http_feed_fetch, sync_icollege
 from app.sources.obsidian import sync_obsidian
+from app.sources.vault_checkout import ensure_checkout
 
 Source = Callable[[Session, datetime], int]
 
@@ -49,24 +50,31 @@ def default_sources(settings: Settings, http, plaid=None) -> dict[str, Source]:
         ids = tuple(c.strip() for c in settings.calendar_ids.split(",") if c.strip())
         return sync_google_calendar(s, client, now, settings.user_timezone, calendar_ids=ids)
 
-    def obsidian(s, now):
+    def vault_path():
+        # a repo URL means: read from a fast local git checkout, kept fresh here,
+        # instead of the vault_path (often a slow cloud-synced folder)
+        if settings.obsidian_repo_url:
+            return ensure_checkout(
+                settings.obsidian_repo_url,
+                settings.obsidian_deploy_key_path,
+                settings.obsidian_checkout_dir,
+            )
         if not settings.obsidian_vault_path:
-            raise FileNotFoundError("OBSIDIAN_VAULT_PATH is not set")
+            raise FileNotFoundError("neither OBSIDIAN_REPO_URL nor OBSIDIAN_VAULT_PATH is set")
+        return settings.obsidian_vault_path
+
+    def obsidian(s, now):
         globs = tuple(g.strip() for g in settings.obsidian_ignore_globs.split(",") if g.strip())
-        return sync_obsidian(
-            s, settings.obsidian_vault_path, now, settings.user_timezone, ignore_globs=globs
-        )
+        return sync_obsidian(s, vault_path(), now, settings.user_timezone, ignore_globs=globs)
 
     def icollege(s, now):
         fetch = http_feed_fetch(http, settings.icollege_feed_url_path)
         return sync_icollege(s, fetch, now, settings.user_timezone)
 
     def vault_index(s, now):
-        if not settings.obsidian_vault_path:
-            raise FileNotFoundError("OBSIDIAN_VAULT_PATH is not set")
         ignore = tuple(g.strip() for g in settings.obsidian_ignore_globs.split(",") if g.strip())
         private = tuple(g.strip() for g in settings.ask_private_globs.split(",") if g.strip())
-        return index_vault(s, settings.obsidian_vault_path, now, ignore, private)
+        return index_vault(s, vault_path(), now, ignore, private)
 
     out = {
         "google_calendar": calendar,
