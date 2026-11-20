@@ -125,3 +125,40 @@ def test_AC6_9_logs_clean(s, caplog):
     with caplog.at_level(logging.DEBUG):
         sync(s, feed(ev("SECRETHOMEWORKNAME - Due", "20261125T045900Z")))
     assert "SECRETHOMEWORKNAME" not in caplog.text and "SUPERSECRETTOKEN" not in caplog.text
+
+
+# ---------- assignment links (spec 13: the agent gets the title and link) ----------
+
+CONTENT = "https://gastate.view.usg.edu/d2l/le/content/111/viewContent/222/View"
+CAL = "https://gastate.view.usg.edu/d2l/le/calendar/111/event/333/detailsview?ou=111#333"
+
+
+def ev_desc(summary, desc):
+    return (
+        f"BEGIN:VEVENT\r\nSUMMARY:{summary}\r\nDESCRIPTION:{desc}\r\n"
+        "DTSTART:20261125T045900Z\r\nEND:VEVENT\r\n"
+    )
+
+
+def test_assignment_link_is_kept_and_beats_the_calendar_link(s):
+    sync(s, feed(ev_desc("HW 9 - Due", f"Homework\\n\\nHW 9 - {CONTENT}\\n\\nView event - {CAL}")))
+    assert tasks(s)[0].source_ref == CONTENT
+
+
+def test_calendar_link_is_the_fallback(s):
+    sync(s, feed(ev_desc("Lab 3 - Due", f"View event - {CAL}")))
+    assert tasks(s)[0].source_ref == CAL
+
+
+@pytest.mark.parametrize(
+    "desc",
+    [
+        "no links here",
+        "http://gastate.view.usg.edu/d2l/le/content/1/View",  # not https
+        "https://evil.example/d2l/le/content/1/View",  # not iCollege
+        "https://gastate.view.usg.edu.evil.example/d2l/x",  # lookalike host
+    ],
+)
+def test_untrusted_or_missing_links_are_dropped(s, desc):
+    sync(s, feed(ev_desc("HW 9 - Due", desc)))
+    assert tasks(s)[0].source_ref == "feed"

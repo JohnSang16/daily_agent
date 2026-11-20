@@ -15,6 +15,13 @@ from app.tasks_sync import sync_tasks
 SOURCE, SCOPE = "icollege", "feed"
 log = logging.getLogger("icollege")
 SUFFIX = re.compile(r"\s*-\s*(Due|Availability Ends)\s*$", re.I)
+# the description is untrusted: only https iCollege links are kept, the item's own page first
+LINK = re.compile(r"https://gastate\.view\.usg\.edu/d2l/[^\s\\]{1,500}")
+
+
+def _link(desc: str) -> str:
+    links = LINK.findall(desc)
+    return next((u for u in links if "/calendar/" not in u), links[0] if links else SCOPE)
 
 
 def _field(block: str, key: str) -> str:
@@ -46,7 +53,8 @@ def parse_feed(text: str, now: datetime, keep_overdue_days: int = 14) -> list[Ta
             title += " (closes)"
         if loc:
             title += f" ({loc[:40]})"
-        out.append(TaskIn(title=title, scope=SCOPE, source_ref=SCOPE, due_at=due))
+        link = _link(_field(blk, "DESCRIPTION"))
+        out.append(TaskIn(title=title, scope=SCOPE, source_ref=link, due_at=due))
     return out
 
 

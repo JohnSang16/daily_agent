@@ -94,3 +94,10 @@ Open questions answered:
 5. Driver: screenshots for the model, plus a fixed page script that reads the real element under each click for the gate.
 6. Cost: see AC13.16.
 Model: claude-opus-5-5 at effort medium, with server side refusal fallbacks (`fallbacks: "default"`). AGENT_MODEL and AGENT_EFFORT change it.
+
+### 2026-11-20, spec 13 gate hardening and assignment links
+What: the page script now picks the tab on screen (newest first) and follows a click down into frames, so a submit inside an embedded player is judged on the real button. A frame it can't get into is marked opaque and needs approval (fails closed). Quiz and exam detection moved from the browser script into the gate: a timer, proctor or Respondus signal, quiz/exam/midterm in the title or top headings, or a quizzing URL path. Bare "test" no longer refuses ("Test 2 Prepration" is homework). iCollege tasks now keep the item's own link from the feed description in `source_ref` (https iCollege links only, the item page before the calendar link), and "Work on it" opens it directly instead of the iCollege home.
+Tests and lint: 309 passed (17 new, the new gate and link tests failed first), ruff clean. Mutation check: turning off the opaque check failed 1 test, turning off the heading check failed 3. Both page scripts pass `node --check`. Real feed: all 20 upcoming items got a link (8 content, 5 dropbox, 5 quizzing, 1 survey, 1 calendar).
+Deviation: no migration, the link lives in `source_ref`, which iCollege tasks set to "feed" before. It is not exposed by any endpoint or log.
+Not verified: the frame and tab logic only runs in a real browser. Check it on the first real session.
+Next step: spec diff for the Gemini solver (a new tool and a new outbound host), then build it.

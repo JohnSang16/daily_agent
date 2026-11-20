@@ -521,3 +521,35 @@ def test_page_script_follows_frames_and_the_visible_tab():
     assert "visibilityState" in INSPECT and "pages()" in INSPECT
     assert "pages()" in GOTO
     assert "opaque" in INSPECT
+
+
+class StartDriver(FakeDriver):
+    def start(self, start_url):
+        self.start_url = start_url
+        return LIVE
+
+
+def _set_ref(app, ref):
+    from app.models import Task
+
+    with app.state.session_factory() as db:
+        db.get(Task, 1).source_ref = ref
+        db.commit()
+
+
+def test_agent_opens_the_assignment_link_straight_away(tmp_path):
+    d = StartDriver()
+    app, c = build(tmp_path, FakeLlm(), d)
+    link = "https://gastate.view.usg.edu/d2l/le/content/1/viewContent/2/View"
+    _set_ref(app, link)
+    start(c)
+    assert d.start_url == link
+
+
+@pytest.mark.parametrize("ref", ["feed", "https://evil.example/d2l/x", "notes/school.md:12"])
+def test_no_safe_link_falls_back_to_icollege_home(tmp_path, ref):
+    d = StartDriver()
+    app, c = build(tmp_path, FakeLlm(), d)
+    _set_ref(app, ref)
+    start(c)
+    assert d.start_url == HOME

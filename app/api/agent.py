@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from app.agent.gate import host_ok
 from app.api.ask import split_course
 from app.auth import require_token
 from app.models import AgentSession, AgentStep, Approval, Task
@@ -98,10 +99,12 @@ def start(body: StartIn, request: Request):
         if t is None or t.status != "open":
             raise HTTPException(404, "task not found")
         title, _ = split_course(t.title)
+        link = t.source_ref if t.source == "icollege" else ""
     if any(True for _ in agent.live):
         raise HTTPException(409, "a homework session is already running. stop it first.")
     try:
-        sid = agent.start(body.task_id, title, body.site, START[body.site])
+        url = link if body.site == "icollege" and host_ok(link, agent.allowed) else START[body.site]
+        sid = agent.start(body.task_id, title, body.site, url)
     except Exception:
         raise HTTPException(502, "the browser could not start") from None
     _kick(request, sid)
