@@ -101,11 +101,14 @@ func reminderDue(_ comps: DateComponents?, tz: TimeZone = .current) -> String? {
 
 struct AgendaItem: Identifiable, Equatable {
     let id: String
+    let backendId: Int
+    let source: String  // "manual" is editable in the app
     let title: String
     let timeText: String
     let isTask: Bool
     let isFirst: Bool
     let sort: Date
+    let rawEnd: Date?  // events only, nil for tasks
 }
 
 struct AgendaSections: Equatable {
@@ -141,19 +144,22 @@ func buildAgenda(day: String, events: [EventItem], tasks: [RankedTask], firstTas
     }
     for e in events {
         if e.allDay {
-            out.allDay.append(AgendaItem(id: "e-" + e.id, title: e.title, timeText: "all day", isTask: false,
-                                         isFirst: false, sort: parseISO(e.start) ?? .distantPast))
+            out.allDay.append(AgendaItem(id: "e-\(e.id)", backendId: e.id, source: e.source, title: e.title,
+                                         timeText: "all day", isTask: false, isFirst: false,
+                                         sort: parseISO(e.start) ?? .distantPast, rawEnd: parseISO(e.end)))
         } else if let s = parseISO(e.start) {
             let end = parseISO(e.end) != nil ? " to " + clock(e.end, tz: tz) : ""
-            place(AgendaItem(id: "e-" + e.id, title: e.title, timeText: clock(e.start, tz: tz) + end,
-                             isTask: false, isFirst: false, sort: s))
+            place(AgendaItem(id: "e-\(e.id)", backendId: e.id, source: e.source, title: e.title,
+                             timeText: clock(e.start, tz: tz) + end, isTask: false, isFirst: false,
+                             sort: s, rawEnd: parseISO(e.end)))
         }
     }
     for t in tasks where localDay(t.dueAt, tz: tz) == day {
         guard let due = parseISO(t.dueAt) else { continue }
         let c = cal.dateComponents([.hour, .minute], from: due)
-        let item = AgendaItem(id: "t-\(t.id)", title: t.title, timeText: "due " + (c.hour == 23 && c.minute == 59 ? "end of day" : clock(t.dueAt!, tz: tz)),
-                              isTask: true, isFirst: t.id == firstTaskId, sort: due)
+        let item = AgendaItem(id: "t-\(t.id)", backendId: t.id, source: t.source, title: t.title,
+                              timeText: "due " + (c.hour == 23 && c.minute == 59 ? "end of day" : clock(t.dueAt!, tz: tz)),
+                              isTask: true, isFirst: t.id == firstTaskId, sort: due, rawEnd: nil)
         if c.hour == 23 && c.minute == 59 { out.allDay.append(item) } else { place(item) }
     }
     out.morning.sort { $0.sort < $1.sort }

@@ -40,11 +40,12 @@ struct RankedTask: Codable, Equatable, Identifiable {
 }
 
 struct EventItem: Codable, Equatable, Identifiable {
+    var id: Int
+    var source: String  // "manual" is editable in the app, anything else is read only here
     var title: String
     var start: String
     var end: String
     var allDay: Bool
-    var id: String { start + title }
 }
 
 struct Explanation: Codable, Equatable {

@@ -57,6 +57,47 @@ def test_AC10a_1_manual_task_and_event_roundtrip(tmp_path):
     assert "Call mom" not in titles(j) and j["events"] == []
 
 
+def test_patch_manual_task_and_event(tmp_path):
+    app, c = build(tmp_path)
+    t = c.post("/items", headers=H, json={"kind": "task", "title": "Call mom", "due": "2026-11-17"}).json()
+    e = c.post(
+        "/items",
+        headers=H,
+        json={
+            "kind": "event",
+            "title": "Dentist",
+            "start": "2026-11-17T15:00:00Z",
+            "end": "2026-11-17T16:00:00Z",
+        },
+    ).json()
+
+    r = c.patch(f"/items/{t['id']}", headers=H, json={"title": "Call mom back", "due": "2026-11-18"})
+    assert r.status_code == 200
+    r = c.patch(
+        f"/items/{e['id']}", headers=H,
+        json={"title": "Dentist (moved)", "start": "2026-11-17T17:00:00Z", "end": "2026-11-17T18:00:00Z"},
+    )
+    assert r.status_code == 200
+
+    j = c.get("/today?date=2026-11-18", headers=H).json()
+    assert "Call mom back" in titles(j)
+    j = c.get("/today?date=2026-11-17", headers=H).json()
+    assert j["events"][0]["title"] == "Dentist (moved)"
+    assert j["events"][0]["start"] == "2026-11-17T17:00:00Z"
+
+
+def test_cannot_patch_other_sources(tmp_path):
+    app, c = build(tmp_path)
+    with app.state.session_factory() as db:
+        sync_tasks(
+            db, "obsidian", "a.md",
+            [TaskIn(title="Essay", scope="a.md", source_ref="x", due_date=datetime(2026, 11, 20).date())],
+            NOW, NY,
+        )
+        tid = db.scalars(select(Task.id)).first()
+    assert c.patch(f"/items/task-{tid}", headers=H, json={"title": "hacked"}).status_code == 404
+
+
 def test_AC10a_2_cannot_delete_other_sources(tmp_path):
     app, c = build(tmp_path)
     with app.state.session_factory() as db:

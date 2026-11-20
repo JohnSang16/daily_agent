@@ -353,6 +353,19 @@ final class AppState: ObservableObject {
         return ok
     }
 
+    /// Only items the app itself created ("manual") can be edited here.
+    func patchItem(_ itemId: String, _ body: [String: Any]) async -> Bool {
+        let ok = await call { c in try await c.send("PATCH", "/items/\(itemId)", json: body) }
+        if ok { Task { await loadWeek(); await refresh() } }
+        return ok
+    }
+
+    func deleteItem(_ itemId: String) async -> Bool {
+        let ok = await call { c in try await c.send("DELETE", "/items/\(itemId)") }
+        if ok { Task { await loadWeek(); await refresh() } }
+        return ok
+    }
+
     func uploadReminders() async {
         guard let c = client else { reminderStatus = "add the address and token first."; return }
         reminderStatus = "uploading."

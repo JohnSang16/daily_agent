@@ -100,6 +100,49 @@ def create_item(body: ItemIn, request: Request, clock: Clock = Depends(get_clock
         return {"id": f"event-{row.id}"}
 
 
+class ItemPatch(BaseModel):
+    title: str | None = Field(None, min_length=1, max_length=300)
+    due: str | None = None  # tasks only
+    effort_minutes: int | None = Field(None, ge=1, le=1440)
+    importance: int | None = Field(None, ge=1, le=5)
+    start: datetime | None = None  # events only
+    end: datetime | None = None
+    all_day: bool | None = None
+
+
+@router.patch("/items/{item_id}")
+def patch_item(item_id: str, body: ItemPatch, request: Request, clock: Clock = Depends(get_clock)):
+    kind, _, num = item_id.partition("-")
+    model = {"task": Task, "event": Event}.get(kind)
+    tz = request.app.state.settings.user_timezone
+    with request.app.state.session_factory() as db:
+        row = db.get(model, int(num)) if model and num.isdigit() else None
+        if row is None or row.source != "manual":  # only items made here can be edited here
+            raise HTTPException(404, "not found")
+        fields = body.model_dump(exclude_unset=True)
+        if body.title is not None:
+            row.title = body.title
+        if kind == "task":
+            if body.due is not None:
+                at, day = _due(body.due)
+                row.due_at = date_only_due_to_utc(day, tz) if day else at
+                row.due_is_date_only = day is not None
+            if "effort_minutes" in fields:
+                row.effort_minutes = body.effort_minutes
+            if "importance" in fields:
+                row.importance = body.importance
+        else:
+            if body.start is not None:
+                row.start_at = body.start.astimezone(UTC)
+            if body.end is not None:
+                row.end_at = body.end.astimezone(UTC)
+            if body.all_day is not None:
+                row.all_day = body.all_day
+        row.updated_at = clock.now()
+        db.commit()
+    return {"id": item_id}
+
+
 @router.delete("/items/{item_id}")
 def delete_item(item_id: str, request: Request):
     kind, _, num = item_id.partition("-")

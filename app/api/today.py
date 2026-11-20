@@ -165,7 +165,14 @@ def today(
         "top_task": top,
         "ranked": items[:limit],
         "events": [
-            {"title": e.title, "start": iso(e.start_at), "end": iso(e.end_at), "all_day": e.all_day}
+            {
+                "id": e.id,
+                "source": e.source,
+                "title": e.title,
+                "start": iso(e.start_at),
+                "end": iso(e.end_at),
+                "all_day": e.all_day,
+            }
             for e in sorted(todays, key=lambda e: e.start_at)
         ],
         "free_blocks": [_block(b) for b in result.free_blocks_today],

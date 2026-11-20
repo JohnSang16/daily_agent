@@ -4,6 +4,7 @@ struct CalendarView: View {
     @EnvironmentObject var state: AppState
     @State private var selected = weekDays(from: Date())[0]
     @State private var adding = false
+    @State private var editing: AgendaItem?
     @Namespace private var pick
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -60,6 +61,7 @@ struct CalendarView: View {
         .refreshable { await state.loadWeek() }
         .task { await state.loadWeek() }
         .sheet(isPresented: $adding) { AddItemSheet(day: selected).environmentObject(state) }
+        .sheet(item: $editing) { it in EditItemSheet(item: it).environmentObject(state) }
     }
 
     private var weekStrip: some View {
@@ -96,22 +98,32 @@ struct CalendarView: View {
             VStack(alignment: .leading, spacing: 16) {
                 sectionLabel(label)
                 ForEach(Array(items.enumerated()), id: \.element.id) { i, it in
-                    HStack(alignment: .top, spacing: 14) {
-                        // a filled dot is a task, a ring is an event
-                        Circle().fill(it.isTask ? Color.white : Color.clear)
-                            .overlay(Circle().stroke(Theme.title, lineWidth: 1.2))
-                            .frame(width: 9, height: 9).padding(.top, 6)
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: 8) {
-                                Text(it.title).font(.system(size: 16)).foregroundStyle(Theme.title)
-                                if it.isFirst { FirstTag() }
-                            }
-                            Text(it.timeText).font(.system(size: 12.5)).monospacedDigit().foregroundStyle(Theme.secondary)
-                        }
-                    }
-                    .reveal(i)
+                    row(it).reveal(i)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ it: AgendaItem) -> some View {
+        let content = HStack(alignment: .top, spacing: 14) {
+            // a filled dot is a task, a ring is an event
+            Circle().fill(it.isTask ? Color.white : Color.clear)
+                .overlay(Circle().stroke(Theme.title, lineWidth: 1.2))
+                .frame(width: 9, height: 9).padding(.top, 6)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text(it.title).font(.system(size: 16)).foregroundStyle(Theme.title)
+                    if it.isFirst { FirstTag() }
+                }
+                Text(it.timeText).font(.system(size: 12.5)).monospacedDigit().foregroundStyle(Theme.secondary)
+            }
+        }
+        if it.source == "manual" {
+            Button { editing = it } label: { content.contentShape(Rectangle()) }
+                .buttonStyle(PressStyle()).accessibilityHint("edit")
+        } else {
+            content
         }
     }
 }
@@ -190,5 +202,74 @@ struct AddItemSheet: View {
             body["end"] = isoString(max(end, when.addingTimeInterval(60)))
         }
         if await state.addItem(body) { dismiss() } else { failed = true }
+    }
+}
+
+struct EditItemSheet: View {
+    @EnvironmentObject var state: AppState
+    @Environment(\.dismiss) private var dismiss
+    let item: AgendaItem
+    @State private var title: String
+    @State private var when: Date
+    @State private var end: Date
+    @State private var failed = false
+    @State private var saving = false
+    @State private var confirmDelete = false
+
+    init(item: AgendaItem) {
+        self.item = item
+        _title = State(initialValue: item.title)
+        _when = State(initialValue: item.sort)
+        _end = State(initialValue: item.rawEnd ?? item.sort.addingTimeInterval(3600))
+    }
+
+    private var canSave: Bool { !saving && !title.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            sheetTitle(item.isTask ? "Edit task" : "Edit event")
+            TextField("title", text: $title).font(.system(size: 16)).foregroundStyle(Theme.title)
+                .padding(.horizontal, 18).frame(minHeight: 48).glass(Capsule())
+            if item.isTask {
+                DatePicker("due", selection: $when, displayedComponents: [.date, .hourAndMinute])
+                    .foregroundStyle(Theme.body)
+            } else {
+                DatePicker("starts", selection: $when).foregroundStyle(Theme.body)
+                DatePicker("ends", selection: $end).foregroundStyle(Theme.body)
+            }
+            if failed { Text("could not save. check the connection.").font(.system(size: 12.5)).foregroundStyle(Theme.secondary) }
+            PillButton(label: saving ? "saving" : "save", primary: true, enabled: canSave, feedback: .success) { Task { await save() } }
+            PillButton(label: "delete", feedback: .warning) { confirmDelete = true }
+            Spacer()
+        }
+        .padding(24).padding(.top, 8).frame(maxWidth: .infinity, alignment: .leading)
+        .sheetChrome([.large])
+        .confirmationDialog("delete this \(item.isTask ? "task" : "event")?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("delete", role: .destructive) { Task { await remove() } }
+        }
+        .onChange(of: when) { old, new in
+            if !item.isTask { end = new.addingTimeInterval(max(end.timeIntervalSince(old), 60)) }
+        }
+    }
+
+    private var itemId: String { (item.isTask ? "task-" : "event-") + "\(item.backendId)" }
+
+    private func save() async {
+        let name = title.trimmingCharacters(in: .whitespaces)
+        guard canSave else { return }
+        saving = true; failed = false
+        defer { saving = false }
+        var body: [String: Any] = ["title": name]
+        if item.isTask {
+            body["due"] = isoString(when)
+        } else {
+            body["start"] = isoString(when)
+            body["end"] = isoString(max(end, when.addingTimeInterval(60)))
+        }
+        if await state.patchItem(itemId, body) { dismiss() } else { failed = true }
+    }
+
+    private func remove() async {
+        if await state.deleteItem(itemId) { dismiss() }
     }
 }
