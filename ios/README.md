@@ -4,6 +4,16 @@ A SwiftUI screen for the daily agent. It only talks to the agent's API, never to
 
 ## What is built (v0.1)
 - Dashboard: weekday title, the agent's one paragraph explanation, today's goal (saved to the agent), top three deadlines, today's schedule, warnings in plain words, "updated" or "offline" line. Pull to refresh. Tap a deadline to snooze it or mark it done.
+- Follow through (spec 18):
+  - #1 is a card with its deep work block and your if-then plan, and #2 and #3 sit quietly under it.
+  - "N done today".
+  - Reps: daily input goals with +1, seven day marks, "x of 7" and "missed twice. today counts.".
+  - "in the mailbox" holds outcome goals as quiet bars.
+  - A check-in card from 9 pm asks "did #1 happen?", "what got in the way?" and "one thing to let go of".
+  - Yesterday's slip shows with "never miss twice".
+  - The digest asks for today's obstacle and an if-then plan, and shows "kept your word x of y days".
+  - Marking a task done or hitting a rep target shows "that's the type of person you are." with one of your identity lines.
+  - Settings turns on a local 9 pm reminder.
 - Calendar: big weekday title, a seven day strip starting today (dot on busy days), the day's agenda split into all day, morning, afternoon and evening (filled dot is a task, ring is an event, "first" tag on the top priority), and an "add" sheet that saves a task or event in the agent only (never to Google Calendar). Month grid not built yet.
 - Digest: the daily brief from `GET /digest`: the mantra, one vision line and the newest WHY from your reflections (all read from the vault), then up to seven hard deadlines in order with an overflow line, and quiet notes about stale or failed sources.
 - Money: four views. Overview (this month's spent, income and net, a spend vs income bar chart for six months, where it went by category, and budget goals you set with a limit and see as bars), Banks (where your money sits: cash, savings, invested, owed on cards and loans, net, then every bank with its accounts, balances and an on/off switch each), Income (the full income log by month with subtotals) and Activity (the plain transaction list).

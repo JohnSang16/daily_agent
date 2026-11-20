@@ -1,5 +1,13 @@
 import Foundation
 import SwiftUI
+import UserNotifications
+
+/// A short win message: "that's the type of person you are." over one identity line.
+struct Toast: Equatable, Identifiable {
+    let id = UUID()
+    let title: String
+    let line: String?
+}
 
 @MainActor
 final class AppState: ObservableObject {
@@ -20,6 +28,10 @@ final class AppState: ObservableObject {
     @Published var summary: MoneySummary?
     @Published var budgets: [BudgetGoal] = []
     @Published var incomeRows: [Txn] = []
+    @Published var checkin: CheckinDay?
+    @Published var goals: [GoalItem] = []
+    @Published var toast: Toast?
+    private var wins = 0
 
     init() {
         if let (t, at) = Cache.load() { today = t; lastUpdated = at }
@@ -77,7 +89,95 @@ final class AppState: ObservableObject {
             today = t
             lastUpdated = Date()
             if let g: Goal = try? await c.get("/goal/today") { goal = g.text }
+            async let ck: CheckinDay? = try? c.get("/checkin/today")
+            async let gs: [GoalItem]? = try? c.get("/goals")
+            if let v = await ck { checkin = v }
+            if let v = await gs { goals = v }
+            if digest == nil { digest = try? await c.get("/digest") }  // identity lines for the win toast
         }
+    }
+
+    // MARK: follow through (spec 18)
+
+    /// Self talk right after a win: said once, then it fades.
+    func celebrate(_ title: String = "that's the type of person you are.") {
+        wins += 1
+        let t = Toast(title: title, line: identityLine(digest?.identity, turn: wins))
+        withAnimation(Theme.spring) { toast = t }
+        Task {
+            try? await Task.sleep(nanoseconds: 2_800_000_000)
+            if toast == t { withAnimation(Theme.ease) { toast = nil } }
+        }
+    }
+
+    func loadCheckin() async {
+        await call { c in checkin = try await c.get("/checkin/today") }
+    }
+
+    /// Partial save: only the keys given change. Shows on screen first.
+    func saveCheckin(_ fields: [String: Any]) async {
+        if var ck = checkin {
+            if let v = fields["obstacle"] as? String { ck.today.obstacle = v }
+            if let v = fields["if_then"] as? String { ck.today.ifThen = v }
+            if let v = fields["did_top"] as? Bool { ck.today.didTop = v }
+            if let v = fields["why_not"] as? String { ck.today.whyNot = v }
+            if let v = fields["let_go"] as? String { ck.today.letGo = v }
+            withAnimation(Theme.spring) { checkin = ck }
+        }
+        await call { c in try await c.send("PUT", "/checkin/today", json: fields) }
+        await loadCheckin()
+    }
+
+    func loadGoals() async {
+        await call { c in goals = try await c.get("/goals") }
+    }
+
+    /// Sets today's count for an input goal. Hitting the target is a win.
+    func logInput(_ g: GoalItem, count: Int) async {
+        let n = max(0, count)
+        let hitNow = n >= g.target && (g.today ?? 0) < g.target
+        if let i = goals.firstIndex(where: { $0.id == g.id }) {
+            goals[i].today = n
+            if var l = goals[i].last7, !l.isEmpty { l[l.count - 1] = n; goals[i].last7 = l }
+        }
+        if hitNow { celebrate() }
+        await call { c in try await c.send("PUT", "/goals/\(g.id)/today", json: ["count": n]) }
+        await loadGoals()
+    }
+
+    func addGoal(_ body: [String: Any]) async -> Bool {
+        let ok = await call { c in try await c.send("POST", "/goals", json: body) }
+        if ok { await loadGoals() }
+        return ok
+    }
+
+    func updateGoal(_ id: Int, _ body: [String: Any]) async {
+        await call { c in try await c.send("PATCH", "/goals/\(id)", json: body) }
+        await loadGoals()
+    }
+
+    func deleteGoal(_ id: Int) async {
+        withAnimation(Theme.spring) { goals.removeAll { $0.id == id } }
+        await call { c in try await c.send("DELETE", "/goals/\(id)") }
+        await loadGoals()
+    }
+
+    /// A local 9 pm reminder, every day. Nothing leaves the phone.
+    func setNightlyReminder(_ on: Bool) async -> Bool {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: ["nightly-checkin"])
+        UserDefaults.standard.set(on, forKey: "nightlyCheckin")
+        guard on else { return true }
+        guard (try? await center.requestAuthorization(options: [.alert, .sound])) == true else {
+            UserDefaults.standard.set(false, forKey: "nightlyCheckin")
+            return false
+        }
+        let content = UNMutableNotificationContent()
+        content.title = "did #1 happen?"
+        content.body = "one minute. answer honestly, then let the rest go."
+        let trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(hour: 21, minute: 0), repeats: true)
+        try? await center.add(UNNotificationRequest(identifier: "nightly-checkin", content: content, trigger: trigger))
+        return true
     }
 
     /// Shows the new goal right away, puts the old one back if the agent refuses it.
@@ -106,6 +206,8 @@ final class AppState: ObservableObject {
 
     func done(_ id: Int) async {
         dropTask(id)
+        today?.doneToday = (today?.doneToday ?? 0) + 1
+        celebrate()
         await call { c in try await c.send("POST", "/tasks/\(id)/done") }
         await refresh()
     }

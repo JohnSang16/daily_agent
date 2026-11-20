@@ -11,6 +11,7 @@ struct Today: Codable, Equatable {
     var explanation: Explanation
     var warnings: [Warning]
     var needsReviewCount: Int
+    var doneToday: Int?  // optional so an older agent still decodes
 }
 
 struct TopTask: Codable, Equatable {
@@ -19,6 +20,12 @@ struct TopTask: Codable, Equatable {
     var dueAt: String?
     var reasons: [String]
     var atRisk: Bool
+    var suggestedBlock: TimeBlock?
+}
+
+struct TimeBlock: Codable, Equatable {
+    var start: String
+    var end: String
 }
 
 struct RankedTask: Codable, Equatable, Identifiable {
@@ -201,4 +208,48 @@ struct BudgetGoal: Codable, Equatable, Identifiable {
     var limitCents: Int
     var spentCents: Int
     var id: String { category }
+}
+
+// Spec 18: check-in and goals
+
+struct Checkin: Codable, Equatable {
+    var obstacle: String?
+    var ifThen: String?
+    var topTaskTitle: String?
+    var didTop: Bool?
+    var whyNot: String?
+    var letGo: String?
+}
+
+struct YesterdayAnswer: Codable, Equatable {
+    var topTaskTitle: String?
+    var didTop: Bool?
+    var whyNot: String?
+}
+
+struct SayDo: Codable, Equatable {
+    var kept: Int
+    var of: Int
+}
+
+struct CheckinDay: Codable, Equatable {
+    var date: String
+    var today: Checkin
+    var yesterday: YesterdayAnswer
+    var sayDo: SayDo
+}
+
+struct GoalItem: Codable, Equatable, Identifiable {
+    var id: Int
+    var name: String
+    var kind: String  // input, outcome
+    var unit: String
+    var target: Int
+    var current: Int?  // outcome
+    var today: Int?  // input
+    var last7: [Int]?
+    var hit7: Int?
+    var missedTwice: Bool?
+    var total30: Int?
+    var isInput: Bool { kind == "input" }
 }

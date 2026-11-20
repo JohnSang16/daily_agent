@@ -24,6 +24,7 @@ struct DigestView: View {
                     if let m = d.mantra { line("mantra", m).reveal(1) }
                     if let v = d.vision { line("vision", v).reveal(2) }
                     if let w = d.why { line("why, \(w.date)", w.text).reveal(3) }
+                    ObstaclePlan().reveal(3)
                     if let id = d.identity, !id.isEmpty { identity(id).reveal(4) }
                     plan(d.plan).reveal(5)
                     deadlines(d).reveal(6)
@@ -37,7 +38,10 @@ struct DigestView: View {
             .page()
         }
         .refreshable { await state.loadDigest() }
-        .task { await state.loadDigest() }
+        .task {
+            await state.loadDigest()
+            if state.checkin == nil { await state.loadCheckin() }
+        }
     }
 
     private func line(_ label: String, _ text: String) -> some View {
@@ -50,6 +54,9 @@ struct DigestView: View {
     private func identity(_ lines: [String]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel("identity, say it out loud, repeat each twice")
+            if let s = state.checkin?.sayDo, !sayDoLine(s).isEmpty {
+                Text(sayDoLine(s)).font(.system(size: 13)).monospacedDigit().foregroundStyle(Theme.secondary)
+            }
             ForEach(Array(lines.enumerated()), id: \.offset) { _, l in
                 Text(l).font(.system(size: 15)).foregroundStyle(Theme.title)
             }
@@ -99,5 +106,50 @@ struct DigestView: View {
                 Text("+\(d.overflow) more with deadlines past \(d.overflowAfter ?? "this list")").font(.system(size: 12.5)).foregroundStyle(Theme.tertiary)
             }
         }
+    }
+}
+
+
+/// Right after the vision: name what is most likely to get in the way, then decide now what you'll do.
+/// Picturing only the win lowers effort. Pairing it with the obstacle raises it.
+struct ObstaclePlan: View {
+    @EnvironmentObject var state: AppState
+    @State private var obstacle = ""
+    @State private var ifThen = ""
+    @State private var loaded = false
+    @FocusState private var focus: Int?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel("what's most likely to stop you today?")
+            box("scrolling, a late night, ...", $obstacle, tag: 0)
+            sectionLabel("if that happens, I'll")
+            box("put the phone in the other room", $ifThen, tag: 1)
+        }
+        .onAppear(perform: fill)
+        .onDisappear(perform: save)
+        .onChange(of: state.checkin) { _, _ in fill() }
+        .onChange(of: focus) { old, _ in if old != nil { save() } }  // saves when you leave a field
+    }
+
+    private func fill() {
+        guard !loaded, let t = state.checkin?.today else { return }
+        obstacle = t.obstacle ?? ""; ifThen = t.ifThen ?? ""; loaded = true
+    }
+
+    private func save() {
+        let t = state.checkin?.today
+        var body: [String: Any] = [:]
+        if obstacle != (t?.obstacle ?? "") { body["obstacle"] = String(obstacle.prefix(200)) }
+        if ifThen != (t?.ifThen ?? "") { body["if_then"] = String(ifThen.prefix(200)) }
+        guard !body.isEmpty else { return }
+        Task { await state.saveCheckin(body) }
+    }
+
+    private func box(_ prompt: String, _ text: Binding<String>, tag: Int) -> some View {
+        TextField(prompt, text: text, axis: .vertical).font(.system(size: 15)).foregroundStyle(Theme.title)
+            .lineLimit(1...3).focused($focus, equals: tag).submitLabel(.done).onSubmit { focus = nil }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+            .glass(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
