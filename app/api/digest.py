@@ -12,6 +12,7 @@ from app.digest import read_identity, read_lines, read_plan_from_vault, read_why
 from app.llm.explain import format_due
 from app.models import Event, Task
 from app.priority.engine import Config, EventView, TaskView, rank
+from app.sources.vault_checkout import resolved_vault_path
 
 router = APIRouter(dependencies=[Depends(require_token)])
 CAP = 7
@@ -67,7 +68,8 @@ def digest(request: Request, clock: Clock = Depends(get_clock)):
                 f"{n} overdue item{'s' if n != 1 else ''} older than "
                 f"{st.stale_overdue_days} days hidden"
             )
-    lines = read_lines(st.obsidian_vault_path)
+    vault_path = resolved_vault_path(st)
+    lines = read_lines(vault_path)
     today = now.astimezone(tz).date().isoformat()
     past = dated[CAP - 1].due_at.astimezone(tz) if len(dated) > CAP else None
     return {
@@ -75,9 +77,9 @@ def digest(request: Request, clock: Clock = Depends(get_clock)):
         "generated_at": iso(now),
         "mantra": lines.get("mantra"),
         "vision": lines.get("vision"),
-        "why": read_why_from_vault(st.obsidian_vault_path),
-        "identity": read_identity(st.obsidian_vault_path),
-        "plan": read_plan_from_vault(st.obsidian_vault_path, today),
+        "why": read_why_from_vault(vault_path),
+        "identity": read_identity(vault_path),
+        "plan": read_plan_from_vault(vault_path, today),
         "deadlines": [
             {
                 "id": t.id,
