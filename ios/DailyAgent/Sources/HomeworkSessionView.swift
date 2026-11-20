@@ -8,10 +8,12 @@ import WebKit
 struct HomeworkSessionView: View {
     @EnvironmentObject var state: AppState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State var session: HomeworkSession
     @State private var note = ""
     @State private var showSteps = true
     @State private var busy = false
+    @State private var reloadToken = 0
     @FocusState private var typing: Bool
 
     var body: some View {
@@ -40,6 +42,7 @@ struct HomeworkSessionView: View {
         .preferredColorScheme(.dark)
         .sensoryFeedback(.warning, trigger: session.approval?.id)
         .task(id: session.id) { await poll() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { reloadToken += 1 } }
     }
 
     // MARK: pieces
@@ -69,7 +72,7 @@ struct HomeworkSessionView: View {
         let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
         ZStack {
             if let s = session.liveViewUrl, let url = URL(string: s) {
-                LiveBrowser(url: url)
+                LiveBrowser(url: url, reloadToken: reloadToken)
             } else {
                 Text(session.isActive ? "connecting to the browser." : "the browser was deleted.")
                     .font(.system(size: 13.5)).foregroundStyle(Theme.secondary)
@@ -197,6 +200,14 @@ struct HomeworkSessionView: View {
 #if os(iOS)
 struct LiveBrowser: UIViewRepresentable {
     let url: URL
+    var reloadToken = 0  // backgrounding the app kills the live view's connection; bump this to reconnect
+
+    final class Coordinator {
+        var lastToken = 0
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
@@ -206,15 +217,20 @@ struct LiveBrowser: UIViewRepresentable {
         v.backgroundColor = .black
         v.scrollView.isScrollEnabled = false
         v.load(URLRequest(url: url))
+        context.coordinator.lastToken = reloadToken
         return v
     }
     func updateUIView(_ v: WKWebView, context: Context) {
-        if v.url?.host != url.host { v.load(URLRequest(url: url)) }
+        if v.url?.host != url.host || context.coordinator.lastToken != reloadToken {
+            context.coordinator.lastToken = reloadToken
+            v.load(URLRequest(url: url))
+        }
     }
 }
 #else
 struct LiveBrowser: View {
     let url: URL
+    var reloadToken = 0
     var body: some View { Text("live view runs on the phone.").foregroundStyle(Theme.secondary) }
 }
 #endif
