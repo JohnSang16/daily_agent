@@ -37,6 +37,7 @@ Names are the settings in `app/config.py`, upper case.
 | ICOLLEGE_FEED_URL_PATH | for school | file holding the private feed URL, secret |
 | OBSIDIAN_VAULT_PATH | for notes | local vault folder, hosted use needs a git checkout (separate spec) |
 | OBSIDIAN_IGNORE_GLOBS | no | default templates/*,archive/* |
+| SCHOOL_NOTES_GLOBS | no | default career/school/*, the notes homework mode searches (spec 19) |
 | OBSIDIAN_REPO_URL | no | git URL of the vault. When set, notes are read from a local checkout instead of OBSIDIAN_VAULT_PATH |
 | OBSIDIAN_DEPLOY_KEY_PATH | with a repo URL | read only deploy key for that repo, kept outside the repo |
 | OBSIDIAN_CHECKOUT_DIR | no | where the checkout lives |
