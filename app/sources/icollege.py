@@ -3,7 +3,7 @@
 import logging
 import re
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -22,7 +22,8 @@ def _field(block: str, key: str) -> str:
     return m.group(1).strip().replace("\\,", ",") if m else ""
 
 
-def parse_feed(text: str, now: datetime) -> list[TaskIn]:
+def parse_feed(text: str, now: datetime, keep_overdue_days: int = 14) -> list[TaskIn]:
+    """Future due items, plus ones missed in the last keep_overdue_days (they show as overdue)."""
     text = re.sub(r"\r?\n[ \t]", "", text)  # unfold wrapped lines
     out = []
     for blk in text.split("BEGIN:VEVENT")[1:]:
@@ -38,7 +39,7 @@ def parse_feed(text: str, now: datetime) -> list[TaskIn]:
             due = datetime.strptime(start, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
         except ValueError:
             continue  # floating or date only starts are not exact due moments
-        if due <= now:
+        if due <= now - timedelta(days=keep_overdue_days):
             continue
         title = SUFFIX.sub("", summary).strip()
         if m.group(1).lower().startswith("availability"):

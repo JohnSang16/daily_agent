@@ -12,11 +12,15 @@ from app.models import BankAccount, Transaction
 
 INTERNAL_PRIMARY = {"TRANSFER_IN", "TRANSFER_OUT"}
 CARD_PAYMENT = "LOAN_PAYMENTS_CREDIT_CARD_PAYMENT"
+# transfer details that are real spending, not a move between my own accounts
+SPEND_TRANSFERS = {"TRANSFER_OUT_WITHDRAWAL"}  # ATM and teller cash
 SAVINGS_SUBTYPES = {"savings", "cd", "money market", "hsa", "cash management"}
 
 
 def is_internal(category: str | None, detail: str | None) -> bool:
-    return category in INTERNAL_PRIMARY or detail == CARD_PAYMENT
+    if detail == CARD_PAYMENT:
+        return True
+    return category in INTERNAL_PRIMARY and detail not in SPEND_TRANSFERS
 
 
 def month_key(d: date) -> str:

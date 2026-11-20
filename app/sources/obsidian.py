@@ -34,6 +34,8 @@ def parse_line(line: str, scope: str, lineno: int, tz: str) -> TaskIn | None:
     due_at = due_date = None
     d = DUE.search(body)
     try:
+        if d is None:
+            raise ValueError("no date after the calendar emoji")
         day = date.fromisoformat(d.group(1))
         if d.group(2):
             h, mi = map(int, d.group(2).split(":"))

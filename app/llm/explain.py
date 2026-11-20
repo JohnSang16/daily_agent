@@ -7,6 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import ExplanationCache, LlmUsage
@@ -98,6 +99,10 @@ def explain(
     if payload["ranking"][0]["title"] not in res.text:
         db.commit()
         return fallback, "template", False  # contradicts the ranking: never show it
+    db.commit()  # the usage row is kept even if the cache insert below loses a race
     db.add(ExplanationCache(key=key, text=res.text, created_at=now))
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:  # another request cached this ranking first: same answer, fine
+        db.rollback()
     return res.text, "llm", False

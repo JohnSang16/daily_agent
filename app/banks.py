@@ -43,8 +43,13 @@ def _upsert_accounts(db: Session, item: BankItem, accounts: list[dict]) -> dict[
 
 
 def store_item(db: Session, box: TokenBox, plaid, public_token: str, now: datetime) -> BankItem:
+    """Raises ValueError if this bank is already connected: a second login would count it twice."""
     access, plaid_item = plaid.exchange(public_token)
     inst_id, inst_name, accounts = plaid.accounts(access)
+    dup = db.scalars(select(BankItem).where(BankItem.institution_id == inst_id)).first()
+    if dup is not None:
+        plaid.item_remove(access)  # close the new login so it is not billed or left dangling
+        raise ValueError(f"{inst_name} is already connected")
     item = BankItem(
         user_id=1,
         plaid_item_id=plaid_item,
@@ -93,20 +98,31 @@ def _apply(db: Session, acct_ids: dict[str, int], res: dict, now: datetime) -> i
     return changed
 
 
+class BankSyncFailed(RuntimeError):
+    """Some banks failed (ids only, never tokens). The others were still synced."""
+
+
 def sync_banks(db: Session, box: TokenBox, plaid, now: datetime) -> int:
-    changed = 0
-    for item in db.scalars(select(BankItem)).all():
-        access = box.decrypt(item.access_token_enc)
-        _, _, accounts = plaid.accounts(access)
-        acct_ids = _upsert_accounts(db, item, accounts)
-        db.commit()  # release the write lock before the next outbound call's own audit write
-        while True:
-            res = plaid.transactions_sync(access, item.cursor)
-            changed += _apply(db, acct_ids, res, now)
-            item.cursor = res["next_cursor"]
+    changed, failed = 0, []
+    for item_id in db.scalars(select(BankItem.id)).all():
+        item = db.get(BankItem, item_id)
+        try:  # one expired login must not stop the banks after it
+            access = box.decrypt(item.access_token_enc)
+            _, _, accounts = plaid.accounts(access)
+            acct_ids = _upsert_accounts(db, item, accounts)
+            db.commit()  # release the write lock before the next outbound call's own audit write
+            while True:
+                res = plaid.transactions_sync(access, item.cursor)
+                changed += _apply(db, acct_ids, res, now)
+                item.cursor = res["next_cursor"]
+                db.commit()
+                if not res.get("has_more"):
+                    break
+            item.last_sync_at = now
             db.commit()
-            if not res.get("has_more"):
-                break
-        item.last_sync_at = now
-        db.commit()
+        except Exception:
+            db.rollback()
+            failed.append(item_id)
+    if failed:
+        raise BankSyncFailed(f"bank ids {failed} failed")
     return changed
