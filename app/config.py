@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     llm_model: str = ""  # never hard coded: set LLM_MODEL when a real client is wired in
     llm_daily_token_budget: int = 20000
+    # api = Console credits, cli = headless Claude Code on the logged in subscription
+    llm_backend: str = "api"
+    claude_cli_path: str = "claude"
     stale_after_hours: int = 26
     stale_overdue_days: int = 14  # overdue longer than this is hidden from /today, 0 shows all
     google_client_secrets_path: str = "./secrets/client_secret.json"

@@ -16,6 +16,7 @@ from app.db import make_session_factory
 from app.http_client import GuardedHttpClient
 from app.jobs.runner import Runner, banks_source, default_sources, scheduler_loop
 from app.llm.anthropic_client import AnthropicClient
+from app.llm.cli_client import ClaudeCliClient
 from app.logging_config import new_request_id, setup_logging
 from app.sources.plaid import PlaidClient
 
@@ -56,6 +57,8 @@ def create_app(
     app.state.settings = settings
     app.state.session_factory = make_session_factory(settings.database_url)
     http = GuardedHttpClient(DbAudit(app.state.session_factory, SystemClock()))
+    if llm is None and settings.llm_backend == "cli" and settings.llm_model:
+        llm = ClaudeCliClient(settings.llm_model, settings.claude_cli_path)
     if llm is None and settings.anthropic_api_key and settings.llm_model:
         llm = AnthropicClient(http, settings.anthropic_api_key, settings.llm_model)
     app.state.llm = llm  # None: explanations use the template

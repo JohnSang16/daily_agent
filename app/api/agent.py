@@ -1,6 +1,7 @@
 """Spec 13 endpoints. All need the bearer token. The live view URL is returned only while the
 session is active and is never logged."""
 
+import logging
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -12,6 +13,7 @@ from app.api.ask import split_course
 from app.auth import require_token
 from app.models import AgentSession, AgentStep, Approval, Task
 
+log = logging.getLogger("agent")
 router = APIRouter(dependencies=[Depends(require_token)])
 START = {
     "icollege": "https://gastate.view.usg.edu/d2l/home",
@@ -105,7 +107,8 @@ def start(body: StartIn, request: Request):
     try:
         url = link if body.site == "icollege" and host_ok(link, agent.allowed) else START[body.site]
         sid = agent.start(body.task_id, title, body.site, url)
-    except Exception:
+    except Exception as exc:
+        log.warning("session start failed: %s", type(exc).__name__)
         raise HTTPException(502, "the browser could not start") from None
     _kick(request, sid)
     return _view(request, sid)
