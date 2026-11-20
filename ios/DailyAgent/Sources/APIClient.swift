@@ -11,12 +11,13 @@ struct APIClient {
     var token: String
     var session: URLSession = .shared
 
-    private func request(_ method: String, _ path: String, query: [URLQueryItem] = [], body: Data? = nil) throws -> URLRequest {
+    private func request(_ method: String, _ path: String, query: [URLQueryItem] = [], body: Data? = nil,
+                         timeout: TimeInterval = 15) throws -> URLRequest {
         guard var comps = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else { throw APIError.notConfigured }
         comps.path = path
         comps.queryItems = query.isEmpty ? nil : query
         guard let url = comps.url else { throw APIError.notConfigured }
-        var r = URLRequest(url: url, timeoutInterval: 15)
+        var r = URLRequest(url: url, timeoutInterval: timeout)
         r.httpMethod = method
         r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         if let body { r.httpBody = body; r.setValue("application/json", forHTTPHeaderField: "Content-Type") }
@@ -43,6 +44,12 @@ struct APIClient {
     func send(_ method: String, _ path: String, json: [String: Any]? = nil) async throws {
         let body = try json.map { try JSONSerialization.data(withJSONObject: $0) }
         _ = try await run(try request(method, path, body: body))
+    }
+
+    /// A POST that returns a body (ask), unlike send.
+    func post<T: Decodable>(_ path: String, json: [String: Any]) async throws -> T {
+        let body = try JSONSerialization.data(withJSONObject: json)
+        return try makeDecoder().decode(T.self, from: try await run(try request("POST", path, body: body, timeout: 40)))
     }
 
     func getData(_ path: String) async throws -> Data {

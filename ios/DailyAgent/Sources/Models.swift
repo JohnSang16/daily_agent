@@ -253,3 +253,31 @@ struct GoalItem: Codable, Equatable, Identifiable {
     var total30: Int?
     var isInput: Bool { kind == "input" }
 }
+
+// Spec 19: the Agent screen
+
+struct AskSource: Codable, Equatable, Identifiable {
+    var path: String
+    var heading: String
+    var excerpt: String
+    var id: String { path + "#" + heading }
+}
+
+struct AskReply: Codable, Equatable {
+    var answer: String
+    var sources: [AskSource]
+    var usedLlm: Bool
+    var route: String?
+}
+
+struct CourseAssignment: Codable, Equatable, Identifiable {
+    var id: Int
+    var title: String
+    var dueAt: String
+}
+
+struct Course: Codable, Equatable, Identifiable {
+    var course: String
+    var assignments: [CourseAssignment]
+    var id: String { course }
+}

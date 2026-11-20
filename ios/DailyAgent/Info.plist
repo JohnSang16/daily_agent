@@ -35,8 +35,12 @@
 			</dict>
 		</dict>
 	</dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Lets you dictate a question to your agent. Audio stays on this phone.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Sends the title, due date and done state of your open reminders to your own agent. Nothing is changed in Reminders.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Turns your dictated question into text on this phone. Nothing is sent until you tap send.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>
