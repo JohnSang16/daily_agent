@@ -216,3 +216,41 @@ class Budget(Base):
     category: Mapped[str] = mapped_column(String, primary_key=True)
     limit_cents: Mapped[int] = mapped_column(Integer)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
+class DailyCheckin(Base):
+    """Spec 18: the morning obstacle and if-then plan, and the nightly answer about #1."""
+
+    __tablename__ = "daily_checkin"
+
+    day: Mapped[str] = mapped_column(String, primary_key=True)  # YYYY-MM-DD in my time zone
+    obstacle: Mapped[str | None] = mapped_column(Text, nullable=True)
+    if_then: Mapped[str | None] = mapped_column(Text, nullable=True)
+    top_task_title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    did_top: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    why_not: Mapped[str | None] = mapped_column(Text, nullable=True)
+    let_go: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
+class Goal(Base):
+    """Spec 18: an input goal (a daily target of reps) or an outcome goal (a total to reach)."""
+
+    __tablename__ = "goals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    kind: Mapped[str] = mapped_column(String)  # input, outcome
+    unit: Mapped[str] = mapped_column(String, default="")
+    target: Mapped[int] = mapped_column(Integer)
+    current: Mapped[int] = mapped_column(Integer, default=0)  # outcome goals only
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class GoalLog(Base):
+    __tablename__ = "goal_logs"
+
+    goal_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    day: Mapped[str] = mapped_column(String, primary_key=True)  # YYYY-MM-DD in my time zone
+    count: Mapped[int] = mapped_column(Integer)

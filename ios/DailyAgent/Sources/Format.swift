@@ -271,3 +271,43 @@ func warningLine(_ w: Warning) -> String {
     default: return (w.detail ?? w.code.replacingOccurrences(of: "_", with: " ")).lowercased()
     }
 }
+
+// MARK: follow through (spec 18)
+
+/// "deep work, 2:00 to 4:00 pm" for the #1 task's suggested block. Empty when there is none.
+func blockLine(_ b: TimeBlock?, tz: TimeZone = .current) -> String {
+    guard let b, parseISO(b.start) != nil else { return "" }
+    let start = clock(b.start, tz: tz), end = clock(b.end, tz: tz)
+    // "2:00 pm to 4:00 pm" reads heavy, drop the first am/pm when both match
+    let s = start.hasSuffix(String(end.suffix(2))) ? String(start.dropLast(3)) : start
+    return "deep work, \(s) to \(end)"
+}
+
+/// The nightly check-in shows from 9 pm until it is answered.
+func checkinDue(_ now: Date, answered: Bool, tz: TimeZone = .current) -> Bool {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    return !answered && cal.component(.hour, from: now) >= 21
+}
+
+/// "kept your word 9 of 11 days", or nothing until there is an answer.
+func sayDoLine(_ s: SayDo) -> String {
+    s.of == 0 ? "" : "kept your word \(s.kept) of \(s.of) day" + (s.of == 1 ? "" : "s")
+}
+
+/// "1 of 2 problems", with the unit only when set.
+func repsLine(_ g: GoalItem) -> String {
+    "\(g.today ?? 0) of \(g.target)" + (g.unit.isEmpty ? "" : " " + g.unit)
+}
+
+/// The identity line under the win toast, rotated by a counter so it is not always the first one.
+func identityLine(_ lines: [String]?, turn: Int) -> String? {
+    guard let lines, !lines.isEmpty else { return nil }
+    return lines[abs(turn) % lines.count]
+}
+
+/// 0 to 1 for an outcome goal's bar.
+func outcomeFraction(_ g: GoalItem) -> Double {
+    guard g.target > 0 else { return 0 }
+    return min(1, Double(g.current ?? 0) / Double(g.target))
+}

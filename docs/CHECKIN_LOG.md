@@ -62,3 +62,10 @@ Tests and lint: 244 passed (21 new in tests/test_triage_fixes.py, each failed fi
 Spec changes (asked for by "fix all the backend bugs"): spec 06 keeps missed iCollege items 14 days, spec 08 limit max 500, spec 16 cash withdrawals count as spending.
 Open: Venmo or Zelle payments to other people still read as transfers. Plaid gives no reliable way to tell them apart from moves between your own accounts. Duplicate Marcus (bank id 6) still needs DELETE /banks/6.
 Next step: run the app on the phone, then the week endpoint.
+
+### 2026-11-20, spec 18 goal follow through
+Acceptance criteria passing: AC18.1 to AC18.11 (19 tests, written first, failed at import).
+Tests and lint: 263 passed, ruff clean. Migration 0008 runs up and down on a scratch database. iOS typecheck clean at macOS 26 and 14, logic checks pass (13 new).
+Deviations: none. The widget is out of scope on purpose (see spec 18, it needs a call on App Groups or where the token is stored).
+Open questions: widget. Also suggested: make the identity lines process based ("I'm the type of person that ...") instead of outcome based ("I'm a Googler"). That is John's call, in `_meta/digest-lines.md`.
+Next step: `uv run alembic upgrade head` on the agent Mac, restart the agent, then run the app.

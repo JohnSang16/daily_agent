@@ -76,6 +76,13 @@ struct RootView: View {
             .offset(x: width * progress)
 
         }
+        .overlay(alignment: .top) {
+            if let t = state.toast {
+                WinToast(toast: t).padding(.top, 6)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .onTapGesture { withAnimation(Theme.ease) { state.toast = nil } }
+            }
+        }
         .sensoryFeedback(.impact(weight: .light), trigger: drawerOpen)
         .onChange(of: state.configured) { _, ok in if !ok { screen = .settings } }
         .onChange(of: scenePhase) { _, p in
@@ -132,5 +139,23 @@ struct RootView: View {
         .opacity(progress)
         .gesture(pull)
         .accessibilityHidden(!drawerOpen)
+    }
+}
+
+
+/// Self talk after a win, in glass at the top: the line, then one identity line under it.
+struct WinToast: View {
+    let toast: Toast
+    var body: some View {
+        VStack(spacing: 3) {
+            Text(toast.title).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.title)
+            if let l = toast.line { Text(l).font(.system(size: 13)).foregroundStyle(Theme.secondary) }
+        }
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 22).padding(.vertical, 12)
+        .glass(Capsule())
+        .shadow(color: .black.opacity(0.4), radius: 20, y: 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isStaticText)
     }
 }
