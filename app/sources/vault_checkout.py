@@ -11,7 +11,11 @@ def resolved_vault_path(settings) -> str:
     """Where to read the vault from right now: the checkout (kept fresh by the
     periodic sync job) when configured, else the raw vault_path. No I/O here,
     callers that need it current should run a sync first or call ensure_checkout."""
-    return settings.obsidian_checkout_dir if settings.obsidian_repo_url else settings.obsidian_vault_path
+    return (
+        settings.obsidian_checkout_dir
+        if settings.obsidian_repo_url
+        else settings.obsidian_vault_path
+    )
 
 
 def ensure_checkout(repo_url: str, deploy_key_path: str, checkout_dir: str) -> str:
