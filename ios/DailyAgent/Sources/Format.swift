@@ -339,3 +339,18 @@ func courseLabel(_ c: String, max: Int = 28) -> String {
     let l = c.lowercased().trimmingCharacters(in: .whitespaces)
     return l.count > max ? String(l.prefix(max - 1)).trimmingCharacters(in: .whitespaces) + "…" : l
 }
+
+// MARK: homework sessions (spec 13)
+
+/// The status chip in plain words.
+func sessionStatusLine(_ status: String) -> String {
+    switch status {
+    case "starting": return "starting the browser"
+    case "running": return "working"
+    case "paused": return "paused"
+    case "takeover": return "you have control"
+    case "needs_approval": return "needs your approval"
+    case "ended": return "ended"
+    default: return status.replacingOccurrences(of: "_", with: " ")
+    }
+}

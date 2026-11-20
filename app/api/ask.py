@@ -120,8 +120,8 @@ def ask(body: AskIn, request: Request, clock: Clock = Depends(get_clock)):
     st, q, now = request.app.state.settings, body.question, clock.now()
     if HOMEWORK.search(q):
         return reply(
-            "The homework agent is off, and it would need your tap anyway. Try asking what the "
-            "assignment covers, or what your notes say about it.",
+            "Tap 'work on it' on the assignment in homework mode to start the agent. Or ask "
+            "what it covers, or what your notes say about it.",
             "homework",
         )
     if DIGEST.search(q):

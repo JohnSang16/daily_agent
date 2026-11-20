@@ -110,6 +110,41 @@ final class AppState: ObservableObject {
         return out
     }
 
+    // MARK: homework agent (spec 13)
+
+    func startHomework(taskId: Int, site: String) async -> HomeworkSession? {
+        var out: HomeworkSession?
+        await call { c in out = try await c.post("/agent/sessions", json: ["task_id": taskId, "site": site]) }
+        return out
+    }
+
+    func homeworkSession(_ id: Int) async -> HomeworkSession? {
+        var out: HomeworkSession?
+        await call { c in out = try await c.get("/agent/sessions/\(id)") }
+        return out
+    }
+
+    /// pause, takeover, handback or stop.
+    func homeworkControl(_ id: Int, _ action: String) async -> HomeworkSession? {
+        var out: HomeworkSession?
+        await call { c in out = try await c.post("/agent/sessions/\(id)/\(action)", json: [:]) }
+        return out
+    }
+
+    func homeworkMessage(_ id: Int, _ text: String) async -> HomeworkSession? {
+        var out: HomeworkSession?
+        await call { c in out = try await c.post("/agent/sessions/\(id)/message", json: ["text": String(text.prefix(1000))]) }
+        return out
+    }
+
+    func homeworkDecide(_ id: Int, approval: Int, approve: Bool) async -> HomeworkSession? {
+        var out: HomeworkSession?
+        await call { c in
+            out = try await c.post("/agent/sessions/\(id)/approvals/\(approval)", json: ["decision": approve ? "approve" : "deny"])
+        }
+        return out
+    }
+
     func loadCourses() async {
         await call { c in courses = try await c.get("/courses") }
     }

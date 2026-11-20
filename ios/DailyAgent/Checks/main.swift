@@ -166,5 +166,11 @@ check(ar.usedLlm && ar.sources[0].id == "a.md#H", "decodes an ask reply")
 let cs = try! makeDecoder().decode([Course].self, from: Data(#"[{"course":"OS","assignments":[{"id":1,"title":"HW 3","due_at":"2026-11-22T04:59:00+00:00"}]}]"#.utf8))
 check(cs[0].assignments[0].title == "HW 3" && parseISO(cs[0].assignments[0].dueAt) != nil, "decodes courses and their due dates parse")
 
+// homework sessions (spec 13)
+let hs = try! makeDecoder().decode(HomeworkSession.self, from: Data(#"{"id":1,"title":"HW 3","site":"icollege","status":"needs_approval","reason":"clicking submit could hand in work.","steps":[{"at":"2026-11-20T15:00:00+00:00","kind":"click","summary":"clicked next on gastate.view.usg.edu"}],"approval":{"id":4,"label":"Submit","expires_at":"2026-11-20T15:10:00+00:00"},"live_view_url":"https://x","usage":{"steps":3,"input_tokens":3000,"output_tokens":150}}"#.utf8))
+check(hs.approval?.label == "Submit" && hs.isActive && hs.usage.steps == 3 && hs.liveViewUrl != nil, "decodes a homework session")
+let ended = try! makeDecoder().decode(HomeworkSession.self, from: Data(#"{"id":1,"title":"HW 3","site":"icollege","status":"ended","reason":null,"steps":[],"approval":null,"live_view_url":null,"usage":{"steps":0,"input_tokens":0,"output_tokens":0}}"#.utf8))
+check(!ended.isActive && ended.liveViewUrl == nil && sessionStatusLine("takeover") == "you have control", "an ended session has no live view")
+
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

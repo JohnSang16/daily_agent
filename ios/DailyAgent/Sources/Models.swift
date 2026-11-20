@@ -281,3 +281,37 @@ struct Course: Codable, Equatable, Identifiable {
     var assignments: [CourseAssignment]
     var id: String { course }
 }
+
+// Spec 13: a homework session as GET /agent/sessions/{id} returns it
+
+struct AgentStepLine: Codable, Equatable, Identifiable {
+    var at: String
+    var kind: String
+    var summary: String
+    var id: String { at + kind + summary }
+}
+
+struct PendingApproval: Codable, Equatable {
+    var id: Int
+    var label: String
+    var expiresAt: String
+}
+
+struct SessionUsage: Codable, Equatable {
+    var steps: Int
+    var inputTokens: Int
+    var outputTokens: Int
+}
+
+struct HomeworkSession: Codable, Equatable, Identifiable {
+    var id: Int
+    var title: String
+    var site: String
+    var status: String  // starting, running, paused, takeover, needs_approval, ended
+    var reason: String?
+    var steps: [AgentStepLine]
+    var approval: PendingApproval?
+    var liveViewUrl: String?
+    var usage: SessionUsage
+    var isActive: Bool { status != "ended" }
+}
