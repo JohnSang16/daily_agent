@@ -172,12 +172,12 @@ def test_ac15_23_undated_oa_invite_goes_first(tmp_path):
     with app.state.session_factory() as db:
         oa = TaskIn(
             title="Beta online assessment",
-            scope="msg:m1",
+            scope="oa:beta",
             source_ref="https://mail.google.com/mail/u/0/#all/m1",
             needs_review=True,
             review_reason="no deadline given",
         )
-        sync_tasks(db, "gmail", "msg:m1", [oa], NOW, NY)
+        sync_tasks(db, "gmail", "oa:beta", [oa], NOW, NY)
     j = c.get("/digest", headers=H).json()
     first = j["deadlines"][0]
     assert first["title"] == "Beta online assessment" and first["due_local"] == "no deadline given"

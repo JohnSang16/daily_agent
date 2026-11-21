@@ -77,7 +77,7 @@ def test_ac15_22_hackerrank_deadline_to_utc(s):
     (t,) = open_tasks(s)
     assert t.title == "Acme online assessment"
     assert t.due_at == datetime(2026, 11, 26, 7, 59, tzinfo=UTC)
-    assert t.scope == "msg:m1" and "m1" in t.source_ref
+    assert t.scope == "oa:acme-online-assessment" and "m1" in t.source_ref
     assert not t.needs_review
     assert "2026-11-19" in llm_prompt(s, body)
 
@@ -106,7 +106,7 @@ def test_ac15_25_invalid_output_discarded_quietly(s, caplog):
     n, _, _ = run(s, {"m1": body, "m2": "ok"}, ["not json", reply(company="Acme")])
     assert [t.title for t in open_tasks(s)] == ["Acme online assessment"]
     assert "SECRET" not in caplog.text
-    assert s.scalars(select(GmailSeen.message_id)).all() == ["m1", "m2"]
+    assert set(s.scalars(select(GmailSeen.message_id))) == {"m1", "m2"}
 
 
 def test_ac15_26_injection_changes_nothing_else(s):
@@ -144,3 +144,21 @@ def test_usage_row_written(s):
     run(s, {"m1": "a"}, [reply(invite=False)])
     (u,) = s.scalars(select(LlmUsage)).all()
     assert u.purpose == "gmail_oa" and u.input_tokens == 100
+
+
+def test_reminder_emails_merge_and_flag_disagreement(s):
+    a = reply(company="Acme", deadline="2026-12-02T14:17:00-08:00")
+    b = reply(company="Acme", deadline="2026-12-01T13:52:00-08:00")
+    # search order is newest first, replies come in processing order (oldest first)
+    run(s, {"new": "re-sent invite", "old": "first invite"}, [b, a])
+    (t,) = open_tasks(s)
+    assert t.due_at == datetime(2026, 12, 2, 22, 17, tzinfo=UTC)
+    assert t.needs_review and "disagree" in t.review_reason
+
+
+def test_reminder_with_same_deadline_is_one_clean_item(s):
+    a = reply(company="Acme", deadline="2026-12-17T21:32:00-06:00")
+    b = reply(company="Acme", deadline="2026-12-17T21:32:03-06:00")
+    run(s, {"m1": "invite", "m2": "reminder"}, [a, b])
+    (t,) = open_tasks(s)
+    assert not t.needs_review

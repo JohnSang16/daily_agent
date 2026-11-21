@@ -14,7 +14,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import GmailSeen, LlmUsage, SyncRun
+from app.models import GmailSeen, LlmUsage, SyncRun, Task
 from app.schemas import TaskIn
 from app.sources.google_calendar import HttpCalendarClient
 from app.tasks_sync import sync_tasks
@@ -100,7 +100,8 @@ def sync_gmail(
 ) -> int:
     day_start = datetime.combine(now.astimezone(ZoneInfo(tz)).date(), time(), ZoneInfo(tz))
     seen = set(s.scalars(select(GmailSeen.message_id)))
-    new = [m for m in client.search(query) if m not in seen][:MAX_EMAILS]
+    # search returns newest first: process oldest first so a newer email's deadline wins
+    new = [m for m in client.search(query) if m not in seen][:MAX_EMAILS][::-1]
     status, changed = "ok", 0
     for mid in new:
         used = s.scalar(
@@ -139,14 +140,25 @@ def sync_gmail(
         if not x.invite:
             continue
         due = x.deadline.astimezone(UTC) if x.deadline and x.deadline.tzinfo else None
-        scope = f"msg:{mid}"
+        title = _title(x.company)
+        scope = "oa:" + re.sub(r"\W+", "-", title.lower())  # reminders merge into one item
+        reason = NO_DEADLINE if due is None else None
+        prev = s.scalars(
+            select(Task).where(Task.source == SOURCE, Task.scope == scope, Task.status == "open")
+        ).first()
+        if prev and prev.due_at:
+            if due and abs((due - prev.due_at).total_seconds()) > 3600:
+                reason = "the invite emails disagree on the deadline"
+            due = due or prev.due_at  # a re-sent invite replaces the old deadline
+            reason = reason if reason != NO_DEADLINE else None
+            reason = reason or (prev.review_reason if prev.needs_review else None)
         item = TaskIn(
-            title=_title(x.company),
+            title=title,
             scope=scope,
             source_ref=f"https://mail.google.com/mail/u/0/#all/{mid}",
             due_at=due,
-            needs_review=due is None,
-            review_reason=NO_DEADLINE if due is None else None,
+            needs_review=reason is not None,
+            review_reason=reason,
         )
         changed += sync_tasks(s, SOURCE, scope, [item], now, tz, user_id=user_id)
     s.add(
