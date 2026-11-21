@@ -66,7 +66,7 @@ def create_app(
         plaid = PlaidClient(http, settings)
     app.state.plaid = plaid
     if sources is None:
-        sources = default_sources(settings, http, plaid)
+        sources = default_sources(settings, http, plaid, llm)
     elif plaid is not None and "banks" not in sources:
         sources = {**sources, "banks": banks_source(settings, plaid)}
     app.state.runner = Runner(app.state.session_factory, sources, SystemClock())

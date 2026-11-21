@@ -37,6 +37,7 @@ Names are the settings in `app/config.py`, upper case.
 | GOOGLE_TOKEN_PATH | for calendar | saved token path, secret, re run `scripts/google_auth.py` weekly while the OAuth app is in Testing |
 | CALENDAR_IDS | no | comma separated, default primary |
 | ICOLLEGE_FEED_URL_PATH | for school | file holding the private feed URL, secret |
+| GMAIL_OA_QUERY | no | Gmail search for the OA sweep, default matches /daily full. Needs the gmail scope on the Google token (rerun scripts/google_auth.py) and LLM_MODEL set |
 | OBSIDIAN_VAULT_PATH | for notes | local vault folder, hosted use needs a git checkout (separate spec) |
 | OBSIDIAN_IGNORE_GLOBS | no | default templates/*,archive/* |
 | SCHOOL_NOTES_GLOBS | no | default career/school/*, the notes homework mode searches (spec 19) |

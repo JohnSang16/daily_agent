@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     google_client_secrets_path: str = "./secrets/client_secret.json"
     google_token_path: str = "./secrets/google_token.json"
     icollege_feed_url_path: str = "~/.config/icollege-feed-url"
+    # same search as /daily full's OA sweep (spec 15)
+    gmail_oa_query: str = (
+        "newer_than:12d (HackerRank OR HireVue OR ModernHire OR CodeSignal OR Glider OR "
+        '"online assessment" OR "pre-employment assessment")'
+    )
     calendar_ids: str = "primary"
     obsidian_vault_path: str = ""
     obsidian_ignore_globs: str = "templates/*,archive/*"
