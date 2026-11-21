@@ -119,3 +119,6 @@ Live: Gemini 3.6 Flash and Claude Sonnet agree on a car force problem (4500 N) a
 Merged: feat/cli-llm-backend (the text only Claude CLI backend). Do not set LLM_BACKEND=cli on the Cox Mac: its claude login is the Cox enterprise account.
 Not done: sign in push (needs APNs and a notifications spec, principles list it as later). Pearson specific answer entry (equation editor, units, drag and drop) waits for the first real session.
 Next step: first real session on a practice assignment, then record AC13.16 cost.
+
+## 2026-11-21 Gmail OA sweep (spec 15, first cut)
+Direct Gmail client on the calendar's token file, one no tools extraction call per new invite, processed ids in `gmail_seen` (migration 0010). Undated invites lead the digest as "no deadline given". AC15.21 to AC15.27. The host Mac needs `scripts/google_auth.py` rerun so its token carries the gmail scope.

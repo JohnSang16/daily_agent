@@ -164,3 +164,21 @@ def test_overflow_names_the_date_it_runs_past(tmp_path):
     add(app, [(f"T{i}", date(2026, 11, 20) + timedelta(days=i)) for i in range(10)])
     j = c.get("/digest", headers=H).json()
     assert j["overflow"] == 3 and j["overflow_after"] == "Thu Nov 26"  # the 7th deadline's day
+
+
+def test_ac15_23_undated_oa_invite_goes_first(tmp_path):
+    app, c = build(tmp_path)
+    add(app, [(f"T{i}", date(2026, 11, 20) + timedelta(days=i)) for i in range(8)])
+    with app.state.session_factory() as db:
+        oa = TaskIn(
+            title="Beta online assessment",
+            scope="msg:m1",
+            source_ref="https://mail.google.com/mail/u/0/#all/m1",
+            needs_review=True,
+            review_reason="no deadline given",
+        )
+        sync_tasks(db, "gmail", "msg:m1", [oa], NOW, NY)
+    j = c.get("/digest", headers=H).json()
+    first = j["deadlines"][0]
+    assert first["title"] == "Beta online assessment" and first["due_local"] == "no deadline given"
+    assert len(j["deadlines"]) == 7 and j["overflow"] == 2

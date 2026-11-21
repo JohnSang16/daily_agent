@@ -14,6 +14,7 @@ from app.config import Settings
 from app.crypto import TokenBox
 from app.models import SyncRun
 from app.search.index import index_vault
+from app.sources.gmail import HttpGmailClient, sync_gmail
 from app.sources.google_calendar import HttpCalendarClient, sync_google_calendar
 from app.sources.icollege import http_feed_fetch, sync_icollege
 from app.sources.obsidian import sync_obsidian
@@ -28,6 +29,7 @@ STALE_HOURS = {
     "icollege": 6,
     "vault_index": 1,
     "gmail_digest": 6,
+    "gmail": 6,
 }
 
 
@@ -42,7 +44,7 @@ def banks_source(settings: Settings, plaid) -> Source:
     return banks
 
 
-def default_sources(settings: Settings, http, plaid=None) -> dict[str, Source]:
+def default_sources(settings: Settings, http, plaid=None, llm=None) -> dict[str, Source]:
     def calendar(s, now):
         client = HttpCalendarClient(
             http, settings.google_client_secrets_path, settings.google_token_path
@@ -82,6 +84,24 @@ def default_sources(settings: Settings, http, plaid=None) -> dict[str, Source]:
         "icollege": icollege,
         "vault_index": vault_index,
     }
+    # spec 15: needs the gmail scope on the google token (scripts/google_auth.py) and an llm
+    if llm is not None:
+
+        def gmail(s, now):
+            client = HttpGmailClient(
+                http, settings.google_client_secrets_path, settings.google_token_path
+            )
+            return sync_gmail(
+                s,
+                client,
+                llm,
+                now,
+                settings.user_timezone,
+                settings.gmail_oa_query,
+                settings.llm_daily_token_budget,
+            )
+
+        out["gmail"] = gmail
     if plaid is not None:
         out["banks"] = banks_source(settings, plaid)
     return out
