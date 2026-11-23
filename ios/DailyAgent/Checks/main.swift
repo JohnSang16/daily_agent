@@ -191,5 +191,24 @@ check(averageComparisonLine(current: 30000, others: [50000, 40000]) == "$150 bel
 check(averageComparisonLine(current: 50000, others: [30000, 40000]) == "$150 above average", "above average line")
 check(averageComparisonLine(current: 30000, others: []) == nil, "no other months means no comparison line")
 
+// money tabs redesign
+let shares = holdingShares(Holdings(cashCents: 25000, savingsCents: 50000, investedCents: 25000, creditOwedCents: 9000, loansOwedCents: 0, netCents: 91000))
+check(shares.cash == 0.25 && shares.savings == 0.5 && shares.invested == 0.25, "holding shares ignore what is owed")
+check(holdingShares(Holdings(cashCents: 0, savingsCents: 0, investedCents: 0, creditOwedCents: 0, loansOwedCents: 0, netCents: 0)).cash == 0, "no holdings means no shares, not a divide by zero")
+check(dollarsAndCents(2340) == "$23.40" && dollarsAndCents(-6418) == "-$64.18" && dollarsAndCents(8850, signed: true) == "+$88.50" && dollarsAndCents(123456) == "$1,234.56", "dollars and cents")
+let acts = [
+    Txn(id: "1", date: "2026-11-23", merchant: "Chick-fil-A", amount: "11.20", direction: "out", bank: "Chase", category: "FOOD_AND_DRINK", pending: true),
+    Txn(id: "2", date: "2026-11-23", merchant: "Zelle from Mom", amount: "+100.00", direction: "in", bank: "Chase", category: "INCOME", pending: false),
+    Txn(id: "3", date: "2026-11-22", merchant: "Target", amount: "52.18", direction: "out", bank: "Freedom", category: "GENERAL_MERCHANDISE", pending: false),
+]
+check(netCents(acts) == 10000 - 1120 - 5218, "net is money in minus money out")
+check(filterTxns(acts, query: "", filter: .spending).map(\.id) == ["1", "3"], "spending filter keeps money out")
+check(filterTxns(acts, query: "", filter: .income).map(\.id) == ["2"], "income filter keeps money in")
+check(filterTxns(acts, query: "", filter: .pending).map(\.id) == ["1"], "pending filter")
+check(filterTxns(acts, query: "  TARGET ", filter: .all).map(\.id) == ["3"], "search matches merchant ignoring case and spaces")
+check(filterTxns(acts, query: "food", filter: .all).map(\.id) == ["1"], "search matches category")
+check(filterTxns(acts, query: "zelle", filter: .spending).isEmpty, "search and filter combine")
+check(categoryIcon("FOOD_AND_DRINK") == "fork.knife" && categoryIcon(nil) == "circle.dashed", "category icons")
+
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

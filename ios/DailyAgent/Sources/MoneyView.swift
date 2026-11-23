@@ -348,18 +348,21 @@ struct BanksView: View {
     @EnvironmentObject var state: AppState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 34) {
-            if let h = state.summary?.holdings { holdings(h).reveal(0) }
+        VStack(alignment: .leading, spacing: 22) {
+            if let h = state.summary?.holdings { netWorthCard(h).reveal(0) }
             if let accts = state.banks?.accounts, !accts.isEmpty {
                 ForEach(Array(groupBanks(accts).enumerated()), id: \.element.bank) { i, g in
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text(g.bank).font(.system(size: 18)).foregroundStyle(Theme.title)
+                            Text(g.bank.lowercased()).font(.system(size: 17)).foregroundStyle(Theme.title)
                             Spacer()
-                            Text(dollars(g.totalCents)).font(.system(size: 18)).monospacedDigit().foregroundStyle(Theme.title)
-                        }
+                            Text(dollars(g.totalCents)).font(.system(size: 17)).monospacedDigit().foregroundStyle(Theme.title)
+                        }.padding(.bottom, 4)
                         ForEach(g.accounts) { a in row(a) }
-                    }.reveal(i + 1)
+                    }
+                    .padding(18)
+                    .glass(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .reveal(i + 1)
                 }
             } else {
                 Text("no bank connected yet.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
@@ -367,28 +370,42 @@ struct BanksView: View {
         }
     }
 
-    private func holdings(_ h: Holdings) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("where your money sits")
-            line("cash", h.cashCents)
-            line("savings", h.savingsCents)
-            line("invested", h.investedCents)
-            if h.creditOwedCents > 0 { line("owed on cards", -h.creditOwedCents) }
-            if h.loansOwedCents > 0 { line("owed on loans", -h.loansOwedCents) }
-            Divider().overlay(Theme.line)
-            HStack {
-                Text("net").font(.system(size: 18, weight: .medium)).foregroundStyle(Theme.title)
-                Spacer()
-                Text(dollars(h.netCents)).font(.system(size: 26, weight: .light)).foregroundStyle(Theme.title)
+    private static let shades: [Color] = [.white, Color(white: 0.71), Color(white: 0.42)]
+
+    private func netWorthCard(_ h: Holdings) -> some View {
+        let sh = holdingShares(h)
+        let parts: [(String, Int, Double)] = [("cash", h.cashCents, sh.cash), ("savings", h.savingsCents, sh.savings), ("invested", h.investedCents, sh.invested)]
+        return VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                sectionLabel("net worth")
+                Text(dollars(h.netCents)).font(.system(size: 34, weight: .light)).monospacedDigit()
+                    .foregroundStyle(Theme.title).contentTransition(.numericText())
+            }
+            ShareBar(fractions: parts.map(\.2), colors: Self.shades)
+            HStack(spacing: 0) {
+                ForEach(Array(parts.enumerated()), id: \.offset) { i, p in
+                    HStack(spacing: 5) {
+                        Circle().fill(Self.shades[i]).frame(width: 7, height: 7)
+                        Text("\(p.0) \(dollars(p.1))").font(.system(size: 12)).monospacedDigit().foregroundStyle(Theme.secondary)
+                            .lineLimit(1).minimumScaleFactor(0.8)
+                    }.frame(maxWidth: .infinity, alignment: i == 0 ? .leading : (i == 2 ? .trailing : .center))
+                }
+            }
+            if h.creditOwedCents > 0 || h.loansOwedCents > 0 {
+                Divider().overlay(Theme.line)
+                if h.creditOwedCents > 0 { owed("owed on cards", h.creditOwedCents) }
+                if h.loansOwedCents > 0 { owed("owed on loans", h.loansOwedCents) }
             }
         }
+        .padding(18)
+        .glass(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private func line(_ label: String, _ cents: Int) -> some View {
+    private func owed(_ label: String, _ cents: Int) -> some View {
         HStack {
-            Text(label).font(.system(size: 15)).foregroundStyle(Theme.body)
+            Text(label).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
             Spacer()
-            Text(dollars(cents)).font(.system(size: 15)).monospacedDigit().foregroundStyle(Theme.title)
+            Text(dollars(-cents)).font(.system(size: 13.5)).monospacedDigit().foregroundStyle(Theme.title)
         }
     }
 
@@ -407,6 +424,31 @@ struct BanksView: View {
     }
 }
 
+/// One rounded bar split into shares, grows in from the left.
+struct ShareBar: View {
+    let fractions: [Double]
+    let colors: [Color]
+    @State private var shown = false
+
+    var body: some View {
+        GeometryReader { geo in
+            HStack(spacing: 2) {
+                ForEach(Array(fractions.enumerated()), id: \.offset) { i, f in
+                    if f > 0 {
+                        Rectangle().fill(colors[i % colors.count])
+                            .frame(width: max(2, (geo.size.width - 4) * f * (shown ? 1 : 0)))
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .background(Theme.raised)
+            .clipShape(Capsule())
+        }
+        .frame(height: 10)
+        .onAppear { withAnimation(Theme.spring.delay(0.1)) { shown = true } }
+    }
+}
+
 // MARK: income log
 
 struct IncomeView: View {
@@ -414,14 +456,7 @@ struct IncomeView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 30) {
-            if let s = state.summary {
-                let total = s.months.map(\.incomeCents).reduce(0, +)
-                let counted = max(s.months.filter { $0.incomeCents > 0 }.count, 1)
-                HStack(alignment: .top, spacing: 0) {
-                    figure("this month", dollars(s.thisMonth.incomeCents))
-                    figure("average a month", dollars(total / counted))
-                }.reveal(0)
-            }
+            if let s = state.summary { hero(s).reveal(0) }
             let groups = incomeByMonth(state.incomeRows)
             if groups.isEmpty {
                 Text("no income logged yet.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
@@ -434,9 +469,10 @@ struct IncomeView: View {
                         Text("+" + dollars(g.totalCents)).font(.system(size: 13)).foregroundStyle(Theme.secondary)
                     }
                     ForEach(g.items) { t in
-                        HStack(alignment: .top) {
+                        HStack(alignment: .center, spacing: 12) {
+                            CategoryIcon(category: t.category ?? "INCOME")
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(t.merchant).font(.system(size: 16)).foregroundStyle(Theme.title)
+                                Text(t.merchant).font(.system(size: 16)).foregroundStyle(Theme.title).lineLimit(1)
                                 Text("\(t.date) · \(t.bank)").font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
                             }
                             Spacer()
@@ -448,12 +484,63 @@ struct IncomeView: View {
         }
     }
 
-    private func figure(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            sectionLabel(label)
-            Text(value).font(.system(size: 26, weight: .light)).monospacedDigit().foregroundStyle(Theme.title)
-                .minimumScaleFactor(0.6).lineLimit(1)
-        }.frame(maxWidth: .infinity, alignment: .leading)
+    private func hero(_ s: MoneySummary) -> some View {
+        let others = s.months.dropLast().map(\.incomeCents)
+        let avg: Int? = others.isEmpty ? nil : others.reduce(0, +) / others.count
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                sectionLabel("income this month")
+                Spacer()
+                if let avg { Text("avg \(dollars(avg))").font(.system(size: 12)).foregroundStyle(Theme.secondary) }
+            }
+            Text(dollars(s.thisMonth.incomeCents)).font(.system(size: 34, weight: .light)).monospacedDigit()
+                .foregroundStyle(Theme.title).contentTransition(.numericText())
+            IncomeBars(months: s.months, average: avg)
+            if let line = averageComparisonLine(current: s.thisMonth.incomeCents, others: others) {
+                Text(line).font(.system(size: 12)).foregroundStyle(Theme.secondary)
+            }
+        }
+        .padding(18)
+        .glass(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+}
+
+/// Six months of income, this month in white, a dashed line at the average of the others.
+struct IncomeBars: View {
+    let months: [MonthTotal]
+    let average: Int?
+    @State private var grown = false
+
+    var body: some View {
+        Chart {
+            ForEach(Array(months.enumerated()), id: \.element.id) { i, m in
+                BarMark(x: .value("month", monthShort(m.month)), y: .value("income", grown ? Double(m.incomeCents) / 100 : 0))
+                    .foregroundStyle(i == months.count - 1 ? Color.white : Color(white: 0.23))
+                    .cornerRadius(5)
+            }
+            if let average {
+                RuleMark(y: .value("average", Double(average) / 100))
+                    .foregroundStyle(Color(white: 0.45))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            }
+        }
+        .chartLegend(.hidden)
+        .chartYAxis(.hidden)
+        .chartXAxis { AxisMarks { _ in AxisValueLabel().foregroundStyle(Theme.tertiary) } }
+        .frame(height: 120)
+        .onAppear { withAnimation(Theme.spring.delay(0.15)) { grown = true } }
+    }
+}
+
+/// A category's symbol in a dark round chip.
+struct CategoryIcon: View {
+    let category: String?
+    var body: some View {
+        Image(systemName: categoryIcon(category)).font(.system(size: 14)).foregroundStyle(Theme.body)
+            .frame(width: 36, height: 36)
+            .background(Circle().fill(Theme.raised))
+            .overlay(Circle().strokeBorder(Theme.line, lineWidth: 0.8))
+            .accessibilityHidden(true)
     }
 }
 
@@ -462,23 +549,57 @@ struct IncomeView: View {
 struct ActivityView: View {
     @EnvironmentObject var state: AppState
     @State private var showBanks = false
+    @State private var query = ""
+    @State private var filter: ActivityFilter = .all
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            Button { showBanks = true } label: {
-                Text(state.banks?.chip ?? "banks: all").font(.system(size: 13.5)).foregroundStyle(Theme.body)
-                    .padding(.horizontal, 16).frame(minHeight: 44).glass(Capsule())
-            }.buttonStyle(PressStyle())
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass").font(.system(size: 14)).foregroundStyle(Theme.tertiary)
+                    TextField("", text: $query, prompt: Text("search transactions").foregroundStyle(Theme.tertiary))
+                        .font(.system(size: 14.5)).foregroundStyle(Theme.title)
+                        .autocorrectionDisabled().submitLabel(.search)
+                    if !query.isEmpty {
+                        Button { query = "" } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.tertiary)
+                        }.buttonStyle(PressStyle()).accessibilityLabel("clear search")
+                    }
+                }
+                .padding(.horizontal, 16).frame(minHeight: 44).glass(Capsule())
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(ActivityFilter.allCases) { f in
+                            Button { withAnimation(Theme.spring) { filter = f } } label: { chip(f.rawValue, on: filter == f) }
+                                .buttonStyle(PressStyle())
+                        }
+                        Button { showBanks = true } label: { chip(state.banks?.chip ?? "banks: all", on: false) }
+                            .buttonStyle(PressStyle())
+                    }
+                }
+                .sensoryFeedback(.selection, trigger: filter)
+            }
             if let note = state.page?.note { Text(note).font(.system(size: 12.5)).foregroundStyle(Theme.secondary) }
             if let page = state.page {
-                ForEach(groupByDay(page.transactions, now: Date()), id: \.heading) { g in
+                let shown = filterTxns(page.transactions, query: query, filter: filter)
+                if shown.isEmpty {
+                    Text(query.isEmpty ? "nothing here yet." : "no matches in what's loaded.")
+                        .font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
+                }
+                ForEach(groupByDay(shown, now: Date()), id: \.heading) { g in
                     VStack(alignment: .leading, spacing: 14) {
-                        sectionLabel(g.heading)
+                        HStack {
+                            sectionLabel(g.heading)
+                            Spacer()
+                            Text(dollarsAndCents(netCents(g.items), signed: true)).font(.system(size: 12.5)).monospacedDigit()
+                                .foregroundStyle(Theme.secondary)
+                        }
                         ForEach(g.items) { t in
-                            HStack(alignment: .top) {
+                            HStack(alignment: .center, spacing: 12) {
+                                CategoryIcon(category: t.category)
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(t.merchant).font(.system(size: 16)).foregroundStyle(Theme.title)
-                                    Text(subline(t)).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
+                                    Text(t.merchant).font(.system(size: 16)).foregroundStyle(Theme.title).lineLimit(1)
+                                    Text(subline(t)).font(.system(size: 12.5)).foregroundStyle(Theme.secondary).lineLimit(1)
                                 }
                                 Spacer()
                                 Text(t.amount).font(.system(size: 16)).monospacedDigit().foregroundStyle(Theme.title)
@@ -493,9 +614,19 @@ struct ActivityView: View {
         .sheet(isPresented: $showBanks) { BanksSheet().environmentObject(state) }
     }
 
+    private func chip(_ text: String, on: Bool) -> some View {
+        Text(text).font(.system(size: 13, weight: on ? .medium : .regular))
+            .foregroundStyle(on ? Color.black : Theme.body)
+            .padding(.horizontal, 14).frame(minHeight: 36)
+            .background { if on { Capsule().fill(Color.white) } }
+            .overlay { if !on { Capsule().strokeBorder(Color(white: 0.18), lineWidth: 1) } }
+            .frame(minHeight: 44)
+    }
+
     private func subline(_ t: Txn) -> String {
-        var parts = [t.bank]
+        var parts: [String] = []
         if let c = t.category { parts.append(categoryLabel(c)) }
+        parts.append(t.bank)
         if t.pending { parts.append("pending") }
         return parts.joined(separator: " · ")
     }

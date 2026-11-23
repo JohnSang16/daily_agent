@@ -376,3 +376,73 @@ func sessionStatusLine(_ status: String) -> String {
     default: return status.replacingOccurrences(of: "_", with: " ")
     }
 }
+
+// MARK: money tabs redesign
+
+/// What each part of holdings is as a share of everything owned (cash + savings + invested).
+func holdingShares(_ h: Holdings) -> (cash: Double, savings: Double, invested: Double) {
+    let total = Double(max(h.cashCents, 0) + max(h.savingsCents, 0) + max(h.investedCents, 0))
+    guard total > 0 else { return (0, 0, 0) }
+    return (Double(max(h.cashCents, 0)) / total, Double(max(h.savingsCents, 0)) / total, Double(max(h.investedCents, 0)) / total)
+}
+
+/// 2340 -> "$23.40", with "+" or "-" in front when signed.
+func dollarsAndCents(_ cents: Int, signed: Bool = false) -> String {
+    let f = NumberFormatter()
+    f.numberStyle = .decimal
+    f.minimumFractionDigits = 2
+    f.maximumFractionDigits = 2
+    f.locale = Locale(identifier: "en_US")
+    let body = "$" + (f.string(from: NSNumber(value: Double(abs(cents)) / 100)) ?? "\(abs(cents))")
+    return cents < 0 ? "-" + body : (signed ? "+" + body : body)
+}
+
+/// Money in minus money out for a set of rows.
+func netCents(_ txns: [Txn]) -> Int {
+    txns.reduce(0) { $0 + ($1.direction == "in" ? 1 : -1) * centsFromDisplay($1.amount) }
+}
+
+enum ActivityFilter: String, CaseIterable, Identifiable {
+    case all, spending, income, pending
+    var id: String { rawValue }
+}
+
+/// Filters the loaded activity page. The query matches merchant, bank or category, ignoring case.
+func filterTxns(_ txns: [Txn], query: String, filter: ActivityFilter) -> [Txn] {
+    let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+    return txns.filter { t in
+        let kept: Bool
+        switch filter {
+        case .all: kept = true
+        case .spending: kept = t.direction == "out"
+        case .income: kept = t.direction == "in"
+        case .pending: kept = t.pending
+        }
+        guard kept else { return false }
+        guard !q.isEmpty else { return true }
+        return t.merchant.lowercased().contains(q) || t.bank.lowercased().contains(q)
+            || categoryLabel(t.category ?? "").contains(q)
+    }
+}
+
+/// SF Symbol for a Plaid primary category.
+func categoryIcon(_ c: String?) -> String {
+    switch c ?? "" {
+    case "FOOD_AND_DRINK": return "fork.knife"
+    case "GENERAL_MERCHANDISE": return "bag"
+    case "TRANSPORTATION": return "car"
+    case "TRAVEL": return "airplane"
+    case "ENTERTAINMENT": return "music.note"
+    case "RENT_AND_UTILITIES": return "house"
+    case "INCOME": return "arrow.down.left"
+    case "TRANSFER_IN", "TRANSFER_OUT": return "arrow.left.arrow.right"
+    case "LOAN_PAYMENTS": return "creditcard"
+    case "MEDICAL": return "cross.case"
+    case "PERSONAL_CARE": return "sparkles"
+    case "GENERAL_SERVICES": return "wrench.and.screwdriver"
+    case "HOME_IMPROVEMENT": return "hammer"
+    case "BANK_FEES": return "building.columns"
+    case "GOVERNMENT_AND_NON_PROFIT": return "building.2"
+    default: return "circle.dashed"
+    }
+}
