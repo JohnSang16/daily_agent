@@ -201,6 +201,22 @@ func categoryLabel(_ c: String) -> String {
     c == "TOTAL" ? "all spending" : c.replacingOccurrences(of: "_", with: " ").lowercased()
 }
 
+/// Top N categories by spend (default 5), any remainder bundled into one "OTHER" bucket.
+func topCategoriesWithOther(_ categories: [CategorySpend], limit: Int = 5) -> [CategorySpend] {
+    guard categories.count > limit else { return categories }
+    let sorted = categories.sorted { $0.spendCents > $1.spendCents }
+    let other = sorted.dropFirst(limit).reduce(0) { $0 + $1.spendCents }
+    return Array(sorted.prefix(limit)) + [CategorySpend(category: "OTHER", spendCents: other)]
+}
+
+/// "$150 below average" or "$150 above average"; nil with no other months to compare to.
+func averageComparisonLine(current: Int, others: [Int]) -> String? {
+    guard !others.isEmpty else { return nil }
+    let avg = others.reduce(0, +) / others.count
+    let diff = avg - current
+    return diff >= 0 ? "\(dollars(diff)) below average" : "\(dollars(-diff)) above average"
+}
+
 func accountKindLabel(_ a: BankAccountInfo) -> String {
     switch a.kind ?? "" {
     case "credit": return "credit card"

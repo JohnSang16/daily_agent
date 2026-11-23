@@ -120,7 +120,8 @@ let sumJSON = """
 {"months":[{"month":"2026-10","income_cents":184500,"spend_cents":264900},{"month":"2026-11","income_cents":12400,"spend_cents":286100}],
  "this_month":{"month":"2026-11","income_cents":12400,"spend_cents":286100,"net_cents":-273700},
  "categories":[{"category":"FOOD_AND_DRINK","spend_cents":36000}],
- "holdings":{"cash_cents":24200,"savings_cents":280200,"invested_cents":137000,"credit_owed_cents":21400,"loans_owed_cents":0,"net_cents":420000}}
+ "holdings":{"cash_cents":24200,"savings_cents":280200,"invested_cents":137000,"credit_owed_cents":21400,"loans_owed_cents":0,"net_cents":420000},
+ "daily":[{"date":"2026-11-01","cumulative_spend_cents":286100}]}
 """
 let ms = try! makeDecoder().decode(MoneySummary.self, from: Data(sumJSON.utf8))
 check(ms.months.count == 2 && ms.thisMonth.netCents == -273700 && ms.holdings.investedCents == 137000, "decodes the money summary")
@@ -171,6 +172,24 @@ let hs = try! makeDecoder().decode(HomeworkSession.self, from: Data(#"{"id":1,"t
 check(hs.approval?.label == "Submit" && hs.isActive && hs.usage.steps == 3 && hs.liveViewUrl != nil, "decodes a homework session")
 let ended = try! makeDecoder().decode(HomeworkSession.self, from: Data(#"{"id":1,"title":"HW 3","site":"icollege","status":"ended","reason":null,"steps":[],"approval":null,"live_view_url":null,"usage":{"steps":0,"input_tokens":0,"output_tokens":0}}"#.utf8))
 check(!ended.isActive && ended.liveViewUrl == nil && sessionStatusLine("takeover") == "you have control", "an ended session has no live view")
+
+// money overview redesign
+let dailyMs = try! makeDecoder().decode(MoneySummary.self, from: Data(#"{"months":[{"month":"2026-11","income_cents":100,"spend_cents":50}],"this_month":{"month":"2026-11","income_cents":100,"spend_cents":50,"net_cents":50},"categories":[],"holdings":{"cash_cents":0,"savings_cents":0,"invested_cents":0,"credit_owed_cents":0,"loans_owed_cents":0,"net_cents":0},"daily":[{"date":"2026-11-01","cumulative_spend_cents":0},{"date":"2026-11-02","cumulative_spend_cents":50}]}"#.utf8))
+check(dailyMs.daily.count == 2 && dailyMs.daily[1].cumulativeSpendCents == 50, "decodes money summary with the daily series")
+let sixCats = [
+    CategorySpend(category: "FOOD_AND_DRINK", spendCents: 500),
+    CategorySpend(category: "TRANSPORTATION", spendCents: 400),
+    CategorySpend(category: "GENERAL_MERCHANDISE", spendCents: 300),
+    CategorySpend(category: "TRAVEL", spendCents: 200),
+    CategorySpend(category: "MEDICAL", spendCents: 100),
+    CategorySpend(category: "BANK_FEES", spendCents: 50),
+]
+let bucketed = topCategoriesWithOther(sixCats)
+check(bucketed.count == 6 && bucketed.last?.category == "OTHER" && bucketed.last?.spendCents == 50, "buckets categories past the limit into OTHER")
+check(topCategoriesWithOther(Array(sixCats.prefix(3))).count == 3, "fewer categories than the limit are left alone")
+check(averageComparisonLine(current: 30000, others: [50000, 40000]) == "$150 below average", "below average line")
+check(averageComparisonLine(current: 50000, others: [30000, 40000]) == "$150 above average", "above average line")
+check(averageComparisonLine(current: 30000, others: []) == nil, "no other months means no comparison line")
 
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)
