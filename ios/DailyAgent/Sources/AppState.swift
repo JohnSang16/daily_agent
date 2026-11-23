@@ -17,6 +17,7 @@ final class AppState: ObservableObject {
     @Published var problem: String?
     @Published var goal: String?
     @Published var page: TxnPage?
+    @Published var recurring: Recurring?
     @Published var banks: Banks?
     @Published var configured = false
     @Published var reminderStatus = ""
@@ -284,8 +285,9 @@ final class AppState: ObservableObject {
             async let b: [BudgetGoal] = c.get("/budgets")
             async let bk: Banks = c.get("/banks")
             async let p: TxnPage = c.get("/transactions", query: [URLQueryItem(name: "limit", value: "100")])
-            let (s1, b1, bk1, p1) = try await (s, b, bk, p)
-            summary = s1; budgets = b1; banks = bk1; page = p1
+            async let r: Recurring = c.get("/money/recurring")
+            let (s1, b1, bk1, p1, r1) = try await (s, b, bk, p, r)
+            summary = s1; budgets = b1; banks = bk1; page = p1; recurring = r1
         }
     }
 

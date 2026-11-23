@@ -465,41 +465,36 @@ struct CategoryIcon: View {
 struct ActivityView: View {
     @EnvironmentObject var state: AppState
     @State private var showBanks = false
-    @State private var query = ""
     @State private var filter: ActivityFilter = .all
+    @State private var day: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass").font(.system(size: 14)).foregroundStyle(Theme.tertiary)
-                    TextField("", text: $query, prompt: Text("search transactions").foregroundStyle(Theme.tertiary))
-                        .font(.system(size: 14.5)).foregroundStyle(Theme.title)
-                        .autocorrectionDisabled().submitLabel(.search)
-                    if !query.isEmpty {
-                        Button { query = "" } label: {
-                            Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.tertiary)
-                        }.buttonStyle(PressStyle()).accessibilityLabel("clear search")
+            if let s = state.summary, !s.daily.isEmpty {
+                SpendCalendar(daily: s.daily, monthCents: s.thisMonth.spendCents, selected: $day).reveal(0)
+            }
+            if let r = state.recurring, !r.items.isEmpty { recurringRow(r).reveal(1) }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    if let d = day {
+                        Button { withAnimation(Theme.spring) { day = nil } } label: {
+                            chip(shortDay(d), on: true, icon: "xmark")
+                        }.buttonStyle(PressStyle()).accessibilityLabel("show every day")
                     }
-                }
-                .padding(.horizontal, 16).frame(minHeight: 44).glass(Capsule())
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(ActivityFilter.allCases) { f in
-                            Button { withAnimation(Theme.spring) { filter = f } } label: { chip(f.rawValue, on: filter == f) }
-                                .buttonStyle(PressStyle())
-                        }
-                        Button { showBanks = true } label: { chip(state.banks?.chip ?? "banks: all", on: false) }
+                    ForEach(ActivityFilter.allCases) { f in
+                        Button { withAnimation(Theme.spring) { filter = f } } label: { chip(f.rawValue, on: filter == f) }
                             .buttonStyle(PressStyle())
                     }
+                    Button { showBanks = true } label: { chip(state.banks?.chip ?? "banks: all", on: false) }
+                        .buttonStyle(PressStyle())
                 }
-                .sensoryFeedback(.selection, trigger: filter)
             }
+            .sensoryFeedback(.selection, trigger: filter)
             if let note = state.page?.note { Text(note).font(.system(size: 12.5)).foregroundStyle(Theme.secondary) }
             if let page = state.page {
-                let shown = filterTxns(page.transactions, query: query, filter: filter)
+                let shown = filterTxns(page.transactions, filter: filter, day: day)
                 if shown.isEmpty {
-                    Text(query.isEmpty ? "nothing here yet." : "no matches in what's loaded.")
+                    Text(day == nil ? "nothing here yet." : "nothing on \(shortDay(day!)).")
                         .font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
                 }
                 ForEach(groupByDay(shown, now: Date()), id: \.heading) { g in
@@ -530,13 +525,46 @@ struct ActivityView: View {
         .sheet(isPresented: $showBanks) { BanksSheet().environmentObject(state) }
     }
 
-    private func chip(_ text: String, on: Bool) -> some View {
-        Text(text).font(.system(size: 13, weight: on ? .medium : .regular))
-            .foregroundStyle(on ? Color.black : Theme.body)
-            .padding(.horizontal, 14).frame(minHeight: 36)
-            .background { if on { Capsule().fill(Color.white) } }
-            .overlay { if !on { Capsule().strokeBorder(Color(white: 0.18), lineWidth: 1) } }
-            .frame(minHeight: 44)
+    private func recurringRow(_ r: Recurring) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                sectionLabel("recurring")
+                Spacer()
+                Text("\(dollars(r.monthlyCents)) / mo").font(.system(size: 12)).monospacedDigit().foregroundStyle(Theme.secondary)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(r.items) { item in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Image(systemName: categoryIcon(item.category)).font(.system(size: 10.5)).foregroundStyle(Theme.secondary)
+                                Text(item.merchant.lowercased()).font(.system(size: 12.5)).foregroundStyle(Theme.title).lineLimit(1)
+                            }
+                            Text(dollars(item.amountCents)).font(.system(size: 15, weight: .light)).monospacedDigit().foregroundStyle(Theme.title)
+                            Text(item.paidThisMonth ? "paid \(shortDay(item.lastDate))" : "due \(shortDay(item.nextDate))")
+                                .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 9)
+                        .frame(minWidth: 96, alignment: .leading)
+                        .glass(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                }
+                .padding(.vertical, 1)
+            }
+        }
+    }
+
+    private func chip(_ text: String, on: Bool, icon: String? = nil) -> some View {
+        HStack(spacing: 5) {
+            Text(text)
+            if let icon { Image(systemName: icon).font(.system(size: 10, weight: .semibold)) }
+        }
+        .font(.system(size: 13, weight: on ? .medium : .regular))
+        .foregroundStyle(on ? Color.black : Theme.body)
+        .padding(.horizontal, 14).frame(minHeight: 36)
+        .background { if on { Capsule().fill(Color.white) } }
+        .overlay { if !on { Capsule().strokeBorder(Color(white: 0.18), lineWidth: 1) } }
+        .frame(minHeight: 44)
     }
 
     private func subline(_ t: Txn) -> String {
@@ -545,6 +573,57 @@ struct ActivityView: View {
         parts.append(t.bank)
         if t.pending { parts.append("pending") }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// This month as a monday first grid, each day shaded by what was spent. Tap a day to show only it.
+struct SpendCalendar: View {
+    let daily: [DailyPoint]
+    let monthCents: Int
+    @Binding var selected: String?
+
+    private let cols = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
+
+    var body: some View {
+        let days = dailySpend(daily)
+        let top = max(days.map(\.cents).max() ?? 0, 1)
+        let biggest = days.max { $0.cents < $1.cents }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                sectionLabel("spending by day")
+                Spacer()
+                Text(dollars(monthCents)).font(.system(size: 12)).monospacedDigit().foregroundStyle(Theme.secondary)
+            }
+            LazyVGrid(columns: cols, spacing: 5) {
+                ForEach(Array(["m", "t", "w", "t", "f", "s", "s"].enumerated()), id: \.offset) { _, d in
+                    Text(d).font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+                }
+                ForEach(0..<leadingBlanks(daily[0].date), id: \.self) { _ in Color.clear.frame(height: 1) }
+                ForEach(days, id: \.date) { d in
+                    let x = Double(d.cents) / Double(top)
+                    let on = selected == d.date
+                    Button {
+                        withAnimation(Theme.spring) { selected = on ? nil : d.date }
+                    } label: {
+                        Text("\(Int(d.date.suffix(2)) ?? 0)").font(.system(size: 11)).monospacedDigit()
+                            .foregroundStyle(x > 0.5 ? Color.black : (on ? Theme.title : Theme.secondary))
+                            .frame(maxWidth: .infinity).aspectRatio(1, contentMode: .fit)
+                            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.white.opacity(x * 0.85)))
+                            .overlay {
+                                if on { RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.white, lineWidth: 1.5) }
+                            }
+                    }
+                    .buttonStyle(PressStyle())
+                    .accessibilityLabel("\(shortDay(d.date)), \(dollars(d.cents))")
+                }
+            }
+            if let b = biggest, b.cents > 0 {
+                Text("biggest day: \(shortDay(b.date)), \(dollars(b.cents))").font(.system(size: 12)).foregroundStyle(Theme.secondary)
+            }
+        }
+        .padding(18)
+        .glass(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .sensoryFeedback(.selection, trigger: selected)
     }
 }
 

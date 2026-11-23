@@ -140,3 +140,8 @@ What: banks has a net worth card with a share bar and glass bank cards. Activity
 Tests: iOS typecheck passed, Checks/main.swift all passed (new checks for holdingShares, dollarsAndCents, netCents, filterTxns, categoryIcon).
 Open: search and the income filter only cover the loaded 100 rows. A backend `q` param is the upgrade if older history matters.
 Next step: run on the phone.
+
+## 2026-11-23 activity: spend calendar and recurring
+What: activity replaces the search field with a spend calendar (from summary.daily, tap a day to filter) and a small recurring row. New `GET /money/recurring`: a merchant charged in 2 or more months of the last 100 days, about once a month, each charge within 20 percent of the middle amount; transfers, card payments and income never count. Next date is the last charge plus one month (monthly bills only).
+Tests and lint: 364 passed (2 new recurring tests, failed first), ruff clean on touched files. iOS typecheck passed, Checks/main.swift all passed.
+Next step: run on the phone, check recurring against real Plaid data for false positives.

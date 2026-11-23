@@ -197,12 +197,18 @@ let acts = [
     Txn(id: "3", date: "2026-11-22", merchant: "Target", amount: "52.18", direction: "out", bank: "Freedom", category: "GENERAL_MERCHANDISE", pending: false),
 ]
 check(netCents(acts) == 10000 - 1120 - 5218, "net is money in minus money out")
-check(filterTxns(acts, query: "", filter: .spending).map(\.id) == ["1", "3"], "spending filter keeps money out")
-check(filterTxns(acts, query: "", filter: .income).map(\.id) == ["2"], "income filter keeps money in")
-check(filterTxns(acts, query: "", filter: .pending).map(\.id) == ["1"], "pending filter")
-check(filterTxns(acts, query: "  TARGET ", filter: .all).map(\.id) == ["3"], "search matches merchant ignoring case and spaces")
-check(filterTxns(acts, query: "food", filter: .all).map(\.id) == ["1"], "search matches category")
-check(filterTxns(acts, query: "zelle", filter: .spending).isEmpty, "search and filter combine")
+check(filterTxns(acts, filter: .spending).map(\.id) == ["1", "3"], "spending filter keeps money out")
+check(filterTxns(acts, filter: .income).map(\.id) == ["2"], "income filter keeps money in")
+check(filterTxns(acts, filter: .pending).map(\.id) == ["1"], "pending filter")
+check(filterTxns(acts, filter: .all, day: "2026-11-22").map(\.id) == ["3"], "picking a day keeps only that day")
+check(filterTxns(acts, filter: .income, day: "2026-11-22").isEmpty, "day and kind combine")
+let ds = dailySpend([DailyPoint(date: "2026-11-01", cumulativeSpendCents: 0), DailyPoint(date: "2026-11-02", cumulativeSpendCents: 500),
+                     DailyPoint(date: "2026-11-03", cumulativeSpendCents: 400), DailyPoint(date: "2026-11-04", cumulativeSpendCents: 1000)])
+check(ds.map(\.cents) == [0, 500, 0, 600], "daily spend from the running total, refund day reads 0")
+check(leadingBlanks("2026-11-01") == 6 && leadingBlanks("2026-12-01") == 1 && leadingBlanks("2026-06-01") == 0, "monday first calendar offset")
+check(shortDay("2026-11-04") == "nov 4", "short day")
+let rec = try! makeDecoder().decode(Recurring.self, from: Data(#"{"items":[{"merchant":"Netflix","amount_cents":1549,"category":"ENTERTAINMENT","last_date":"2026-11-03","next_date":"2026-12-03","paid_this_month":true}],"monthly_cents":1549}"#.utf8))
+check(rec.items[0].nextDate == "2026-12-03" && rec.items[0].paidThisMonth && rec.monthlyCents == 1549, "decodes recurring")
 check(categoryIcon("FOOD_AND_DRINK") == "fork.knife" && categoryIcon(nil) == "circle.dashed", "category icons")
 
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")

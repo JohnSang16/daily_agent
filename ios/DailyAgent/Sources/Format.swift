@@ -393,22 +393,40 @@ enum ActivityFilter: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-/// Filters the loaded activity page. The query matches merchant, bank or category, ignoring case.
-func filterTxns(_ txns: [Txn], query: String, filter: ActivityFilter) -> [Txn] {
-    let q = query.trimmingCharacters(in: .whitespaces).lowercased()
-    return txns.filter { t in
-        let kept: Bool
+/// Filters the loaded activity page by kind, and to one day when a day is picked.
+func filterTxns(_ txns: [Txn], filter: ActivityFilter, day: String? = nil) -> [Txn] {
+    txns.filter { t in
+        if let day, t.date != day { return false }
         switch filter {
-        case .all: kept = true
-        case .spending: kept = t.direction == "out"
-        case .income: kept = t.direction == "in"
-        case .pending: kept = t.pending
+        case .all: return true
+        case .spending: return t.direction == "out"
+        case .income: return t.direction == "in"
+        case .pending: return t.pending
         }
-        guard kept else { return false }
-        guard !q.isEmpty else { return true }
-        return t.merchant.lowercased().contains(q) || t.bank.lowercased().contains(q)
-            || categoryLabel(t.category ?? "").contains(q)
     }
+}
+
+/// Spend on each day, from the running total (a refund day reads as 0, not negative).
+func dailySpend(_ daily: [DailyPoint]) -> [(date: String, cents: Int)] {
+    var prev = 0
+    return daily.map { p in
+        defer { prev = p.cumulativeSpendCents }
+        return (p.date, max(p.cumulativeSpendCents - prev, 0))
+    }
+}
+
+/// Empty cells before day 1 in a monday first week grid.
+func leadingBlanks(_ isoFirst: String) -> Int {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(identifier: "UTC")!
+    guard let d = fmt("yyyy-MM-dd", cal.timeZone).date(from: isoFirst) else { return 0 }
+    return (cal.component(.weekday, from: d) + 5) % 7  // sunday 1 -> 6, monday 2 -> 0
+}
+
+/// "2026-11-14" -> "nov 14"
+func shortDay(_ iso: String) -> String {
+    guard iso.count >= 10, let d = Int(iso.suffix(2)) else { return iso }
+    return "\(monthShort(String(iso.prefix(7)))) \(d)"
 }
 
 /// SF Symbol for a Plaid primary category.
