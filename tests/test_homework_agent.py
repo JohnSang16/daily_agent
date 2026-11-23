@@ -92,9 +92,10 @@ class FakeLlm:
     """Plays back one response per step, then waits (an end_turn with no tools)."""
 
     def __init__(self, *turns):
-        self.turns, self.seen = list(turns), []
+        self.turns, self.seen, self.models = list(turns), [], []
 
-    def next(self, messages):
+    def next(self, messages, model=None):
+        self.models.append(model)
         self.seen.append(json.dumps(messages)[-4000:])
         content = self.turns.pop(0) if self.turns else [{"type": "text", "text": "waiting."}]
         stop = "tool_use" if any(b["type"] == "tool_use" for b in content) else "end_turn"
@@ -686,3 +687,31 @@ def test_AC13_24_report_ranks_what_went_wrong(tmp_path):
     assert all("agreed" != i["what"].split()[1] for i in items)  # successes are not problems
     assert not any("clicked" in i["what"] or i["what"] == "old" for i in items)
     assert c.get("/agent/report").status_code == 401
+
+
+class FailOnceLlm(FakeLlm):
+    def next(self, messages, model=None):
+        if not self.models:
+            self.models.append(model)
+            raise RuntimeError("overloaded")
+        return super().next(messages, model)
+
+
+def test_AC13_25_failed_step_escalates_the_session(tmp_path):
+    d = FakeDriver()
+    llm = FailOnceLlm([call("screenshot")])
+    app, c = build(tmp_path, llm, d)
+    st = app.state.settings
+    assert st.agent_model == "claude-sonnet-5-5" and st.agent_escalate_model == "claude-opus-5-5"
+    s = start(c)
+    assert s["status"] == "paused" and llm.models == ["claude-sonnet-5-5"]
+    c.post(f"/agent/sessions/{s['id']}/handback", headers=H)
+    assert llm.models[1:] and set(llm.models[1:]) == {"claude-opus-5-5"}
+    with app.state.session_factory() as db:
+        used = {r.model for r in db.scalars(select(LlmUsage))}
+    assert used == {"claude-opus-5-5"}
+    c.post(f"/agent/sessions/{s['id']}/stop", headers=H)
+    llm2 = FakeLlm([call("screenshot")])
+    app.state.agent.llm = llm2
+    start(c)
+    assert llm2.models[0] == "claude-sonnet-5-5"

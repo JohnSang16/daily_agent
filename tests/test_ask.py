@@ -105,12 +105,16 @@ def test_AC14_2_answer_with_sources(tmp_path):
     )
 
 
-def test_AC14_3_nothing_found_no_llm(tmp_path):
+def test_AC14_3_no_match_is_a_general_question(tmp_path):
     llm = FakeLlm()
     app, c, _ = build(tmp_path, NOTES, llm=llm)
     j = ask(c, "zebra quantum submarine").json()
+    assert j["route"] == "general" and j["sources"] == [] and j["used_llm"]
+    assert len(llm.prompts) == 1 and "zebra quantum submarine" in llm.prompts[0]
+    assert "linear regression" not in llm.prompts[0] and "cooking app" not in llm.prompts[0]
+    app2, c2, _ = build(tmp_path / "b", NOTES)  # no model configured
+    j = ask(c2, "zebra quantum submarine").json()
     assert j["sources"] == [] and not j["used_llm"] and "nothing" in j["answer"].lower()
-    assert llm.prompts == []
 
 
 def test_AC14_4_and_6_injection_and_prompt_contents(tmp_path):
@@ -206,7 +210,8 @@ def test_AC14_13_and_14_context_enforced(tmp_path):
     llm = FakeLlm()
     app, c, _ = build(tmp_path, NOTES, llm=llm)
     j = ask(c, "what about regression", context=["calendar"]).json()
-    assert j["sources"] == [] and "vault" in j["answer"].lower() and llm.prompts == []
+    assert j["sources"] == [] and j["route"] == "general"
+    assert all("linear regression" not in p for p in llm.prompts)
     j = ask(c, "what's due this week", context=["vault"]).json()
     assert "calendar" in j["answer"].lower() and "Essay" not in j["answer"]
 
@@ -220,3 +225,18 @@ def test_AC14_15_cox_text_never_in_prompt(tmp_path):
     assert llm.prompts and all("COXSECRETDETAIL" not in p for p in llm.prompts)
     only = ask(c, "COXSECRETDETAIL").json()
     assert only["sources"] and not only["used_llm"] and "cox" in only["answer"].lower()
+
+
+def test_AC14_16_general_question_budget_and_usage(tmp_path):
+    llm = FakeLlm()
+    app, c, _ = build(tmp_path, NOTES, llm=llm)
+    assert ask(c, "explain kirchhoff's law").json()["used_llm"]
+    with app.state.session_factory() as db:
+        assert [r.purpose for r in db.scalars(select(LlmUsage))] == ["ask"]
+    llm2 = FakeLlm()
+    app2, c2, _ = build(tmp_path / "b", NOTES, llm=llm2, llm_daily_token_budget=10)
+    with app2.state.session_factory() as db:
+        db.add(LlmUsage(at=NOW, purpose="ask", model="m", input_tokens=20, output_tokens=0))
+        db.commit()
+    j = ask(c2, "explain kirchhoff's law").json()
+    assert not j["used_llm"] and "budget" in j["answer"].lower() and llm2.prompts == []

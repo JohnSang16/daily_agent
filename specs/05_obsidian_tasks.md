@@ -28,7 +28,7 @@ Checkbox lines using `*` or the dash list marker, with `[ ]` for open and `[x]` 
 9. Malformed dates (for example `2026-13-45`) leave the task with no due date and `needs_review` true with a reason.
 
 ## Scope rules
-0. The whole vault is in scope, including `cox/`. Only hidden folders, `node_modules` and `OBSIDIAN_IGNORE_GLOBS` (`templates/*,archive/*`) are skipped.
+0. The whole vault is in scope, including `cox/`. Only hidden folders, `node_modules` and `OBSIDIAN_IGNORE_GLOBS` (`templates/*,archive/*,_archive/*`) are skipped.
 1. Only `.md` files. Skip hidden folders and anything matching `OBSIDIAN_IGNORE_GLOBS`.
 2. File size cap of 1 MB per file and a cap on total files. Oversized files are skipped with a logged count.
 3. The fingerprint scope is the relative file path (spec 03).

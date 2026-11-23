@@ -124,7 +124,7 @@ class AgentLlm:
     def __init__(self, http, api_key: str, model: str, effort: str = "medium"):
         self.http, self.key, self.model, self.effort = http, api_key, model, effort
 
-    def next(self, messages: list) -> dict:
+    def next(self, messages: list, model: str | None = None) -> dict:
         r = self.http.request(
             "anthropic_agent",
             "POST",
@@ -135,7 +135,7 @@ class AgentLlm:
                 "anthropic-beta": FALLBACK_BETA,
             },
             json={
-                "model": self.model,
+                "model": model or self.model,
                 "max_tokens": 16000,
                 "system": SYSTEM,
                 "tools": TOOLS,

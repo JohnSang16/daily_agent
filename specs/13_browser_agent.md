@@ -23,7 +23,7 @@ An agent that works inside a sandboxed cloud browser (Kernel) on assignments in 
 ## Components
 1. **Session manager** (`app/agent/sessions.py`): creates a Kernel browser from a dedicated profile used only for school sites, records the session, returns a live view URL to the authenticated app only, and deletes the browser on end or timeout.
 2. **Browser driver interface** (`app/agent/driver.py`): the small set of actions the agent may use (open page, read page text, click, type, scroll, screenshot). A real Kernel driver and a fake for tests.
-3. **Agent loop** (`app/agent/loop.py`): the LLM plans and chooses driver actions. Every action passes through the gate first.
+3. **Agent loop** (`app/agent/loop.py`): the LLM plans and chooses driver actions. Every action passes through the gate first. The model is Sonnet by default (`AGENT_MODEL`, default claude-sonnet-5-5, changed 2026-11-23 with John's approval). When a step fails on it (the call errors, the reply is cut off, or it declines), the session pauses as before and switches to `AGENT_ESCALATE_MODEL` (default claude-opus-5-5) for the rest of that session, so the retry after hand back runs on the stronger model.
 4. **Approval gate** (`app/agent/gate.py`): classifies each proposed action. Blocked classes include clicks on controls whose accessible name or surrounding text suggests submit, turn in, send, pay, finish, confirm, or delete, any form submission, any navigation off the allowlist, and any action on a page that looks like a final review or payment step. A blocked action creates an approval request and waits.
 5. **Approval records**: tied to the session, the exact action (hash of type, target, and visible label), and an expiry (default 10 minutes). One use only.
 6. **Step log**: a plain language line for every action, shown on the Agent screen. Contains no passwords and no private page text beyond what is needed.
@@ -67,6 +67,7 @@ All tests use a fake driver and fake LLM.
 * AC13.22 A solve marked as having a figure sends the screenshot to the solver, and every rung gets it as an image.
 * AC13.23 Text typed into a plain field that does not show up in the field is flagged back to the agent; a match is a plain "Done."
 * AC13.24 The report ranks problems by count over the chosen days, leaves out successes, ordinary actions and older steps, and needs the bearer token.
+* AC13.25 A session starts on `AGENT_MODEL`. After a failed, cut off or declined step it pauses, and every later step in that session uses `AGENT_ESCALATE_MODEL`; the `llm_usage` row names the model actually used. Other sessions still start on `AGENT_MODEL`.
 * AC13.16 Measure and record the average cost of one homework session in `docs/CHECKIN_LOG.md`.
 
 ## Manual verification (John)

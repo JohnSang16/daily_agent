@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     )
     calendar_ids: str = "primary"
     obsidian_vault_path: str = ""
-    obsidian_ignore_globs: str = "templates/*,archive/*"
+    obsidian_ignore_globs: str = "templates/*,archive/*,_archive/*"
     # set to sync from a local git checkout instead of obsidian_vault_path
     obsidian_repo_url: str = ""
     obsidian_deploy_key_path: str = "./secrets/vault_deploy_key"
@@ -45,7 +45,10 @@ class Settings(BaseSettings):
     # spec 13 homework agent
     kernel_api_key: str = ""
     kernel_profile: str = "school"  # a browser profile used only for school sites
-    agent_model: str = "claude-opus-5-5"
+    agent_model: str = "claude-sonnet-5-5"
+    agent_escalate_model: str = (
+        "claude-opus-5-5"  # used for the rest of a session after a failed step
+    )
     agent_effort: str = "medium"
     agent_allowed_hosts: str = (
         "gastate.view.usg.edu,gsu.edu,pearson.com,pearsoncmg.com,pearsoned.com"

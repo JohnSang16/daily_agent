@@ -122,3 +122,9 @@ Next step: first real session on a practice assignment, then record AC13.16 cost
 
 ## 2026-11-21 Gmail OA sweep (spec 15, first cut)
 Direct Gmail client on the calendar's token file, one no tools extraction call per new invite, processed ids in `gmail_seen` (migration 0010). Undated invites lead the digest as "no deadline given". AC15.21 to AC15.27. The host Mac needs `scripts/google_auth.py` rerun so its token carries the gmail scope.
+
+## 2026-11-23 ask anything, homework agent on Sonnet (specs 13 and 14, approved by John)
+What: ask answers any question. Notes that match are used and cited; when none match or the vault is off, the question goes to the model on its own (route `general`, no note text in the prompt, same budget and usage row). The homework agent now runs on claude-sonnet-5-5 (`AGENT_MODEL`) and moves to `AGENT_ESCALATE_MODEL` (claude-opus-5-5) for the rest of a session after a failed, cut off or declined step.
+Acceptance criteria passing: AC14.3 and AC14.13 (rewritten), AC14.16, AC13.25 (all failed first).
+Tests and lint: 351 passed, ruff clean.
+Still blocked: the ANTHROPIC_API_KEY in .env was invalid on 2026-11-20, so no live check. Billing is Console credits (LLM_BACKEND=api); do not use the cli backend on the Cox Mac.

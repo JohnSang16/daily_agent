@@ -33,6 +33,7 @@ class Live:
     notes: list = field(default_factory=list)  # John's messages waiting to go to the model
     pending: dict | None = None  # the tool call held for approval
     solves: dict = field(default_factory=dict)  # problem text -> times solved this session
+    escalated: bool = False  # after a failed step the rest of the session runs on the bigger model
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -248,10 +249,12 @@ class Agent:
             if content:
                 live.messages.append({"role": "user", "content": content})
                 live.results, live.notes = [], []
+            model = self.st.agent_escalate_model if live.escalated else self.st.agent_model
             try:
-                resp = self.llm.next(live.messages)
+                resp = self.llm.next(live.messages, model=model)
             except Exception:
                 log.warning("agent model call failed")
+                live.escalated = True
                 self.set_status(sid, "paused", "the model call failed. hand back to retry.")
                 return False
             usage = resp.get("usage") or {}
@@ -261,7 +264,7 @@ class Agent:
                     LlmUsage(
                         at=self._now(),
                         purpose=PURPOSE,
-                        model=self.st.agent_model,
+                        model=model,
                         input_tokens=inp,
                         output_tokens=out,
                     )
@@ -278,6 +281,8 @@ class Agent:
                 {"role": "assistant", "content": blocks}
             )  # full content, thinking kept
             stop = resp.get("stop_reason")
+            if stop in ("refusal", "max_tokens"):
+                live.escalated = True
             if stop == "refusal":
                 self.set_status(sid, "paused", "the model declined this step.")
                 return False
