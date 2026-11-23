@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.auth import require_token
 from app.clock import Clock, get_clock
 from app.models import Budget
-from app.money import daily_cumulative_spend, holdings, last_months, month_totals
+from app.money import daily_cumulative_spend, holdings, last_months, month_totals, recurring
 
 router = APIRouter(dependencies=[Depends(require_token)])
 
@@ -49,6 +49,13 @@ def summary(
                 for d, cents in daily_cumulative_spend(db, today)
             ],
         }
+
+
+@router.get("/money/recurring")
+def recurring_charges(request: Request, clock: Clock = Depends(get_clock)):
+    with request.app.state.session_factory() as db:
+        items = recurring(db, _today(request, clock))
+    return {"items": items, "monthly_cents": sum(i["amount_cents"] for i in items)}
 
 
 class BudgetIn(BaseModel):
