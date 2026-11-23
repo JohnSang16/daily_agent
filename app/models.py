@@ -307,3 +307,12 @@ class Approval(Base):
     status: Mapped[str] = mapped_column(String)  # pending, approved, denied, used, expired
     expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
     decided_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class GmailSeen(Base):
+    """Message ids the OA sweep already sent to the model (spec 15). Ids only, never content."""
+
+    __tablename__ = "gmail_seen"
+
+    message_id: Mapped[str] = mapped_column(String, primary_key=True)
+    at: Mapped[datetime] = mapped_column(UTCDateTime)

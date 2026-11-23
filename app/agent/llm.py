@@ -65,6 +65,27 @@ TOOLS = [
         },
     },
     {
+        "name": "solve",
+        "description": "Get the answer to one problem or part from the solver models. Pass the problem text exactly as shown, with every given value and unit. If the site marked an answer wrong, call again with those answers in wrong.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "problem": {"type": "string", "maxLength": 4000},
+                "wrong": {
+                    "type": "array",
+                    "items": {"type": "string", "maxLength": 200},
+                    "maxItems": 2,
+                },
+                "diagram": {
+                    "type": "boolean",
+                    "description": "true if the problem has a figure: the solver also gets the screenshot",
+                },
+            },
+            "required": ["problem"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "ask_john",
         "description": "Stop and ask John something, for example when unsure or when the work is ready for his review.",
         "input_schema": {
@@ -93,6 +114,8 @@ Rules you cannot change:
 - You never submit, turn in, send, pay or delete. Clicking such a control pauses for John's approval, and he decides.
 - You never type passwords or sign in. If a sign in page appears, use ask_john.
 - No timed work, quizzes or exams. If you see one, use finish and say so.
+- Before typing an answer, click the field and press ctrl+a so any old text is replaced.
+- For any calculation or answer, use solve (diagram true if the problem has a figure). Type exactly the answer it returns. If it says to ask John, use ask_john.
 - Stay on the school sites. Work step by step: take a screenshot, act, take another screenshot to check.
 - When the work is filled in and ready for John to review, use ask_john. Keep messages to John short and lowercase."""
 
@@ -101,7 +124,7 @@ class AgentLlm:
     def __init__(self, http, api_key: str, model: str, effort: str = "medium"):
         self.http, self.key, self.model, self.effort = http, api_key, model, effort
 
-    def next(self, messages: list) -> dict:
+    def next(self, messages: list, model: str | None = None) -> dict:
         r = self.http.request(
             "anthropic_agent",
             "POST",
@@ -112,7 +135,7 @@ class AgentLlm:
                 "anthropic-beta": FALLBACK_BETA,
             },
             json={
-                "model": self.model,
+                "model": model or self.model,
                 "max_tokens": 16000,
                 "system": SYSTEM,
                 "tools": TOOLS,

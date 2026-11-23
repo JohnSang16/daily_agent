@@ -61,6 +61,16 @@ class HttpCalendarClient:
         self.token_path.write_text(json.dumps(self.token))
         self.token_path.chmod(0o600)
 
+    def authed_get(self, integration: str, url: str, params: dict):
+        """GET with the saved token, refreshing it once on a 401."""
+        for attempt in (0, 1):
+            h = {"Authorization": f"Bearer {self.token.get('access_token', '')}"}
+            r = self.http.get(integration, url, params=params, headers=h)
+            if r.status_code == 401 and attempt == 0:
+                self._refresh()
+                continue
+            return r
+
     def list_events(self, calendar_id, time_min, time_max, page_token=None):
         params = {
             "timeMin": time_min.isoformat(),
@@ -73,14 +83,7 @@ class HttpCalendarClient:
         }
         if page_token:
             params["pageToken"] = page_token
-        url = f"{API}/{quote(calendar_id, safe='')}/events"
-        for attempt in (0, 1):
-            h = {"Authorization": f"Bearer {self.token.get('access_token', '')}"}
-            r = self.http.get(SOURCE, url, params=params, headers=h)
-            if r.status_code == 401 and attempt == 0:
-                self._refresh()
-                continue
-            break
+        r = self.authed_get(SOURCE, f"{API}/{quote(calendar_id, safe='')}/events", params)
         if r.status_code in (403, 429):
             raise RateLimited()
         r.raise_for_status()

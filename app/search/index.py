@@ -39,7 +39,7 @@ def index_vault(
     s: Session,
     vault_path,
     now: datetime,
-    ignore_globs=("templates/*", "archive/*"),
+    ignore_globs=("templates/*", "archive/*", "_archive/*"),
     private_globs=(),
     max_bytes: int = 1_000_000,
 ) -> int:

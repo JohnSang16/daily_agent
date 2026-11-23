@@ -90,6 +90,12 @@ class GuardedHttpClient:
                 return False
         if integration == "anthropic_agent":
             return _agent_body_ok(req)
+        if integration == "gemini":  # text in, text out: no tools, no files, no other options
+            try:
+                body = json.loads(req.content)
+            except ValueError:
+                return False
+            return set(body) <= {"model", "input"} and _gemini_input_ok(body.get("input"))
         if integration == "kernel" and req.url.path.endswith("/playwright/execute"):
             return _browser_code_ok(req)
         if integration == "plaid":  # read only: transactions is the only product ever requested
@@ -128,6 +134,26 @@ class GuardedHttpClient:
 
     def get(self, integration: str, url: str, **kwargs) -> httpx.Response:
         return self.request(integration, "GET", url, **kwargs)
+
+
+def _gemini_input_ok(inp) -> bool:
+    """Plain text, or inline text and PNG blocks only: no URLs, files or other content types."""
+    if isinstance(inp, str):
+        return True
+    if not isinstance(inp, list) or not 0 < len(inp) <= 4:
+        return False
+    for b in inp:
+        if not isinstance(b, dict):
+            return False
+        if b.get("type") == "text":
+            ok = set(b) == {"type", "text"} and isinstance(b["text"], str)
+        elif b.get("type") == "image":
+            ok = set(b) == {"type", "data", "mime_type"} and b["mime_type"] == "image/png"
+        else:
+            ok = False
+        if not ok:
+            return False
+    return True
 
 
 def _agent_body_ok(req: httpx.Request) -> bool:

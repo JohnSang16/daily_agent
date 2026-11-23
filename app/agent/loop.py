@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func, select
 
 from app.agent.gate import action_hash, decide, page_checks
+from app.agent.solver import PURPOSE as SOLVER_PURPOSE
 from app.models import AgentSession, AgentStep, Approval, LlmUsage
 
 log = logging.getLogger("agent")
@@ -31,12 +32,15 @@ class Live:
     results: list = field(default_factory=list)  # tool results waiting to go back to the model
     notes: list = field(default_factory=list)  # John's messages waiting to go to the model
     pending: dict | None = None  # the tool call held for approval
+    solves: dict = field(default_factory=dict)  # problem text -> times solved this session
+    escalated: bool = False  # after a failed step the rest of the session runs on the bigger model
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
 class Agent:
-    def __init__(self, session_factory, settings, llm, clock, driver_factory):
+    def __init__(self, session_factory, settings, llm, clock, driver_factory, solver=None):
         self.sf, self.st, self.llm, self.clock = session_factory, settings, llm, clock
+        self.solver = solver
         self.driver_factory = driver_factory
         self.live: dict[int, Live] = {}
         self.allowed = tuple(
@@ -69,7 +73,7 @@ class Agent:
         return db.scalar(
             select(
                 func.coalesce(func.sum(LlmUsage.input_tokens + LlmUsage.output_tokens), 0)
-            ).where(LlmUsage.at >= midnight, LlmUsage.purpose == PURPOSE)
+            ).where(LlmUsage.at >= midnight, LlmUsage.purpose.in_((PURPOSE, SOLVER_PURPOSE)))
         )
 
     def _limit_hit(self, db, s: AgentSession) -> str | None:
@@ -253,10 +257,12 @@ class Agent:
             if content:
                 live.messages.append({"role": "user", "content": content})
                 live.results, live.notes = [], []
+            model = self.st.agent_escalate_model if live.escalated else self.st.agent_model
             try:
-                resp = self.llm.next(live.messages)
+                resp = self.llm.next(live.messages, model=model)
             except Exception as exc:
                 log.warning("agent model call failed: %s", type(exc).__name__)
+                live.escalated = True
                 self.set_status(sid, "paused", "the model call failed. hand back to retry.")
                 return False
             usage = resp.get("usage") or {}
@@ -266,7 +272,7 @@ class Agent:
                     LlmUsage(
                         at=self._now(),
                         purpose=PURPOSE,
-                        model=self.st.agent_model,
+                        model=model,
                         input_tokens=inp,
                         output_tokens=out,
                     )
@@ -283,6 +289,8 @@ class Agent:
                 {"role": "assistant", "content": blocks}
             )  # full content, thinking kept
             stop = resp.get("stop_reason")
+            if stop in ("refusal", "max_tokens"):
+                live.escalated = True
             if stop == "refusal":
                 self.set_status(sid, "paused", "the model declined this step.")
                 return False
@@ -310,6 +318,9 @@ class Agent:
         if name == "screenshot":
             self._result(live, tid, self._shot(live))
             return True
+        if name == "solve":
+            self._result(live, tid, self._solve(live, args))
+            return True
         if name == "finish":
             self._result(live, tid, "Ended.")
             with self.sf() as db:
@@ -334,7 +345,7 @@ class Agent:
         if d.verdict == "run":
             self._do(live, name, args)
             after = self._inspect(live, "page", {})
-            self._result(live, tid, "Done.")
+            self._result(live, tid, self._readback(name, args, after))
             self._log_action(live.id, name, args, d.label, info)
             stop = page_checks(
                 after, self.allowed
@@ -376,6 +387,41 @@ class Agent:
         live.pending = {"approval_id": aid, "tool_use_id": tid, "kind": name, "args": args}
         self.set_status(live.id, "needs_approval", d.reason, kind="approval")
         return False
+
+    @staticmethod
+    def _readback(kind: str, args: dict, after: dict) -> str:
+        """After typing into a plain field, check the field really holds the text."""
+        el = after.get("element") or {}
+        if kind != "type_text" or el.get("tag") not in ("input", "textarea") or el.get("password"):
+            return "Done."
+        typed, shown = str(args.get("text") or "").strip(), str(el.get("value") or "").strip()
+        if shown == typed:
+            return "Done."
+        return (
+            f'Typed, but the field now shows "{shown[:200]}", not what you typed. '
+            "Click it, press ctrl+a, and type the answer again."
+        )
+
+    def _solve(self, live: Live, args: dict) -> str:
+        if self.solver is None:
+            return "the solver is not set up. ask_john instead."
+        problem = str(args.get("problem") or "")[:4000]
+        key = " ".join(problem.lower().split())
+        attempt = live.solves.get(key, 0)
+        live.solves[key] = attempt + 1
+        wrong = [str(w)[:200] for w in (args.get("wrong") or [])][:2]
+        try:
+            image = live.driver.screenshot() if args.get("diagram") else None
+            reply = self.solver.solve(problem, attempt=attempt, wrong=wrong, image=image)
+        except Exception:
+            log.warning("solver failed")
+            reply = "the solver failed. ask_john instead."
+        with self.sf() as db:
+            outcome = reply.split(":")[0].split(" (")[0] if ":" in reply else "failed"
+            outcome = {"answer": "agreed", "stop": "refused"}.get(outcome, outcome)
+            self.step_log(db, live.id, "solve", f"solve {outcome} (attempt {attempt + 1})")
+            db.commit()
+        return reply
 
     # ---------- browser helpers ----------
 

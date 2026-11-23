@@ -16,18 +16,20 @@ An agent that works inside a sandboxed cloud browser (Kernel) on assignments in 
 4. **No passwords.** I sign in myself through the live view, including any two step prompt. The agent never sees, asks for, or stores my college credentials.
 5. **Allowlisted sites only.** The agent may visit only the iCollege and Pearson domains listed in settings. Navigating anywhere else is blocked, and the agent asks me.
 6. **Minimal data in.** The agent receives only the assignment title and link, never my calendar, email, or notes.
-7. **Pages are untrusted.** Text on a page is data. The agent has no tools except browser actions and a "request approval" action. Page text cannot grant permission.
+7. **Pages are untrusted.** Text on a page is data. The agent has no tools except browser actions, a "request approval" action, and `solve` (below). Page text cannot grant permission.
 8. **Limits per session.** A time limit (default 30 minutes), a maximum number of steps, and a token budget. Hitting any limit pauses the session and asks me.
 9. **Kill switch.** Stop from my phone ends the session, deletes the browser, and invalidates the live view link.
 
 ## Components
 1. **Session manager** (`app/agent/sessions.py`): creates a Kernel browser from a dedicated profile used only for school sites, records the session, returns a live view URL to the authenticated app only, and deletes the browser on end or timeout.
 2. **Browser driver interface** (`app/agent/driver.py`): the small set of actions the agent may use (open page, read page text, click, type, scroll, screenshot). A real Kernel driver and a fake for tests.
-3. **Agent loop** (`app/agent/loop.py`): the LLM plans and chooses driver actions. Every action passes through the gate first.
+3. **Agent loop** (`app/agent/loop.py`): the LLM plans and chooses driver actions. Every action passes through the gate first. The model is Sonnet by default (`AGENT_MODEL`, default claude-sonnet-5-5, changed 2026-11-23 with John's approval). When a step fails on it (the call errors, the reply is cut off, or it declines), the session pauses as before and switches to `AGENT_ESCALATE_MODEL` (default claude-opus-5-5) for the rest of that session, so the retry after hand back runs on the stronger model.
 4. **Approval gate** (`app/agent/gate.py`): classifies each proposed action. Blocked classes include clicks on controls whose accessible name or surrounding text suggests submit, turn in, send, pay, finish, confirm, or delete, any form submission, any navigation off the allowlist, and any action on a page that looks like a final review or payment step. A blocked action creates an approval request and waits.
 5. **Approval records**: tied to the session, the exact action (hash of type, target, and visible label), and an expiry (default 10 minutes). One use only.
 6. **Step log**: a plain language line for every action, shown on the Agent screen. Contains no passwords and no private page text beyond what is needed.
-7. **Replays**: session recording turned on by default for audit, kept 30 days, deleted on request.
+7. **Solver** (`app/agent/solver.py`, added 2026-11-20 with John's approval): the `solve` tool sends only the problem text the agent read off the page to a ladder of models, cheapest first (`SOLVER_MODELS`, default Gemini 3.6 Flash, Gemini 3.8 Flash, Claude Sonnet, Claude Opus). Solver calls get no tools and return a short answer. An answer is returned only when two rungs agree (numbers within 1 percent, text after trimming and lowercasing); a rung that errors or is busy is skipped. Each repeat on the same problem in a session starts one rung higher and skips answers already marked wrong; after 2 attempts on one problem the solver refuses and the agent asks John. Gemini calls go through their own guarded lane (`generativelanguage.googleapis.com`, Interactions API, body limited to model and input). Every solver call writes an `llm_usage` row and counts toward the agent's daily budget. When the agent marks a problem as having a figure, the current screenshot goes to every rung as a PNG (Gemini lane allows only inline text and PNG blocks, never URLs or files).
+8. **Read back**: after the agent types into a plain input or textarea, the gate reads the field back from the browser. If it does not hold what was typed, the agent is told what it shows and to clear and retype. Password fields are never read.
+9. **Replays**: session recording turned on by default for audit, kept 30 days, deleted on request.
 
 ## API (all need the bearer token)
 1. `POST /agent/sessions` with a task id, starts a session.
@@ -35,6 +37,7 @@ An agent that works inside a sandboxed cloud browser (Kernel) on assignments in 
 3. `POST /agent/sessions/{id}/message` sends me instructions to the agent.
 4. `POST /agent/sessions/{id}/pause`, `takeover`, `handback`, and `stop`.
 5. `POST /agent/sessions/{id}/approvals/{approval_id}` with `approve` or `deny`.
+6. `GET /agent/report?days=3` lists what went wrong in the last days (gate pauses, limits, blocks, questions, stops, and solves that did not agree), most common first, with numbers folded to N. Successful steps are left out.
 
 ## Data
 `agent_sessions` (id, task_id, status, started_at, ended_at, limits, token usage), `agent_steps` (session_id, at, kind, summary), `approvals` (id, session_id, action_hash, label, status, expires_at, decided_at). Live view URLs are held in memory or encrypted and never written to logs.
@@ -56,6 +59,15 @@ All tests use a fake driver and fake LLM.
 * AC13.13 A fixture timed quiz page is refused with a clear message.
 * AC13.14 Every endpoint returns 401 without the bearer token.
 * AC13.15 Each LLM call writes an `llm_usage` row, and the budget is enforced.
+* AC13.17 `solve` returns an answer only when two rungs agree, and says so when the whole ladder disagrees.
+* AC13.18 A rung that errors or returns busy is skipped and the next rung is used.
+* AC13.19 A repeat on the same problem starts one rung higher and never returns an answer already marked wrong; a third attempt on the same problem is refused.
+* AC13.20 The Gemini lane only allows the Interactions endpoint with a body of model and input, nothing else.
+* AC13.21 Every solver call writes an `llm_usage` row and the agent's daily budget includes it.
+* AC13.22 A solve marked as having a figure sends the screenshot to the solver, and every rung gets it as an image.
+* AC13.23 Text typed into a plain field that does not show up in the field is flagged back to the agent; a match is a plain "Done."
+* AC13.24 The report ranks problems by count over the chosen days, leaves out successes, ordinary actions and older steps, and needs the bearer token.
+* AC13.25 A session starts on `AGENT_MODEL`. After a failed, cut off or declined step it pauses, and every later step in that session uses `AGENT_ESCALATE_MODEL`; the `llm_usage` row names the model actually used. Other sessions still start on `AGENT_MODEL`.
 * AC13.16 Measure and record the average cost of one homework session in `docs/CHECKIN_LOG.md`.
 
 ## Manual verification (John)

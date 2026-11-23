@@ -12,6 +12,7 @@ from app.digest import read_identity, read_lines, read_plan_from_vault, read_why
 from app.llm.explain import format_due
 from app.models import Event, Task
 from app.priority.engine import Config, EventView, TaskView, rank
+from app.sources.gmail import NO_DEADLINE
 from app.sources.vault_checkout import resolved_vault_path
 
 router = APIRouter(dependencies=[Depends(require_token)])
@@ -61,6 +62,8 @@ def digest(request: Request, clock: Clock = Depends(get_clock)):
         )
         by_id = {t.id: t for t in tasks}
         dated = [by_id[r.task_id] for r in result.ranked if by_id[r.task_id].due_at]
+        # spec 15: an OA invite with no stated deadline is do first, never given an invented date
+        dated = [t for t in tasks if t.source == "gmail" and t.due_at is None] + dated
         notes = [_note(w) for w in _warnings(db, now, st.stale_after_hours, 0)]
         if result.stale_ids:
             n = len(result.stale_ids)
@@ -71,7 +74,8 @@ def digest(request: Request, clock: Clock = Depends(get_clock)):
     vault_path = resolved_vault_path(st)
     lines = read_lines(vault_path)
     today = now.astimezone(tz).date().isoformat()
-    past = dated[CAP - 1].due_at.astimezone(tz) if len(dated) > CAP else None
+    past = dated[CAP - 1].due_at if len(dated) > CAP else None
+    past = past.astimezone(tz) if past else None
     return {
         "date": today,
         "generated_at": iso(now),
@@ -84,8 +88,10 @@ def digest(request: Request, clock: Clock = Depends(get_clock)):
             {
                 "id": t.id,
                 "title": t.title,
-                "due_at": iso(t.due_at),
-                "due_local": format_due(iso(t.due_at), st.user_timezone),
+                "due_at": iso(t.due_at) if t.due_at else None,
+                "due_local": format_due(iso(t.due_at), st.user_timezone)
+                if t.due_at
+                else NO_DEADLINE,
             }
             for t in dated[:CAP]
         ],

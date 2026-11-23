@@ -2,12 +2,15 @@
 session is active and is never logged."""
 
 import logging
+import re
+from datetime import timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from app.agent.gate import host_ok
 from app.api.ask import split_course
 from app.auth import require_token
 from app.models import AgentSession, AgentStep, Approval, Task
@@ -100,10 +103,12 @@ def start(body: StartIn, request: Request):
         if t is None or t.status != "open":
             raise HTTPException(404, "task not found")
         title, _ = split_course(t.title)
+        link = t.source_ref if t.source == "icollege" else ""
     if any(True for _ in agent.live):
         raise HTTPException(409, "a homework session is already running. stop it first.")
     try:
-        sid = agent.start(body.task_id, title, body.site, START[body.site])
+        url = link if body.site == "icollege" and host_ok(link, agent.allowed) else START[body.site]
+        sid = agent.start(body.task_id, title, body.site, url)
     except Exception as exc:
         log.warning("session start failed: %s", type(exc).__name__)
         raise HTTPException(502, "the browser could not start") from None
@@ -150,3 +155,28 @@ def approval(sid: int, aid: int, body: DecisionIn, request: Request):
     if result == "used":
         _kick(request, sid)
     return {**_view(request, sid), "result": result}
+
+
+# step kinds that mean something went wrong or needed John. Successful solves are left out.
+PROBLEM_KINDS = ("gate", "limit", "blocked", "ask", "stop")
+
+
+@router.get("/agent/report")
+def report(request: Request, days: int = Query(3, ge=1, le=30)):
+    """What went wrong in the last few days, most common first, for John's review."""
+    since = (
+        request.app.state.agent.clock.now() - timedelta(days=days)
+        if request.app.state.agent
+        else None
+    )
+    if since is None:
+        raise HTTPException(503, "the homework agent is not configured")
+    with request.app.state.session_factory() as db:
+        steps = db.scalars(select(AgentStep).where(AgentStep.at >= since))
+        counts: dict[str, int] = {}
+        for st in steps:
+            if st.kind in PROBLEM_KINDS or (st.kind == "solve" and "agreed" not in st.summary):
+                what = re.sub(r"\d+", "N", st.summary)
+                counts[what] = counts.get(what, 0) + 1
+    items = sorted(counts.items(), key=lambda kv: -kv[1])[:15]
+    return {"days": days, "items": [{"what": w, "count": n} for w, n in items]}
