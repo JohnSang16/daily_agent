@@ -229,3 +229,40 @@ def test_a_disabled_account_leaves_the_holdings(tmp_path):
     )
     c.patch(f"/banks/accounts/{inv['id']}", headers=H, json={"enabled": False})
     assert c.get("/money/summary", headers=H).json()["holdings"]["invested_cents"] == 0
+
+
+def test_daily_is_a_running_total_through_today_with_gaps_carried_forward(tmp_path):
+    app, c = ready(tmp_path)
+    daily = c.get("/money/summary", headers=H).json()["daily"]
+    assert len(daily) == 19  # november 1 through 19
+    assert daily[0] == {"date": "2026-11-01", "cumulative_spend_cents": 0}
+    by = {d["date"]: d["cumulative_spend_cents"] for d in daily}
+    assert by["2026-11-06"] == 4000  # 40 food
+    assert by["2026-11-07"] == 10000  # +60 merchandise
+    assert by["2026-11-08"] == 8000  # -20 refund
+    assert by["2026-11-09"] == 11000  # +30 transport
+    assert by["2026-11-15"] == 11000  # no activity that day: carries the prior total forward
+    assert daily[-1] == {"date": "2026-11-19", "cumulative_spend_cents": 11000}
+    this_month = c.get("/money/summary", headers=H).json()["this_month"]
+    assert daily[-1]["cumulative_spend_cents"] == this_month["spend_cents"]
+
+
+def test_daily_excludes_transfers_and_card_payments(tmp_path):
+    page = {
+        "added": [
+            t("y1", "a1", 2000.00, "2026-11-01", "TRANSFER_OUT"),
+            t("y2", "a2", -2000.00, "2026-11-01", "TRANSFER_IN"),
+            t("y3", "a1", 300.00, "2026-11-01", "LOAN_PAYMENTS", CC, name="Card payment"),
+            t("y4", "a2", -300.00, "2026-11-01", "LOAN_PAYMENTS", CC, name="Card payment"),
+            t("y5", "a1", 1000.00, "2026-11-01", "FOOD_AND_DRINK"),
+        ],
+        "modified": [],
+        "removed": [],
+        "next_cursor": "c",
+        "has_more": False,
+    }
+    app, c = build(tmp_path, Plaid2([page]))
+    connect(c)
+    sync(app)
+    daily = c.get("/money/summary", headers=H).json()["daily"]
+    assert daily[0] == {"date": "2026-11-01", "cumulative_spend_cents": 100000}
