@@ -129,7 +129,7 @@ git commit -m "feat: add daily_cumulative_spend for the money overview redesign"
 **Files:**
 - Modify: `app/api/money.py:22-46` (the `summary` endpoint)
 
-- [ ] **Step 1: Update the import and endpoint**
+- [x] **Step 1: Update the import and endpoint**
 
 In `app/api/money.py`, change:
 
@@ -208,17 +208,17 @@ def summary(
         }
 ```
 
-- [ ] **Step 2: Run the tests to verify they pass**
+- [x] **Step 2: Run the tests to verify they pass**
 
 Run: `cd /Users/johns/projects/daily_agent && uv run pytest tests/test_money_overview.py -v`
 Expected: all tests in the file PASS, including the two new ones from Task 1.
 
-- [ ] **Step 3: Run the full backend suite and lint**
+- [x] **Step 3: Run the full backend suite and lint**
 
 Run: `cd /Users/johns/projects/daily_agent && uv run pytest -q && uv run ruff check app/money.py app/api/money.py tests/test_money_overview.py`
 Expected: all tests pass (364+2 = 366), ruff reports no errors on these files.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /Users/johns/projects/daily_agent
@@ -233,7 +233,7 @@ git commit -m "feat: expose the daily cumulative spend series on GET /money/summ
 **Files:**
 - Modify: `ios/DailyAgent/Sources/Models.swift:200-205` (`MoneySummary`)
 
-- [ ] **Step 1: Add the model**
+- [x] **Step 1: Add the model**
 
 In `ios/DailyAgent/Sources/Models.swift`, replace:
 
@@ -264,7 +264,7 @@ struct MoneySummary: Codable, Equatable {
 }
 ```
 
-- [ ] **Step 2: Add a decode check**
+- [x] **Step 2: Add a decode check**
 
 In `ios/DailyAgent/Checks/main.swift`, right before the final `print(failures == 0 ...)` / `exit(...)` lines, add:
 
@@ -274,17 +274,17 @@ let ms = try! makeDecoder().decode(MoneySummary.self, from: Data(#"{"months":[{"
 check(ms.daily.count == 2 && ms.daily[1].cumulativeSpendCents == 50, "decodes money summary with the daily series")
 ```
 
-- [ ] **Step 3: Run the checks to verify they fail**
+- [x] **Step 3: Run the checks to verify they fail**
 
 Run: `cd /Users/johns/projects/daily_agent/ios/DailyAgent && swiftc Sources/Models.swift Sources/Format.swift Checks/main.swift -o /tmp/checks && /tmp/checks`
 Expected: a compile error, `value of type 'MoneySummary' has no member 'daily'` is not yet possible since Step 1 already added it — if Step 1 and Step 2 are done together this will actually PASS. Run this step before Step 1's edit if you want to see it fail first; otherwise skip straight to Step 4.
 
-- [ ] **Step 4: Run the checks to verify they pass**
+- [x] **Step 4: Run the checks to verify they pass**
 
 Run: `cd /Users/johns/projects/daily_agent/ios/DailyAgent && swiftc Sources/Models.swift Sources/Format.swift Checks/main.swift -o /tmp/checks && /tmp/checks`
 Expected: `all checks passed`, exit code 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Users/johns/projects/daily_agent
@@ -299,7 +299,7 @@ git commit -m "feat(ios): decode the daily cumulative spend series"
 **Files:**
 - Modify: `ios/DailyAgent/Sources/Format.swift` (add two functions near `categoryLabel`/`dollars`)
 
-- [ ] **Step 1: Add checks for functions that don't exist yet**
+- [x] **Step 1: Add checks for functions that don't exist yet**
 
 In `ios/DailyAgent/Checks/main.swift`, right after the check added in Task 3, add:
 
@@ -320,12 +320,12 @@ check(averageComparisonLine(current: 500, others: [300, 400]) == "$150 above ave
 check(averageComparisonLine(current: 300, others: []) == nil, "no other months means no comparison line")
 ```
 
-- [ ] **Step 2: Run the checks to verify they fail**
+- [x] **Step 2: Run the checks to verify they fail**
 
 Run: `cd /Users/johns/projects/daily_agent/ios/DailyAgent && swiftc Sources/Models.swift Sources/Format.swift Checks/main.swift -o /tmp/checks && /tmp/checks`
 Expected: a compile error, `cannot find 'topCategoriesWithOther' in scope`.
 
-- [ ] **Step 3: Write the minimal implementation**
+- [x] **Step 3: Write the minimal implementation**
 
 In `ios/DailyAgent/Sources/Format.swift`, right after the existing `categoryLabel(_:)` function (around line 202), add:
 
@@ -347,12 +347,12 @@ func averageComparisonLine(current: Int, others: [Int]) -> String? {
 }
 ```
 
-- [ ] **Step 4: Run the checks to verify they pass**
+- [x] **Step 4: Run the checks to verify they pass**
 
 Run: `cd /Users/johns/projects/daily_agent/ios/DailyAgent && swiftc Sources/Models.swift Sources/Format.swift Checks/main.swift -o /tmp/checks && /tmp/checks`
 Expected: `all checks passed`, exit code 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Users/johns/projects/daily_agent
@@ -373,7 +373,7 @@ This is a pure visual change (no new backend calls, no new `AppState` state), so
 meaningful "failing test" to write first the way the backend tasks have one — the project's own
 check for UI code is the typecheck script, run at the end of this task and Task 6 and Task 7.
 
-- [ ] **Step 1: Replace `thisMonth`, `chart`, and `legend`**
+- [x] **Step 1: Replace `thisMonth`, `chart`, and `legend`**
 
 In `ios/DailyAgent/Sources/MoneyView.swift`, delete these three methods from `MoneyOverviewView`:
 
@@ -488,7 +488,7 @@ with:
             }
 ```
 
-- [ ] **Step 2: Add `HeroMode` and `TrendPoint`, replace `SpendIncomeChart`**
+- [x] **Step 2: Add `HeroMode` and `TrendPoint`, replace `SpendIncomeChart`**
 
 In `ios/DailyAgent/Sources/MoneyView.swift`, add this near the top of the file, after the existing `MoneyTab` enum:
 
@@ -586,17 +586,17 @@ struct TrendLineChart: View {
 }
 ```
 
-- [ ] **Step 3: Typecheck**
+- [x] **Step 3: Typecheck**
 
 Run: `cd /Users/johns/projects/daily_agent/ios/DailyAgent && sh Checks/typecheck.sh`
 Expected: `typecheck passed`. If it fails, the error will name the exact file/line — common culprits at this step are a stray reference to `thisMonth(`, `chart(`, `legend(`, or `SpendIncomeChart(` left somewhere (the body update in Step 1 should have removed the only call sites).
 
-- [ ] **Step 4: Run the existing iOS checks**
+- [x] **Step 4: Run the existing iOS checks**
 
 Run: `cd /Users/johns/projects/daily_agent/ios/DailyAgent && swiftc Sources/Models.swift Sources/Format.swift Checks/main.swift -o /tmp/checks && /tmp/checks`
 Expected: `all checks passed` (this file doesn't touch anything `main.swift`'s checks exercise directly, this just confirms nothing broke).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Users/johns/projects/daily_agent
@@ -611,7 +611,7 @@ git commit -m "feat(ios): replace the money figures and bar chart with a trend h
 **Files:**
 - Modify: `ios/DailyAgent/Sources/MoneyView.swift:123-139` (the `categories(_:)` method)
 
-- [ ] **Step 1: Replace the method**
+- [x] **Step 1: Replace the method**
 
 In `ios/DailyAgent/Sources/MoneyView.swift`, replace:
 
@@ -671,12 +671,12 @@ with:
     }
 ```
 
-- [ ] **Step 2: Typecheck**
+- [x] **Step 2: Typecheck**
 
 Run: `cd /Users/johns/projects/daily_agent/ios/DailyAgent && sh Checks/typecheck.sh`
 Expected: `typecheck passed`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /Users/johns/projects/daily_agent
@@ -692,7 +692,7 @@ git commit -m "feat(ios): replace the category bars with a donut and legend"
 - Modify: `ios/DailyAgent/Sources/MoneyView.swift:141-172` (the `goals` property)
 - Modify: `ios/DailyAgent/Sources/MoneyView.swift:176-192` (keep `Bar`, it's still used nowhere else after this — check Step 1 note below)
 
-- [ ] **Step 1: Replace the `goals` property**
+- [x] **Step 1: Replace the `goals` property**
 
 In `ios/DailyAgent/Sources/MoneyView.swift`, replace:
 
@@ -764,7 +764,7 @@ with:
     }
 ```
 
-- [ ] **Step 2: Add the `RingGauge` primitive**
+- [x] **Step 2: Add the `RingGauge` primitive**
 
 In `ios/DailyAgent/Sources/MoneyView.swift`, right after the existing `Bar` struct (the one `Bar` is still used by `categories(_:)` — wait, `categories(_:)` was replaced in Task 6 and no longer uses `Bar`. Check: grep for `Bar(` in the file before deleting anything — if Task 6 was done first, `Bar` now has zero call sites and should be deleted here instead of kept. Add `RingGauge` either way:
 
@@ -792,7 +792,7 @@ struct RingGauge: View {
 }
 ```
 
-- [ ] **Step 3: Check whether `Bar` is now dead code and remove it if so**
+- [x] **Step 3: Check whether `Bar` is now dead code and remove it if so**
 
 Run: `cd /Users/johns/projects/daily_agent && grep -rn "Bar(fraction" ios/DailyAgent/Sources/`
 Expected: no output (both of `Bar`'s only two call sites — the old `categories(_:)` and the old `goals` — were replaced in Task 6 and Step 1 of this task). If the grep is empty, delete the `Bar` struct from `ios/DailyAgent/Sources/Theme.swift:176-192`:
@@ -820,12 +820,12 @@ struct Bar: View {
 
 (If the grep finds a remaining call site, leave `Bar` in place — don't delete code something else still uses.)
 
-- [ ] **Step 4: Typecheck**
+- [x] **Step 4: Typecheck**
 
 Run: `cd /Users/johns/projects/daily_agent/ios/DailyAgent && sh Checks/typecheck.sh`
 Expected: `typecheck passed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Users/johns/projects/daily_agent
@@ -841,12 +841,12 @@ git commit -m "feat(ios): replace linear budget bars with ring gauges"
 - Modify: `design/DESIGN_NOTES.md` (append a dated update, matching the existing convention of dated updates at the end of the file)
 - Modify: `docs/CHECKIN_LOG.md` (append an entry, matching the existing convention for every shipped spec)
 
-- [ ] **Step 1: Run the full backend suite one more time**
+- [x] **Step 1: Run the full backend suite one more time**
 
 Run: `cd /Users/johns/projects/daily_agent && uv run pytest -q && uv run ruff check app/ tests/test_money_overview.py`
 Expected: all tests pass, no ruff errors on the touched files.
 
-- [ ] **Step 2: Run the full iOS checks one more time**
+- [x] **Step 2: Run the full iOS checks one more time**
 
 Run:
 ```bash
@@ -856,7 +856,7 @@ swiftc Sources/Models.swift Sources/Format.swift Checks/main.swift -o /tmp/check
 ```
 Expected: `typecheck passed` and `all checks passed`.
 
-- [ ] **Step 3: Append to `design/DESIGN_NOTES.md`**
+- [x] **Step 3: Append to `design/DESIGN_NOTES.md`**
 
 Add at the end of the file:
 
@@ -871,7 +871,7 @@ slice. The linear budget-goal bars became ring gauges in a horizontal scroll row
 colors, still respects Reduce Motion.
 ```
 
-- [ ] **Step 4: Append to `docs/CHECKIN_LOG.md`**
+- [x] **Step 4: Append to `docs/CHECKIN_LOG.md`**
 
 Add at the end of the file, following the format of every other entry in it:
 
@@ -890,7 +890,7 @@ Next step: run on the phone and confirm the hero card's day/month toggle and the
 well at real data sizes (lots of categories, lots of budget goals).
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Users/johns/projects/daily_agent

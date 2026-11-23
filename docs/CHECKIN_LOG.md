@@ -128,3 +128,9 @@ What: ask answers any question. Notes that match are used and cited; when none m
 Acceptance criteria passing: AC14.3 and AC14.13 (rewritten), AC14.16, AC13.25 (all failed first).
 Tests and lint: 351 passed, ruff clean.
 Still blocked: the ANTHROPIC_API_KEY in .env was invalid on 2026-11-20, so no live check. Billing is Console credits (LLM_BACKEND=api); do not use the cli backend on the Cox Mac.
+
+## 2026-11-23 money overview redesign
+What: Money overview now has a trend hero card (day/month toggle, spend only line chart, income and net in a footer line, above/below average line), a category donut (top 5 plus other) and ring gauge budget goals. `GET /money/summary` gained `daily`, a running total of this month's spend through today, using the same rules as month_totals. Spec: docs/superpowers/specs/2026-11-23-money-overview-redesign-design.md.
+Tests and lint: 362 passed, ruff clean on touched files (5 E501 in tests/test_backend_additions.py and tests/test_homework_agent.py were already there). iOS typecheck passed, Checks/main.swift all passed.
+Deviations: average line checks use dollar scale cents (the plan's fixtures were 100x too small for "$150"). `Bar` kept, DashboardView still uses it. One Chart with conditional axes instead of two copies. Ring trim capped at 100 percent.
+Next step: run on the phone and check the hero toggle, donut and rings at real data sizes.
