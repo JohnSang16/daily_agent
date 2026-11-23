@@ -197,11 +197,18 @@ struct Holdings: Codable, Equatable {
     var netCents: Int
 }
 
+struct DailyPoint: Codable, Equatable, Identifiable {
+    var date: String
+    var cumulativeSpendCents: Int
+    var id: String { date }
+}
+
 struct MoneySummary: Codable, Equatable {
     var months: [MonthTotal]
     var thisMonth: ThisMonth
     var categories: [CategorySpend]
     var holdings: Holdings
+    var daily: [DailyPoint]
 }
 
 struct BudgetGoal: Codable, Equatable, Identifiable {

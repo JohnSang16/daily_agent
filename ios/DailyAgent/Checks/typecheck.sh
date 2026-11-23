@@ -4,7 +4,9 @@
 set -e
 cd "$(dirname "$0")/.."
 out=$(mktemp -d)
-for f in Sources/*.swift; do sed 's/@State /@StandInState /g' "$f" > "$out/$(basename "$f")"; done
+for f in Sources/*.swift; do
+    sed -e 's/@State /@StandInState /g' -e 's/= State(initialValue:/= StandInState(wrappedValue:/g' "$f" > "$out/$(basename "$f")"
+done
 cat > "$out/_StandIn.swift" <<'SWIFT'
 import SwiftUI
 @propertyWrapper struct StandInState<V>: DynamicProperty {

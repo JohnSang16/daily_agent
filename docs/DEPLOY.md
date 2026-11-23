@@ -29,18 +29,24 @@ Names are the settings in `app/config.py`, upper case.
 | LLM_MODEL | for AI text | model name, never hard coded |
 | ANTHROPIC_API_KEY | for AI text | secret, without it explanations use a plain template |
 | LLM_DAILY_TOKEN_BUDGET | no | daily token cap, default 20000 |
+| LLM_BACKEND | no | api (default, Console credits) or cli (headless Claude Code, bills the logged in subscription) |
+| CLAUDE_CLI_PATH | no | claude binary for LLM_BACKEND=cli, default claude |
 | STALE_OVERDUE_DAYS | no | overdue items older than this leave the ranking and show a warning, default 14, 0 keeps them |
 | STALE_AFTER_HOURS | no | fallback stale threshold, default 26 |
 | GOOGLE_CLIENT_SECRETS_PATH | for calendar | OAuth client JSON path, secret |
 | GOOGLE_TOKEN_PATH | for calendar | saved token path, secret, re run `scripts/google_auth.py` weekly while the OAuth app is in Testing |
 | CALENDAR_IDS | no | comma separated, default primary |
 | ICOLLEGE_FEED_URL_PATH | for school | file holding the private feed URL, secret |
+| GMAIL_OA_QUERY | no | Gmail search for the OA sweep, default matches /daily full. Needs the gmail scope on the Google token (rerun scripts/google_auth.py) and LLM_MODEL set |
 | OBSIDIAN_VAULT_PATH | for notes | local vault folder, hosted use needs a git checkout (separate spec) |
-| OBSIDIAN_IGNORE_GLOBS | no | default templates/*,archive/* |
+| OBSIDIAN_IGNORE_GLOBS | no | default templates/*,archive/*,_archive/* |
 | SCHOOL_NOTES_GLOBS | no | default career/school/*, the notes homework mode searches (spec 19) |
 | KERNEL_API_KEY | for homework | Kernel cloud browser key (spec 13). The agent is off without it |
 | KERNEL_PROFILE | no | default school, the browser profile that keeps you signed in |
-| AGENT_MODEL | no | default claude-opus-5-5 |
+| GEMINI_API_KEY | no | free tier AI Studio key for the homework solver (spec 13). Without it the solver uses only the Claude rungs |
+| SOLVER_MODELS | no | the solver ladder, cheapest first, default gemini-3.6-flash,gemini-3.8-flash,claude-sonnet-5-5,claude-opus-5-5 |
+| AGENT_MODEL | no | default claude-sonnet-5-5 |
+| AGENT_ESCALATE_MODEL | no | default claude-opus-5-5, used for the rest of a session after a failed step |
 | AGENT_EFFORT | no | default medium (low, medium, high, xhigh, max) |
 | AGENT_ALLOWED_HOSTS | no | domains the agent may visit, subdomains included |
 | AGENT_MAX_STEPS | no | default 60 model turns before it pauses |

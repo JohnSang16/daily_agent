@@ -67,6 +67,43 @@ def month_totals(db: Session, months: list[str]) -> tuple[dict, dict]:
     return out, {k: v for k, v in cats.items() if v > 0}
 
 
+def daily_cumulative_spend(db: Session, today: date) -> list[tuple[date, int]]:
+    """One point per day of the current month, day 1 through today: a running total of spend
+    cents, same filtering rules as month_totals (is_internal, refunds reduce spend). A day with
+    nothing to add carries the prior day's total forward, so the series has no gaps. The running
+    sum is floored at 0 the same way month_totals floors the month total: by clamping the
+    cumulative sum at each point, not by clamping (and losing) any single day's delta."""
+    first = date(today.year, today.month, 1)
+    rows = db.execute(
+        select(
+            Transaction.posted_date,
+            Transaction.direction,
+            Transaction.amount_cents,
+            Transaction.category,
+            Transaction.category_detail,
+        )
+        .join(BankAccount, BankAccount.id == Transaction.account_id)
+        .where(
+            BankAccount.enabled.is_(True),
+            Transaction.posted_date >= first,
+            Transaction.posted_date <= today,
+        )
+    ).all()
+    by_day: dict[date, int] = {}
+    for d, direction, cents, cat, detail in rows:
+        if is_internal(cat, detail) or (direction == "in" and cat == "INCOME"):
+            continue
+        signed = cents if direction == "out" else -cents
+        by_day[d] = by_day.get(d, 0) + signed
+    out: list[tuple[date, int]] = []
+    raw = 0
+    for i in range((today - first).days + 1):
+        d = date.fromordinal(first.toordinal() + i)
+        raw += by_day.get(d, 0)
+        out.append((d, max(raw, 0)))
+    return out
+
+
 def holdings(db: Session) -> dict:
     """Where the money sits, from the latest balance of every enabled account."""
     h = {"cash": 0, "savings": 0, "invested": 0, "credit_owed": 0, "loans_owed": 0}

@@ -62,6 +62,8 @@ RULES = [
     # spec 13: the homework agent's own model lane (tools checked in the guard) and its browser
     Rule("anthropic_agent", "api.anthropic.com", "POST", r"/v1/messages"),
     *_kernel(),
+    # spec 13 solver: Gemini's Interactions API, body limited to model and input in the guard
+    Rule("gemini", "generativelanguage.googleapis.com", "POST", r"/v1beta/interactions"),
     # token refresh is a POST but only talks to Google's token endpoint
     Rule("google_oauth", "oauth2.googleapis.com", "POST", r"/token"),
 ]

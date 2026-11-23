@@ -94,3 +94,43 @@ Open questions answered:
 5. Driver: screenshots for the model, plus a fixed page script that reads the real element under each click for the gate.
 6. Cost: see AC13.16.
 Model: claude-opus-5-5 at effort medium, with server side refusal fallbacks (`fallbacks: "default"`). AGENT_MODEL and AGENT_EFFORT change it.
+
+### 2026-11-20, spec 13 gate hardening and assignment links
+What: the page script now picks the tab on screen (newest first) and follows a click down into frames, so a submit inside an embedded player is judged on the real button. A frame it can't get into is marked opaque and needs approval (fails closed). Quiz and exam detection moved from the browser script into the gate: a timer, proctor or Respondus signal, quiz/exam/midterm in the title or top headings, or a quizzing URL path. Bare "test" no longer refuses ("Test 2 Prepration" is homework). iCollege tasks now keep the item's own link from the feed description in `source_ref` (https iCollege links only, the item page before the calendar link), and "Work on it" opens it directly instead of the iCollege home.
+Tests and lint: 309 passed (17 new, the new gate and link tests failed first), ruff clean. Mutation check: turning off the opaque check failed 1 test, turning off the heading check failed 3. Both page scripts pass `node --check`. Real feed: all 20 upcoming items got a link (8 content, 5 dropbox, 5 quizzing, 1 survey, 1 calendar).
+Deviation: no migration, the link lives in `source_ref`, which iCollege tasks set to "feed" before. It is not exposed by any endpoint or log.
+Not verified: the frame and tab logic only runs in a real browser. Check it on the first real session.
+Next step: spec diff for the Gemini solver (a new tool and a new outbound host), then build it.
+
+### 2026-11-20, spec 13 solver (component 7, approved by John)
+Spec change (John said yes): boundary 7 now allows a `solve` tool, new component 7 (solver ladder), AC13.17 to AC13.21.
+What: `app/agent/solver.py`. The agent's `solve` tool sends only the problem text to a ladder of models (SOLVER_MODELS, default gemini-3.6-flash, gemini-3.8-flash, claude-sonnet-5-5, claude-opus-5-5). An answer comes back only when two rungs agree (numbers within 1 percent, text trimmed and lowercased). Busy or failing rungs are skipped. Each repeat of the same problem in a session starts one rung higher and skips answers marked wrong; the third attempt is refused and the agent asks John. Gemini has its own guarded lane (Interactions API, body limited to model and input). Claude rungs reuse the plain `anthropic` lane (no tools). Solver usage rows (purpose homework_solver) count toward the agent's daily budget.
+Acceptance criteria passing: AC13.17 to AC13.21 (14 new tests, all failed first).
+Tests and lint: 323 passed, ruff clean.
+Live check: gemini-3.6-flash answered a real physics problem correctly (4500 N). gemini-3.8-flash returned 503 (busy). Both Claude rungs returned 401: the ANTHROPIC_API_KEY in .env is invalid, which also blocks the agent itself. John needs a new key.
+Open: the solver is text only, diagrams are not sent yet. Answer entry checks (spec step 4) wait for the first real session, they depend on Pearson's real inputs.
+Next step: new Anthropic key, then the first real session.
+
+### 2026-11-20, spec 13 diagrams, read back and review report (John: "can't you do this now")
+What: `solve` takes `diagram: true` and sends the current screenshot to every rung as a PNG (Gemini lane allows inline text and PNG blocks only). After typing into a plain field the agent is told if the field doesn't hold what it typed (password fields never read). The system prompt says to ctrl+a before typing an answer. `GET /agent/report?days=3` ranks what went wrong (gate pauses, limits, blocks, questions, stops, solves that didn't agree). Solver replies are judged on the final line, the last bold part or what follows the last "=", because Sonnet shows working even when told not to.
+Acceptance criteria passing: AC13.22 to AC13.24 (all failed first), plus the answer line parsing tests.
+Tests and lint: 337 passed, ruff clean, page script passes `node --check`.
+Live: Gemini 3.6 Flash and Claude Sonnet agree on a car force problem (4500 N) and on a drawn circuit diagram (2 A).
+Merged: feat/cli-llm-backend (the text only Claude CLI backend). Do not set LLM_BACKEND=cli on the Cox Mac: its claude login is the Cox enterprise account.
+Not done: sign in push (needs APNs and a notifications spec, principles list it as later). Pearson specific answer entry (equation editor, units, drag and drop) waits for the first real session.
+Next step: first real session on a practice assignment, then record AC13.16 cost.
+
+## 2026-11-21 Gmail OA sweep (spec 15, first cut)
+Direct Gmail client on the calendar's token file, one no tools extraction call per new invite, processed ids in `gmail_seen` (migration 0010). Undated invites lead the digest as "no deadline given". AC15.21 to AC15.27. The host Mac needs `scripts/google_auth.py` rerun so its token carries the gmail scope.
+
+## 2026-11-23 ask anything, homework agent on Sonnet (specs 13 and 14, approved by John)
+What: ask answers any question. Notes that match are used and cited; when none match or the vault is off, the question goes to the model on its own (route `general`, no note text in the prompt, same budget and usage row). The homework agent now runs on claude-sonnet-5-5 (`AGENT_MODEL`) and moves to `AGENT_ESCALATE_MODEL` (claude-opus-5-5) for the rest of a session after a failed, cut off or declined step.
+Acceptance criteria passing: AC14.3 and AC14.13 (rewritten), AC14.16, AC13.25 (all failed first).
+Tests and lint: 351 passed, ruff clean.
+Still blocked: the ANTHROPIC_API_KEY in .env was invalid on 2026-11-20, so no live check. Billing is Console credits (LLM_BACKEND=api); do not use the cli backend on the Cox Mac.
+
+## 2026-11-23 money overview redesign
+What: Money overview now has a trend hero card (day/month toggle, spend only line chart, income and net in a footer line, above/below average line), a category donut (top 5 plus other) and ring gauge budget goals. `GET /money/summary` gained `daily`, a running total of this month's spend through today, using the same rules as month_totals. Spec: docs/superpowers/specs/2026-11-23-money-overview-redesign-design.md.
+Tests and lint: 362 passed, ruff clean on touched files (5 E501 in tests/test_backend_additions.py and tests/test_homework_agent.py were already there). iOS typecheck passed, Checks/main.swift all passed.
+Deviations: average line checks use dollar scale cents (the plan's fixtures were 100x too small for "$150"). `Bar` kept, DashboardView still uses it. One Chart with conditional axes instead of two copies. Ring trim capped at 100 percent.
+Next step: run on the phone and check the hero toggle, donut and rings at real data sizes.

@@ -43,3 +43,6 @@ At John's request the iPhone app uses frosted glass surfaces, a soft sheen on th
 
 ## Update 2026-11-19: money charts and goals
 At John's request Money has an overview with a grouped bar chart (income in white, spend in gray), category bars, budget goal bars, holdings and a bank by bank view. These break the old "no charts, no progress indicators" line on purpose. They stay monochrome: bars are white on a dark track, and over budget is said in words, never in a color.
+
+## Update 2026-11-23: money overview redesign
+At John's request, borrowing Rocket Money's layout patterns while staying monochrome. The three figures and the grouped income/spend bar chart became one trend hero card: a big spend number, a day/month toggle, and a line and area chart (white line, white to clear gradient). Income moved from its own bars into a text only footer line. The category bars became a donut with a gray ramp, top 5 categories plus one "other" slice in the darkest gray. The budget goal bars became ring gauges in a horizontal scroll row, with a trailing add ring. Still no accent colors.

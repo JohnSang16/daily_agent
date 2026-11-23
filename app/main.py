@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from app.agent.driver import KernelDriver
 from app.agent.llm import AgentLlm
 from app.agent.loop import Agent
+from app.agent.solver import Solver
 from app.api import agent, ask, audit, banks, digest, eod, goals, health, local, money, sync, today
 from app.audit import DbAudit
 from app.clock import SystemClock
@@ -15,6 +16,7 @@ from app.db import make_session_factory
 from app.http_client import GuardedHttpClient
 from app.jobs.runner import Runner, banks_source, default_sources, scheduler_loop
 from app.llm.anthropic_client import AnthropicClient
+from app.llm.cli_client import ClaudeCliClient
 from app.logging_config import new_request_id, setup_logging
 from app.sources.plaid import PlaidClient
 
@@ -55,6 +57,8 @@ def create_app(
     app.state.settings = settings
     app.state.session_factory = make_session_factory(settings.database_url)
     http = GuardedHttpClient(DbAudit(app.state.session_factory, SystemClock()))
+    if llm is None and settings.llm_backend == "cli" and settings.llm_model:
+        llm = ClaudeCliClient(settings.llm_model, settings.claude_cli_path)
     if llm is None and settings.anthropic_api_key and settings.llm_model:
         llm = AnthropicClient(http, settings.anthropic_api_key, settings.llm_model)
     app.state.llm = llm  # None: explanations use the template
@@ -62,7 +66,7 @@ def create_app(
         plaid = PlaidClient(http, settings)
     app.state.plaid = plaid
     if sources is None:
-        sources = default_sources(settings, http, plaid)
+        sources = default_sources(settings, http, plaid, llm)
     elif plaid is not None and "banks" not in sources:
         sources = {**sources, "banks": banks_source(settings, plaid)}
     app.state.runner = Runner(app.state.session_factory, sources, SystemClock())
@@ -77,7 +81,16 @@ def create_app(
             return KernelDriver(http, settings.kernel_api_key, settings.kernel_profile)
 
     app.state.agent = (
-        Agent(app.state.session_factory, settings, agent_llm, SystemClock(), agent_driver_factory)
+        Agent(
+            app.state.session_factory,
+            settings,
+            agent_llm,
+            SystemClock(),
+            agent_driver_factory,
+            solver=Solver(http, settings, app.state.session_factory, SystemClock())
+            if settings.anthropic_api_key or settings.gemini_api_key
+            else None,
+        )
         if agent_llm is not None and agent_driver_factory is not None
         else None
     )
