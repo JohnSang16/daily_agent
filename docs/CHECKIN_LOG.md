@@ -134,3 +134,9 @@ What: Money overview now has a trend hero card (day/month toggle, spend only lin
 Tests and lint: 362 passed, ruff clean on touched files (5 E501 in tests/test_backend_additions.py and tests/test_homework_agent.py were already there). iOS typecheck passed, Checks/main.swift all passed.
 Deviations: average line checks use dollar scale cents (the plan's fixtures were 100x too small for "$150"). `Bar` kept, DashboardView still uses it. One Chart with conditional axes instead of two copies. Ring trim capped at 100 percent.
 Next step: run on the phone and check the hero toggle, donut and rings at real data sizes.
+
+## 2026-11-23 money tabs: banks and activity redesign, income tab removed
+What: banks has a net worth card with a share bar and glass bank cards. Activity has search, filter chips (all, spending, income, pending), category symbols and per day net totals, all filtered client side over the loaded page (latest 100). Income tab, its 500 row fetch and incomeByMonth removed. iOS only, no backend change.
+Tests: iOS typecheck passed, Checks/main.swift all passed (new checks for holdingShares, dollarsAndCents, netCents, filterTxns, categoryIcon).
+Open: search and the income filter only cover the loaded 100 rows. A backend `q` param is the upgrade if older history matters.
+Next step: run on the phone.

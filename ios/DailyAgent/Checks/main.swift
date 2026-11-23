@@ -108,11 +108,6 @@ let gb = groupBanks(acc)
 check(gb.count == 2 && gb[0].bank == "Chase" && gb[0].totalCents == 70000, "bank total is assets minus what is owed (got \(gb[0].totalCents))")
 check(gb[1].totalCents == 500000, "a turned off account does not count toward the bank total")
 check(accountKindLabel(acc[1]) == "credit card" && accountKindLabel(acc[2]) == "brokerage" && isOwed(acc[1]) && !isOwed(acc[0]), "account kind labels and owed")
-let inc = [Txn(id: "1", date: "2026-11-05", merchant: "Pay", amount: "+2100.00", direction: "in", bank: "B", category: "INCOME", pending: false),
-           Txn(id: "2", date: "2026-11-01", merchant: "Pay", amount: "+50.50", direction: "in", bank: "B", category: "INCOME", pending: false),
-           Txn(id: "3", date: "2026-10-15", merchant: "Pay", amount: "+2000.00", direction: "in", bank: "B", category: "INCOME", pending: false)]
-let ib = incomeByMonth(inc)
-check(ib.count == 2 && ib[0].month == "2026-11" && ib[0].totalCents == 215050 && ib[1].totalCents == 200000, "income log groups by month with subtotals (got \(ib.map { $0.totalCents }))")
 check(goalProgress(spent: 250, limit: 500).fraction == 0.5 && !goalProgress(spent: 250, limit: 500).over, "goal halfway")
 check(goalProgress(spent: 900, limit: 500).fraction == 1 && goalProgress(spent: 900, limit: 500).over, "goal over reads full and over")
 check(goalProgress(spent: 10, limit: 0).fraction == 0, "goal with no limit")

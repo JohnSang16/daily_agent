@@ -2,7 +2,7 @@ import Charts
 import SwiftUI
 
 enum MoneyTab: String, CaseIterable, Identifiable {
-    case overview, banks, income, activity
+    case overview, banks, activity
     var id: String { rawValue }
 }
 
@@ -17,8 +17,8 @@ struct TrendPoint: Identifiable {
     let cents: Int
 }
 
-/// Money: four views of the same data. Overview (spend vs income, goals), banks and holdings,
-/// the income log, and the plain activity list.
+/// Money: three views of the same data. Overview (spend trend, categories, goals), banks and
+/// net worth, and the activity list (search and filters, income included).
 struct MoneyView: View {
     @EnvironmentObject var state: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -38,7 +38,6 @@ struct MoneyView: View {
                     switch tab {
                     case .overview: MoneyOverviewView()
                     case .banks: BanksView()
-                    case .income: IncomeView()
                     case .activity: ActivityView()
                     }
                 }
@@ -446,89 +445,6 @@ struct ShareBar: View {
         }
         .frame(height: 10)
         .onAppear { withAnimation(Theme.spring.delay(0.1)) { shown = true } }
-    }
-}
-
-// MARK: income log
-
-struct IncomeView: View {
-    @EnvironmentObject var state: AppState
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 30) {
-            if let s = state.summary { hero(s).reveal(0) }
-            let groups = incomeByMonth(state.incomeRows)
-            if groups.isEmpty {
-                Text("no income logged yet.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
-            }
-            ForEach(Array(groups.enumerated()), id: \.element.month) { i, g in
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        sectionLabel(monthLong(g.month))
-                        Spacer()
-                        Text("+" + dollars(g.totalCents)).font(.system(size: 13)).foregroundStyle(Theme.secondary)
-                    }
-                    ForEach(g.items) { t in
-                        HStack(alignment: .center, spacing: 12) {
-                            CategoryIcon(category: t.category ?? "INCOME")
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(t.merchant).font(.system(size: 16)).foregroundStyle(Theme.title).lineLimit(1)
-                                Text("\(t.date) · \(t.bank)").font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
-                            }
-                            Spacer()
-                            Text(t.amount).font(.system(size: 16)).monospacedDigit().foregroundStyle(Theme.title)
-                        }
-                    }
-                }.reveal(i + 1)
-            }
-        }
-    }
-
-    private func hero(_ s: MoneySummary) -> some View {
-        let others = s.months.dropLast().map(\.incomeCents)
-        let avg: Int? = others.isEmpty ? nil : others.reduce(0, +) / others.count
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                sectionLabel("income this month")
-                Spacer()
-                if let avg { Text("avg \(dollars(avg))").font(.system(size: 12)).foregroundStyle(Theme.secondary) }
-            }
-            Text(dollars(s.thisMonth.incomeCents)).font(.system(size: 34, weight: .light)).monospacedDigit()
-                .foregroundStyle(Theme.title).contentTransition(.numericText())
-            IncomeBars(months: s.months, average: avg)
-            if let line = averageComparisonLine(current: s.thisMonth.incomeCents, others: others) {
-                Text(line).font(.system(size: 12)).foregroundStyle(Theme.secondary)
-            }
-        }
-        .padding(18)
-        .glass(RoundedRectangle(cornerRadius: 22, style: .continuous))
-    }
-}
-
-/// Six months of income, this month in white, a dashed line at the average of the others.
-struct IncomeBars: View {
-    let months: [MonthTotal]
-    let average: Int?
-    @State private var grown = false
-
-    var body: some View {
-        Chart {
-            ForEach(Array(months.enumerated()), id: \.element.id) { i, m in
-                BarMark(x: .value("month", monthShort(m.month)), y: .value("income", grown ? Double(m.incomeCents) / 100 : 0))
-                    .foregroundStyle(i == months.count - 1 ? Color.white : Color(white: 0.23))
-                    .cornerRadius(5)
-            }
-            if let average {
-                RuleMark(y: .value("average", Double(average) / 100))
-                    .foregroundStyle(Color(white: 0.45))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
-            }
-        }
-        .chartLegend(.hidden)
-        .chartYAxis(.hidden)
-        .chartXAxis { AxisMarks { _ in AxisValueLabel().foregroundStyle(Theme.tertiary) } }
-        .frame(height: 120)
-        .onAppear { withAnimation(Theme.spring.delay(0.15)) { grown = true } }
     }
 }
 

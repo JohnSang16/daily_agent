@@ -252,20 +252,6 @@ func centsFromDisplay(_ s: String) -> Int {
     return whole * 100 + frac
 }
 
-/// Income rows grouped by month, newest month first, with a subtotal for each.
-func incomeByMonth(_ txns: [Txn]) -> [(month: String, totalCents: Int, items: [Txn])] {
-    var out: [(month: String, totalCents: Int, items: [Txn])] = []
-    for t in txns {
-        let m = String(t.date.prefix(7))
-        if let i = out.firstIndex(where: { $0.month == m }) {
-            out[i].items.append(t); out[i].totalCents += centsFromDisplay(t.amount)
-        } else {
-            out.append((m, centsFromDisplay(t.amount), [t]))
-        }
-    }
-    return out
-}
-
 /// How far through a goal: 0 to 1 (a goal that is over reads as 1), and whether it is over.
 func goalProgress(spent: Int, limit: Int) -> (fraction: Double, over: Bool) {
     guard limit > 0 else { return (0, false) }

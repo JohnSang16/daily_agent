@@ -46,3 +46,6 @@ At John's request Money has an overview with a grouped bar chart (income in whit
 
 ## Update 2026-11-23: money overview redesign
 At John's request, borrowing Rocket Money's layout patterns while staying monochrome. The three figures and the grouped income/spend bar chart became one trend hero card: a big spend number, a day/month toggle, and a line and area chart (white line, white to clear gradient). Income moved from its own bars into a text only footer line. The category bars became a donut with a gray ramp, top 5 categories plus one "other" slice in the darkest gray. The budget goal bars became ring gauges in a horizontal scroll row, with a trailing add ring. Still no accent colors.
+
+## Update 2026-11-23: banks and activity, income tab removed
+Picked from localhost mocks. Banks opens with a glass net worth card (big number, one bar split into cash, savings and invested in white and two grays, what's owed below), then one glass card per bank. Activity gets a search field and filter chips (all, spending, income, pending, banks), a category symbol on each row and a net total per day. The income tab is gone: the activity income filter lists income, and the overview footer shows this month's income and net.
