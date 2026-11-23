@@ -13,7 +13,7 @@ let todayJSON = """
  "top_task":{"id":4,"title":"OA","due_at":"2026-12-02T22:17:00Z","reasons":["due_soon"],"at_risk":false,"suggested_block":null},
  "ranked":[{"id":4,"rank":1,"title":"OA","due_at":"2026-12-02T22:17:00Z","source":"obsidian","reasons":["due_soon"],"at_risk":false,"needs_review":false},
            {"id":9,"rank":2,"title":"Project","due_at":"2026-12-05T04:59:59Z","source":"icollege","reasons":[],"at_risk":true,"needs_review":false}],
- "events":[{"title":"Class","start":"2026-11-19T16:00:00Z","end":"2026-11-19T17:00:00Z","all_day":false}],
+ "events":[{"id":1,"source":"manual","title":"Class","start":"2026-11-19T16:00:00Z","end":"2026-11-19T17:00:00Z","all_day":false}],
  "free_blocks":[],"explanation":{"text":"Start with OA.","source":"llm"},
  "warnings":[{"code":"SOURCE_STALE","source":"obsidian","detail":"last success 3h ago"},{"code":"NEEDS_REVIEW","source":null,"detail":"1 to review"}],
  "needs_review_count":1}
@@ -62,9 +62,9 @@ check(reminderDue(nil, tz: ny) == nil, "reminder with no due date")
 let wk = weekDays(from: now, tz: ny)
 check(wk.count == 7 && wk[0] == "2026-11-19" && wk[6] == "2026-11-25", "week strip starts today and runs seven days (got \(wk.first ?? "") to \(wk.last ?? ""))")
 check(localDay("2026-12-05T04:59:59Z", tz: ny) == "2026-12-04", "date only due belongs to the local day before its UTC date")
-let evs = [EventItem(title: "Class", start: "2026-11-19T16:00:00Z", end: "2026-11-19T17:15:00Z", allDay: false),
-           EventItem(title: "Holiday", start: "2026-11-19T05:00:00Z", end: "2026-11-20T05:00:00Z", allDay: true),
-           EventItem(title: "Dinner", start: "2026-11-19T23:30:00Z", end: "2026-11-20T00:30:00Z", allDay: false)]
+let evs = [EventItem(id: 1, source: "manual", title: "Class", start: "2026-11-19T16:00:00Z", end: "2026-11-19T17:15:00Z", allDay: false),
+           EventItem(id: 2, source: "manual", title: "Holiday", start: "2026-11-19T05:00:00Z", end: "2026-11-20T05:00:00Z", allDay: true),
+           EventItem(id: 3, source: "manual", title: "Dinner", start: "2026-11-19T23:30:00Z", end: "2026-11-20T00:30:00Z", allDay: false)]
 let tks = [RankedTask(id: 4, rank: 1, title: "OA", dueAt: "2026-11-19T20:00:00Z", source: "obsidian", reasons: [], atRisk: false, needsReview: false),
            RankedTask(id: 9, rank: 2, title: "Project", dueAt: "2026-11-20T04:59:59Z", source: "icollege", reasons: [], atRisk: false, needsReview: false),
            RankedTask(id: 7, rank: 3, title: "Other day", dueAt: "2026-11-22T20:00:00Z", source: "obsidian", reasons: [], atRisk: false, needsReview: false)]
