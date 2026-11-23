@@ -2,7 +2,7 @@ import Charts
 import SwiftUI
 
 enum MoneyTab: String, CaseIterable, Identifiable {
-    case overview, banks, income, activity
+    case overview, banks, activity
     var id: String { rawValue }
 }
 
@@ -17,8 +17,8 @@ struct TrendPoint: Identifiable {
     let cents: Int
 }
 
-/// Money: four views of the same data. Overview (spend vs income, goals), banks and holdings,
-/// the income log, and the plain activity list.
+/// Money: three views of the same data. Overview (spend trend, categories, goals), banks and
+/// net worth, and the activity list (search and filters, income included).
 struct MoneyView: View {
     @EnvironmentObject var state: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -38,7 +38,6 @@ struct MoneyView: View {
                     switch tab {
                     case .overview: MoneyOverviewView()
                     case .banks: BanksView()
-                    case .income: IncomeView()
                     case .activity: ActivityView()
                     }
                 }
@@ -348,18 +347,21 @@ struct BanksView: View {
     @EnvironmentObject var state: AppState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 34) {
-            if let h = state.summary?.holdings { holdings(h).reveal(0) }
+        VStack(alignment: .leading, spacing: 22) {
+            if let h = state.summary?.holdings { netWorthCard(h).reveal(0) }
             if let accts = state.banks?.accounts, !accts.isEmpty {
                 ForEach(Array(groupBanks(accts).enumerated()), id: \.element.bank) { i, g in
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text(g.bank).font(.system(size: 18)).foregroundStyle(Theme.title)
+                            Text(g.bank.lowercased()).font(.system(size: 17)).foregroundStyle(Theme.title)
                             Spacer()
-                            Text(dollars(g.totalCents)).font(.system(size: 18)).monospacedDigit().foregroundStyle(Theme.title)
-                        }
+                            Text(dollars(g.totalCents)).font(.system(size: 17)).monospacedDigit().foregroundStyle(Theme.title)
+                        }.padding(.bottom, 4)
                         ForEach(g.accounts) { a in row(a) }
-                    }.reveal(i + 1)
+                    }
+                    .padding(18)
+                    .glass(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .reveal(i + 1)
                 }
             } else {
                 Text("no bank connected yet.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
@@ -367,28 +369,42 @@ struct BanksView: View {
         }
     }
 
-    private func holdings(_ h: Holdings) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("where your money sits")
-            line("cash", h.cashCents)
-            line("savings", h.savingsCents)
-            line("invested", h.investedCents)
-            if h.creditOwedCents > 0 { line("owed on cards", -h.creditOwedCents) }
-            if h.loansOwedCents > 0 { line("owed on loans", -h.loansOwedCents) }
-            Divider().overlay(Theme.line)
-            HStack {
-                Text("net").font(.system(size: 18, weight: .medium)).foregroundStyle(Theme.title)
-                Spacer()
-                Text(dollars(h.netCents)).font(.system(size: 26, weight: .light)).foregroundStyle(Theme.title)
+    private static let shades: [Color] = [.white, Color(white: 0.71), Color(white: 0.42)]
+
+    private func netWorthCard(_ h: Holdings) -> some View {
+        let sh = holdingShares(h)
+        let parts: [(String, Int, Double)] = [("cash", h.cashCents, sh.cash), ("savings", h.savingsCents, sh.savings), ("invested", h.investedCents, sh.invested)]
+        return VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                sectionLabel("net worth")
+                Text(dollars(h.netCents)).font(.system(size: 34, weight: .light)).monospacedDigit()
+                    .foregroundStyle(Theme.title).contentTransition(.numericText())
+            }
+            ShareBar(fractions: parts.map(\.2), colors: Self.shades)
+            HStack(spacing: 0) {
+                ForEach(Array(parts.enumerated()), id: \.offset) { i, p in
+                    HStack(spacing: 5) {
+                        Circle().fill(Self.shades[i]).frame(width: 7, height: 7)
+                        Text("\(p.0) \(dollars(p.1))").font(.system(size: 12)).monospacedDigit().foregroundStyle(Theme.secondary)
+                            .lineLimit(1).minimumScaleFactor(0.8)
+                    }.frame(maxWidth: .infinity, alignment: i == 0 ? .leading : (i == 2 ? .trailing : .center))
+                }
+            }
+            if h.creditOwedCents > 0 || h.loansOwedCents > 0 {
+                Divider().overlay(Theme.line)
+                if h.creditOwedCents > 0 { owed("owed on cards", h.creditOwedCents) }
+                if h.loansOwedCents > 0 { owed("owed on loans", h.loansOwedCents) }
             }
         }
+        .padding(18)
+        .glass(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private func line(_ label: String, _ cents: Int) -> some View {
+    private func owed(_ label: String, _ cents: Int) -> some View {
         HStack {
-            Text(label).font(.system(size: 15)).foregroundStyle(Theme.body)
+            Text(label).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
             Spacer()
-            Text(dollars(cents)).font(.system(size: 15)).monospacedDigit().foregroundStyle(Theme.title)
+            Text(dollars(-cents)).font(.system(size: 13.5)).monospacedDigit().foregroundStyle(Theme.title)
         }
     }
 
@@ -407,53 +423,40 @@ struct BanksView: View {
     }
 }
 
-// MARK: income log
-
-struct IncomeView: View {
-    @EnvironmentObject var state: AppState
+/// One rounded bar split into shares, grows in from the left.
+struct ShareBar: View {
+    let fractions: [Double]
+    let colors: [Color]
+    @State private var shown = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 30) {
-            if let s = state.summary {
-                let total = s.months.map(\.incomeCents).reduce(0, +)
-                let counted = max(s.months.filter { $0.incomeCents > 0 }.count, 1)
-                HStack(alignment: .top, spacing: 0) {
-                    figure("this month", dollars(s.thisMonth.incomeCents))
-                    figure("average a month", dollars(total / counted))
-                }.reveal(0)
-            }
-            let groups = incomeByMonth(state.incomeRows)
-            if groups.isEmpty {
-                Text("no income logged yet.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
-            }
-            ForEach(Array(groups.enumerated()), id: \.element.month) { i, g in
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        sectionLabel(monthLong(g.month))
-                        Spacer()
-                        Text("+" + dollars(g.totalCents)).font(.system(size: 13)).foregroundStyle(Theme.secondary)
+        GeometryReader { geo in
+            HStack(spacing: 2) {
+                ForEach(Array(fractions.enumerated()), id: \.offset) { i, f in
+                    if f > 0 {
+                        Rectangle().fill(colors[i % colors.count])
+                            .frame(width: max(2, (geo.size.width - 4) * f * (shown ? 1 : 0)))
                     }
-                    ForEach(g.items) { t in
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(t.merchant).font(.system(size: 16)).foregroundStyle(Theme.title)
-                                Text("\(t.date) · \(t.bank)").font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
-                            }
-                            Spacer()
-                            Text(t.amount).font(.system(size: 16)).monospacedDigit().foregroundStyle(Theme.title)
-                        }
-                    }
-                }.reveal(i + 1)
+                }
+                Spacer(minLength: 0)
             }
+            .background(Theme.raised)
+            .clipShape(Capsule())
         }
+        .frame(height: 10)
+        .onAppear { withAnimation(Theme.spring.delay(0.1)) { shown = true } }
     }
+}
 
-    private func figure(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            sectionLabel(label)
-            Text(value).font(.system(size: 26, weight: .light)).monospacedDigit().foregroundStyle(Theme.title)
-                .minimumScaleFactor(0.6).lineLimit(1)
-        }.frame(maxWidth: .infinity, alignment: .leading)
+/// A category's symbol in a dark round chip.
+struct CategoryIcon: View {
+    let category: String?
+    var body: some View {
+        Image(systemName: categoryIcon(category)).font(.system(size: 14)).foregroundStyle(Theme.body)
+            .frame(width: 36, height: 36)
+            .background(Circle().fill(Theme.raised))
+            .overlay(Circle().strokeBorder(Theme.line, lineWidth: 0.8))
+            .accessibilityHidden(true)
     }
 }
 
@@ -462,23 +465,52 @@ struct IncomeView: View {
 struct ActivityView: View {
     @EnvironmentObject var state: AppState
     @State private var showBanks = false
+    @State private var filter: ActivityFilter = .all
+    @State private var day: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            Button { showBanks = true } label: {
-                Text(state.banks?.chip ?? "banks: all").font(.system(size: 13.5)).foregroundStyle(Theme.body)
-                    .padding(.horizontal, 16).frame(minHeight: 44).glass(Capsule())
-            }.buttonStyle(PressStyle())
+            if let s = state.summary, !s.daily.isEmpty {
+                SpendCalendar(daily: s.daily, monthCents: s.thisMonth.spendCents, selected: $day).reveal(0)
+            }
+            if let r = state.recurring, !r.items.isEmpty { recurringRow(r).reveal(1) }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    if let d = day {
+                        Button { withAnimation(Theme.spring) { day = nil } } label: {
+                            chip(shortDay(d), on: true, icon: "xmark")
+                        }.buttonStyle(PressStyle()).accessibilityLabel("show every day")
+                    }
+                    ForEach(ActivityFilter.allCases) { f in
+                        Button { withAnimation(Theme.spring) { filter = f } } label: { chip(f.rawValue, on: filter == f) }
+                            .buttonStyle(PressStyle())
+                    }
+                    Button { showBanks = true } label: { chip(state.banks?.chip ?? "banks: all", on: false) }
+                        .buttonStyle(PressStyle())
+                }
+            }
+            .sensoryFeedback(.selection, trigger: filter)
             if let note = state.page?.note { Text(note).font(.system(size: 12.5)).foregroundStyle(Theme.secondary) }
             if let page = state.page {
-                ForEach(groupByDay(page.transactions, now: Date()), id: \.heading) { g in
+                let shown = filterTxns(page.transactions, filter: filter, day: day)
+                if shown.isEmpty {
+                    Text(day == nil ? "nothing here yet." : "nothing on \(shortDay(day!)).")
+                        .font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
+                }
+                ForEach(groupByDay(shown, now: Date()), id: \.heading) { g in
                     VStack(alignment: .leading, spacing: 14) {
-                        sectionLabel(g.heading)
+                        HStack {
+                            sectionLabel(g.heading)
+                            Spacer()
+                            Text(dollarsAndCents(netCents(g.items), signed: true)).font(.system(size: 12.5)).monospacedDigit()
+                                .foregroundStyle(Theme.secondary)
+                        }
                         ForEach(g.items) { t in
-                            HStack(alignment: .top) {
+                            HStack(alignment: .center, spacing: 12) {
+                                CategoryIcon(category: t.category)
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(t.merchant).font(.system(size: 16)).foregroundStyle(Theme.title)
-                                    Text(subline(t)).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
+                                    Text(t.merchant).font(.system(size: 16)).foregroundStyle(Theme.title).lineLimit(1)
+                                    Text(subline(t)).font(.system(size: 12.5)).foregroundStyle(Theme.secondary).lineLimit(1)
                                 }
                                 Spacer()
                                 Text(t.amount).font(.system(size: 16)).monospacedDigit().foregroundStyle(Theme.title)
@@ -493,11 +525,106 @@ struct ActivityView: View {
         .sheet(isPresented: $showBanks) { BanksSheet().environmentObject(state) }
     }
 
+    private func recurringRow(_ r: Recurring) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                sectionLabel("recurring")
+                Spacer()
+                Text("\(dollars(r.monthlyCents)) / mo").font(.system(size: 12)).monospacedDigit().foregroundStyle(Theme.secondary)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(r.items) { item in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 10) {
+                                Text(item.merchant.lowercased()).font(.system(size: 12.5)).foregroundStyle(Theme.title).lineLimit(1)
+                                Spacer(minLength: 0)
+                                Image(systemName: categoryIcon(item.category)).font(.system(size: 10.5)).foregroundStyle(Theme.tertiary)
+                            }
+                            Text(dollars(item.amountCents)).font(.system(size: 15, weight: .light)).monospacedDigit().foregroundStyle(Theme.title)
+                            Text(item.paidThisMonth ? "paid \(shortDay(item.lastDate))" : "due \(shortDay(item.nextDate))")
+                                .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 9)
+                        .frame(minWidth: 96, alignment: .leading)
+                        .glass(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                }
+                .padding(.vertical, 1)
+            }
+        }
+    }
+
+    private func chip(_ text: String, on: Bool, icon: String? = nil) -> some View {
+        HStack(spacing: 5) {
+            Text(text)
+            if let icon { Image(systemName: icon).font(.system(size: 10, weight: .semibold)) }
+        }
+        .font(.system(size: 13, weight: on ? .medium : .regular))
+        .foregroundStyle(on ? Color.black : Theme.body)
+        .padding(.horizontal, 14).frame(minHeight: 36)
+        .background { if on { Capsule().fill(Color.white) } }
+        .overlay { if !on { Capsule().strokeBorder(Color(white: 0.18), lineWidth: 1) } }
+        .frame(minHeight: 44)
+    }
+
     private func subline(_ t: Txn) -> String {
-        var parts = [t.bank]
+        var parts: [String] = []
         if let c = t.category { parts.append(categoryLabel(c)) }
+        parts.append(t.bank)
         if t.pending { parts.append("pending") }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// This month as a monday first grid, each day shaded by what was spent. Tap a day to show only it.
+struct SpendCalendar: View {
+    let daily: [DailyPoint]
+    let monthCents: Int
+    @Binding var selected: String?
+
+    private let cols = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
+
+    var body: some View {
+        let days = dailySpend(daily)
+        let top = max(days.map(\.cents).max() ?? 0, 1)
+        let biggest = days.max { $0.cents < $1.cents }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                sectionLabel("spending by day")
+                Spacer()
+                Text(dollars(monthCents)).font(.system(size: 12)).monospacedDigit().foregroundStyle(Theme.secondary)
+            }
+            LazyVGrid(columns: cols, spacing: 5) {
+                ForEach(Array(["m", "t", "w", "t", "f", "s", "s"].enumerated()), id: \.offset) { _, d in
+                    Text(d).font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+                }
+                ForEach(0..<leadingBlanks(daily[0].date), id: \.self) { _ in Color.clear.frame(height: 1) }
+                ForEach(days, id: \.date) { d in
+                    let x = Double(d.cents) / Double(top)
+                    let on = selected == d.date
+                    Button {
+                        withAnimation(Theme.spring) { selected = on ? nil : d.date }
+                    } label: {
+                        Text("\(Int(d.date.suffix(2)) ?? 0)").font(.system(size: 11)).monospacedDigit()
+                            .foregroundStyle(x > 0.5 ? Color.black : (on ? Theme.title : Theme.secondary))
+                            .frame(maxWidth: .infinity).aspectRatio(1, contentMode: .fit)
+                            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.white.opacity(x * 0.85)))
+                            .overlay {
+                                if on { RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.white, lineWidth: 1.5) }
+                            }
+                    }
+                    .buttonStyle(PressStyle())
+                    .accessibilityLabel("\(shortDay(d.date)), \(dollars(d.cents))")
+                }
+            }
+            if let b = biggest, b.cents > 0 {
+                Text("biggest day: \(shortDay(b.date)), \(dollars(b.cents))").font(.system(size: 12)).foregroundStyle(Theme.secondary)
+            }
+        }
+        .padding(18)
+        .glass(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .sensoryFeedback(.selection, trigger: selected)
     }
 }
 

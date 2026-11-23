@@ -266,3 +266,55 @@ def test_daily_excludes_transfers_and_card_payments(tmp_path):
     sync(app)
     daily = c.get("/money/summary", headers=H).json()["daily"]
     assert daily[0] == {"date": "2026-11-01", "cumulative_spend_cents": 100000}
+
+
+def recurring_app(tmp_path):
+    page = {
+        "added": [
+            t("r1", "a2", 15.49, "2026-09-03", "ENTERTAINMENT", name="Netflix"),
+            t("r2", "a2", 15.49, "2026-10-03", "ENTERTAINMENT", name="Netflix"),
+            t("r3", "a2", 15.49, "2026-11-03", "ENTERTAINMENT", name="Netflix"),
+            t("r4", "a1", 640.00, "2026-10-01", "RENT_AND_UTILITIES", name="Rent"),
+            t("r5", "a1", 650.00, "2026-11-01", "RENT_AND_UTILITIES", name="Rent"),
+            t("r6", "a1", 40.00, "2026-10-10", "FOOD_AND_DRINK", name="Publix"),
+            t("r7", "a1", 95.00, "2026-11-10", "FOOD_AND_DRINK", name="Publix"),
+            t("r8", "a1", 300.00, "2026-11-12", "GENERAL_MERCHANDISE", name="Best Buy"),
+            t("r9", "a1", 200.00, "2026-10-04", "TRANSFER_OUT", name="To savings"),
+            t("r10", "a1", 200.00, "2026-11-04", "TRANSFER_OUT", name="To savings"),
+            t("r11", "a1", -2000.00, "2026-10-15", "INCOME", name="Paycheck"),
+            t("r12", "a1", -2000.00, "2026-11-15", "INCOME", name="Paycheck"),
+        ],
+        "modified": [],
+        "removed": [],
+        "next_cursor": "c",
+        "has_more": False,
+    }
+    app, c = build(tmp_path, Plaid2([page]))
+    connect(c)
+    sync(app)
+    return c
+
+
+def test_recurring_finds_repeat_charges_at_a_steady_amount(tmp_path):
+    c = recurring_app(tmp_path)
+    j = c.get("/money/recurring", headers=H).json()
+    by = {i["merchant"]: i for i in j["items"]}
+    # publix swings too much, best buy happened once, transfers and paychecks are not bills
+    assert set(by) == {"Netflix", "Rent"}
+    assert by["Netflix"] == {
+        "merchant": "Netflix",
+        "amount_cents": 1549,
+        "category": "ENTERTAINMENT",
+        "last_date": "2026-11-03",
+        "next_date": "2026-12-03",
+        "paid_this_month": True,
+    }
+    assert by["Rent"]["amount_cents"] == 65000  # the latest amount
+    assert by["Rent"]["next_date"] == "2026-12-01"
+    assert j["monthly_cents"] == 1549 + 65000
+    assert [i["merchant"] for i in j["items"]] == ["Rent", "Netflix"]  # soonest next first
+
+
+def test_recurring_is_empty_without_history(tmp_path):
+    app, c = ready(tmp_path)
+    assert c.get("/money/recurring", headers=H).json() == {"items": [], "monthly_cents": 0}

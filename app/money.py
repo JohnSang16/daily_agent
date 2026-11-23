@@ -3,6 +3,7 @@
 Moves between my own accounts and credit card payments are not spending or income, and a
 refund reduces spending instead of counting as income."""
 
+from calendar import monthrange
 from datetime import date
 
 from sqlalchemy import select
@@ -102,6 +103,62 @@ def daily_cumulative_spend(db: Session, today: date) -> list[tuple[date, int]]:
         raw += by_day.get(d, 0)
         out.append((d, max(raw, 0)))
     return out
+
+
+def _next_month(d: date) -> date:
+    y, m = (d.year, d.month + 1) if d.month < 12 else (d.year + 1, 1)
+    return date(y, m, min(d.day, monthrange(y, m)[1]))
+
+
+def recurring(db: Session, today: date, lookback_days: int = 100) -> list[dict]:
+    """Bills and subscriptions: a merchant charged in 2 or more months of the lookback window,
+    about once a month, every charge within 20 percent of the middle amount. Transfers, card
+    payments and income never count. Soonest expected charge first."""
+    # ponytail: monthly bills only, next_date is last charge + 1 month; weekly or yearly need gaps
+    since = date.fromordinal(today.toordinal() - lookback_days)
+    rows = db.execute(
+        select(
+            Transaction.posted_date,
+            Transaction.merchant,
+            Transaction.amount_cents,
+            Transaction.category,
+            Transaction.category_detail,
+        )
+        .join(BankAccount, BankAccount.id == Transaction.account_id)
+        .where(
+            BankAccount.enabled.is_(True),
+            Transaction.direction == "out",
+            Transaction.pending.is_(False),
+            Transaction.posted_date >= since,
+            Transaction.posted_date <= today,
+        )
+        .order_by(Transaction.posted_date)
+    ).all()
+    groups: dict[str, list] = {}
+    for r in rows:
+        if not is_internal(r.category, r.category_detail):
+            groups.setdefault(r.merchant.strip().lower(), []).append(r)
+    out = []
+    for charges in groups.values():
+        months = {month_key(r.posted_date) for r in charges}
+        if len(months) < 2 or len(charges) > len(months) + 1:
+            continue
+        amounts = sorted(r.amount_cents for r in charges)
+        mid = amounts[len(amounts) // 2]
+        if any(abs(a - mid) > mid * 0.2 for a in amounts):
+            continue
+        last = charges[-1]
+        out.append(
+            {
+                "merchant": last.merchant,
+                "amount_cents": last.amount_cents,
+                "category": last.category,
+                "last_date": last.posted_date.isoformat(),
+                "next_date": _next_month(last.posted_date).isoformat(),
+                "paid_this_month": month_key(last.posted_date) == month_key(today),
+            }
+        )
+    return sorted(out, key=lambda i: (i["next_date"], i["merchant"]))
 
 
 def holdings(db: Session) -> dict:
