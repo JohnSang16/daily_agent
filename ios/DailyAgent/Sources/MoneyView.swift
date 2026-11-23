@@ -6,6 +6,17 @@ enum MoneyTab: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum HeroMode: String, CaseIterable, Identifiable {
+    case day, month
+    var id: String { rawValue }
+}
+
+struct TrendPoint: Identifiable {
+    let id: String
+    let label: String
+    let cents: Int
+}
+
 /// Money: four views of the same data. Overview (spend vs income, goals), banks and holdings,
 /// the income log, and the plain activity list.
 struct MoneyView: View {
@@ -69,14 +80,15 @@ struct MoneyOverviewView: View {
     @EnvironmentObject var state: AppState
     @State private var editing: BudgetGoal?
     @State private var adding = false
+    @State private var heroMode: HeroMode = .day
+    @Namespace private var heroPick
 
     var body: some View {
         if let s = state.summary {
             VStack(alignment: .leading, spacing: 34) {
-                thisMonth(s).reveal(0)
-                chart(s).reveal(1)
-                categories(s).reveal(2)
-                goals.reveal(3)
+                heroCard(s).reveal(0)
+                categories(s).reveal(1)
+                goals.reveal(2)
             }
             .sheet(item: $editing) { g in BudgetSheet(existing: g, categories: s.categories.map(\.category)).environmentObject(state) }
             .sheet(isPresented: $adding) { BudgetSheet(existing: nil, categories: s.categories.map(\.category)).environmentObject(state) }
@@ -85,54 +97,86 @@ struct MoneyOverviewView: View {
         }
     }
 
-    private func thisMonth(_ s: MoneySummary) -> some View {
-        HStack(alignment: .top, spacing: 0) {
-            figure("spent", dollars(s.thisMonth.spendCents))
-            figure("income", dollars(s.thisMonth.incomeCents))
-            figure("net", (s.thisMonth.netCents >= 0 ? "+" : "") + dollars(s.thisMonth.netCents))
-        }
-    }
-
-    private func figure(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            sectionLabel(label)
-            Text(value).font(.system(size: 26, weight: .light)).monospacedDigit().foregroundStyle(Theme.title)
-                .minimumScaleFactor(0.6).lineLimit(1).contentTransition(.numericText())
-        }.frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func chart(_ s: MoneySummary) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 16) {
-                sectionLabel("spend vs income, last 6 months")
+    private func heroCard(_ s: MoneySummary) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                sectionLabel("spent this month")
                 Spacer()
-                legend("income", .white)
-                legend("spend", Color(white: 0.45))
+                heroToggle
             }
-            SpendIncomeChart(months: s.months)
+            Text(dollars(s.thisMonth.spendCents)).font(.system(size: 34, weight: .light))
+                .monospacedDigit().foregroundStyle(Theme.title).contentTransition(.numericText())
+            TrendLineChart(points: heroPoints(s), showAxes: heroMode == .month)
+            HStack {
+                if let line = averageComparisonLine(current: s.thisMonth.spendCents, others: s.months.dropLast().map(\.spendCents)) {
+                    Text(line).font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                }
+                Spacer()
+                Text("income \(dollars(s.thisMonth.incomeCents)) · net \(s.thisMonth.netCents >= 0 ? "+" : "")\(dollars(s.thisMonth.netCents))")
+                    .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+            }
+        }
+        .padding(18)
+        .glass(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private var heroToggle: some View {
+        HStack(spacing: 2) {
+            ForEach(HeroMode.allCases) { m in
+                Button { withAnimation(Theme.spring) { heroMode = m } } label: {
+                    Text(m.rawValue).font(.system(size: 11.5, weight: heroMode == m ? .medium : .regular))
+                        .foregroundStyle(heroMode == m ? Color.black : Theme.secondary)
+                        .padding(.horizontal, 10).frame(minHeight: 26)
+                        .background {
+                            if heroMode == m {
+                                Capsule().fill(Color.white).matchedGeometryEffect(id: "hero-mode", in: heroPick)
+                            }
+                        }
+                }.buttonStyle(PressStyle())
+            }
+        }
+        .padding(2).glass(Capsule())
+    }
+
+    private func heroPoints(_ s: MoneySummary) -> [TrendPoint] {
+        switch heroMode {
+        case .day: return s.daily.map { TrendPoint(id: $0.date, label: $0.date, cents: $0.cumulativeSpendCents) }
+        case .month: return s.months.map { TrendPoint(id: $0.month, label: monthShort($0.month), cents: $0.spendCents) }
         }
     }
 
-    private func legend(_ text: String, _ c: Color) -> some View {
-        HStack(spacing: 5) {
-            Circle().fill(c).frame(width: 7, height: 7)
-            Text(text).font(.system(size: 12)).foregroundStyle(Theme.secondary)
-        }
+    /// White down to darker grays; "other" always takes the darkest.
+    private func donutGray(_ i: Int, _ c: CategorySpend) -> Color {
+        let ramp: [Color] = [.white, Color(white: 0.78), Color(white: 0.6), Color(white: 0.46), Color(white: 0.34)]
+        return c.category == "OTHER" ? Color(white: 0.24) : ramp[i % ramp.count]
     }
 
     private func categories(_ s: MoneySummary) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             sectionLabel("where it went this month")
-            let top = max(s.categories.map(\.spendCents).max() ?? 1, 1)
-            if s.categories.isEmpty { Text("nothing spent yet.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary) }
-            ForEach(s.categories) { c in
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text(categoryLabel(c.category)).font(.system(size: 15)).foregroundStyle(Theme.title)
-                        Spacer()
-                        Text(dollars(c.spendCents)).font(.system(size: 15)).monospacedDigit().foregroundStyle(Theme.title)
+            if s.categories.isEmpty {
+                Text("nothing spent yet.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
+            } else {
+                let buckets = Array(topCategoriesWithOther(s.categories).enumerated())
+                HStack(alignment: .center, spacing: 18) {
+                    Chart(buckets, id: \.offset) { i, c in
+                        SectorMark(angle: .value("spend", c.spendCents), innerRadius: .ratio(0.65), angularInset: 1.5)
+                            .foregroundStyle(donutGray(i, c))
+                            .cornerRadius(3)
                     }
-                    Bar(fraction: Double(c.spendCents) / Double(top), strong: false)
+                    .chartLegend(.hidden)
+                    .frame(width: 96, height: 96)
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(buckets, id: \.offset) { i, c in
+                            HStack {
+                                Circle().fill(donutGray(i, c)).frame(width: 7, height: 7)
+                                Text(categoryLabel(c.category)).font(.system(size: 13.5)).foregroundStyle(Theme.title)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(dollars(c.spendCents)).font(.system(size: 13.5)).monospacedDigit().foregroundStyle(Theme.title)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -140,33 +184,29 @@ struct MoneyOverviewView: View {
 
     private var goals: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                sectionLabel("budget goals")
-                Spacer()
-                Button { adding = true } label: {
-                    Label("add goal", systemImage: "plus").font(.system(size: 14)).foregroundStyle(Theme.title)
-                        .padding(.horizontal, 14).frame(minHeight: 36).glass(Capsule()).frame(minHeight: 44)
-                }.buttonStyle(PressStyle())
-            }
+            sectionLabel("budget goals")
             if state.budgets.isEmpty {
                 Text("no goals yet. add a monthly limit for all spending or for one category.")
                     .font(.system(size: 14)).foregroundStyle(Theme.secondary)
             }
-            ForEach(state.budgets) { g in
-                let p = goalProgress(spent: g.spentCents, limit: g.limitCents)
-                Button { editing = g } label: {
-                    VStack(alignment: .leading, spacing: 7) {
-                        HStack {
-                            Text(categoryLabel(g.category)).font(.system(size: 15)).foregroundStyle(Theme.title)
-                            Spacer()
-                            Text("\(dollars(g.spentCents)) of \(dollars(g.limitCents))").font(.system(size: 13.5))
-                                .foregroundStyle(p.over ? Theme.title : Theme.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 20) {
+                    ForEach(state.budgets) { g in
+                        let p = goalProgress(spent: g.spentCents, limit: g.limitCents)
+                        Button { editing = g } label: { RingGauge(fraction: p.fraction, label: categoryLabel(g.category)) }
+                            .buttonStyle(PressStyle())
+                    }
+                    Button { adding = true } label: {
+                        VStack(spacing: 6) {
+                            ZStack {
+                                Circle().stroke(Theme.raised, lineWidth: 8).frame(width: 78, height: 78)
+                                Image(systemName: "plus").font(.system(size: 18)).foregroundStyle(Theme.secondary)
+                            }
+                            Text("add goal").font(.system(size: 12)).foregroundStyle(Theme.secondary)
                         }
-                        Bar(fraction: p.fraction, strong: true)
-                        Text(p.over ? "over by \(dollars(g.spentCents - g.limitCents))" : "\(dollars(g.limitCents - g.spentCents)) left")
-                            .font(.system(size: 12)).foregroundStyle(p.over ? Theme.title : Theme.tertiary)
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                }.buttonStyle(PressStyle())
+                    }.buttonStyle(PressStyle())
+                }
+                .padding(.horizontal, 2).padding(.vertical, 4)
             }
         }
     }
@@ -191,33 +231,56 @@ struct Bar: View {
     }
 }
 
-struct SpendIncomeChart: View {
-    let months: [MonthTotal]
+struct RingGauge: View {
+    let fraction: Double
+    let label: String
+    @State private var shown = false
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ZStack {
+                Circle().stroke(Theme.raised, lineWidth: 8)
+                Circle().trim(from: 0, to: shown ? min(fraction, 1) : 0)
+                    .stroke(Color.white, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Text("\(Int((fraction * 100).rounded()))%").font(.system(size: 15)).monospacedDigit().foregroundStyle(Theme.title)
+            }
+            .frame(width: 78, height: 78)
+            Text(label).font(.system(size: 12)).foregroundStyle(Theme.secondary).lineLimit(1).frame(maxWidth: 90)
+        }
+        .animation(Theme.spring, value: fraction)
+        .onAppear { withAnimation(Theme.spring.delay(0.1)) { shown = true } }
+    }
+}
+
+struct TrendLineChart: View {
+    let points: [TrendPoint]
+    let showAxes: Bool
     @State private var grown = false
 
     var body: some View {
         Chart {
-            ForEach(months) { m in
-                BarMark(x: .value("month", monthShort(m.month)), y: .value("income", grown ? Double(m.incomeCents) / 100 : 0))
-                    .position(by: .value("kind", "income")).foregroundStyle(by: .value("kind", "income"))
-                    .cornerRadius(4)
-                BarMark(x: .value("month", monthShort(m.month)), y: .value("spend", grown ? Double(m.spendCents) / 100 : 0))
-                    .position(by: .value("kind", "spend")).foregroundStyle(by: .value("kind", "spend"))
-                    .cornerRadius(4)
+            ForEach(points) { p in
+                AreaMark(x: .value("x", p.label), y: .value("spend", grown ? Double(p.cents) / 100 : 0))
+                    .foregroundStyle(LinearGradient(colors: [Color.white.opacity(0.3), Color.white.opacity(0)], startPoint: .top, endPoint: .bottom))
+                LineMark(x: .value("x", p.label), y: .value("spend", grown ? Double(p.cents) / 100 : 0))
+                    .foregroundStyle(Color.white)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
             }
         }
-        .chartForegroundStyleScale(["income": Color.white, "spend": Color(white: 0.45)])
         .chartLegend(.hidden)
         .chartYAxis {
             AxisMarks(position: .leading) { v in
-                AxisGridLine().foregroundStyle(Theme.line)
-                AxisValueLabel {
-                    if let d = v.as(Double.self) { Text(d >= 1000 ? "\(Int(d / 1000))k" : "\(Int(d))").foregroundStyle(Theme.tertiary) }
+                if showAxes {
+                    AxisGridLine().foregroundStyle(Theme.line)
+                    AxisValueLabel {
+                        if let d = v.as(Double.self) { Text(d >= 1000 ? "\(Int(d / 1000))k" : "\(Int(d))").foregroundStyle(Theme.tertiary) }
+                    }
                 }
             }
         }
-        .chartXAxis { AxisMarks { _ in AxisValueLabel().foregroundStyle(Theme.secondary) } }
-        .frame(height: 190)
+        .chartXAxis { AxisMarks { _ in if showAxes { AxisValueLabel().foregroundStyle(Theme.secondary) } } }
+        .frame(height: 120)
         .onAppear { withAnimation(Theme.spring.delay(0.15)) { grown = true } }
     }
 }
