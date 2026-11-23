@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.auth import require_token
 from app.clock import Clock, get_clock
 from app.models import Budget
-from app.money import holdings, last_months, month_totals
+from app.money import daily_cumulative_spend, holdings, last_months, month_totals
 
 router = APIRouter(dependencies=[Depends(require_token)])
 
@@ -23,7 +23,8 @@ def _today(request: Request, clock: Clock) -> date:
 def summary(
     request: Request, months: int = Query(6, ge=1, le=24), clock: Clock = Depends(get_clock)
 ):
-    keys = last_months(_today(request, clock), months)
+    today = _today(request, clock)
+    keys = last_months(today, months)
     with request.app.state.session_factory() as db:
         totals, cats = month_totals(db, keys)
         now = totals[keys[-1]]
@@ -43,6 +44,10 @@ def summary(
                 for c, v in sorted(cats.items(), key=lambda kv: (-kv[1], kv[0]))[:8]
             ],
             "holdings": holdings(db),
+            "daily": [
+                {"date": d.isoformat(), "cumulative_spend_cents": cents}
+                for d, cents in daily_cumulative_spend(db, today)
+            ],
         }
 
 
