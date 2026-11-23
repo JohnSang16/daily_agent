@@ -14,11 +14,13 @@
 
 ## Task 1: Backend — daily cumulative spend function
 
+**Status: DONE** — implemented, committed `764451b` on branch `money-overview-redesign`. Spec/quality review not yet run.
+
 **Files:**
 - Modify: `app/money.py` (add a new function after `month_totals`, before `holdings`)
 - Test: `tests/test_money_overview.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tests/test_money_overview.py` (both tests use the existing `ready()` fixture and `t()`/`Plaid2`/`build`/`connect`/`sync` helpers already in this file; `ready()` uses `NOW = datetime(2026, 11, 19, 15, 0, tzinfo=UTC)` from `test_banks.py`, so "today" is 2026-11-19):
 
@@ -60,12 +62,12 @@ def test_daily_excludes_transfers_and_card_payments(tmp_path):
     assert daily[0] == {"date": "2026-11-01", "cumulative_spend_cents": 100000}
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd /Users/johns/projects/daily_agent && uv run pytest tests/test_money_overview.py -k daily -v`
 Expected: FAIL with `KeyError: 'daily'` (the field doesn't exist on the response yet).
 
-- [ ] **Step 3: Write the minimal implementation**
+- [x] **Step 3: Write the minimal implementation**
 
 In `app/money.py`, add this function after `month_totals` and before `holdings`:
 
@@ -107,12 +109,12 @@ def daily_cumulative_spend(db: Session, today: date) -> list[tuple[date, int]]:
     return out
 ```
 
-- [ ] **Step 4: Run the tests to verify they still fail the same way**
+- [x] **Step 4: Run the tests to verify they still fail the same way**
 
 Run: `cd /Users/johns/projects/daily_agent && uv run pytest tests/test_money_overview.py -k daily -v`
 Expected: still FAIL with `KeyError: 'daily'` — the function exists now but nothing calls it yet (Task 2 wires it into the endpoint). This confirms the test is actually exercising the endpoint, not the function directly.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Users/johns/projects/daily_agent
