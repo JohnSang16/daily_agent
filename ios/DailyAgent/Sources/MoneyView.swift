@@ -536,9 +536,10 @@ struct ActivityView: View {
                 HStack(spacing: 8) {
                     ForEach(r.items) { item in
                         VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Image(systemName: categoryIcon(item.category)).font(.system(size: 10.5)).foregroundStyle(Theme.secondary)
+                            HStack(spacing: 10) {
                                 Text(item.merchant.lowercased()).font(.system(size: 12.5)).foregroundStyle(Theme.title).lineLimit(1)
+                                Spacer(minLength: 0)
+                                Image(systemName: categoryIcon(item.category)).font(.system(size: 10.5)).foregroundStyle(Theme.tertiary)
                             }
                             Text(dollars(item.amountCents)).font(.system(size: 15, weight: .light)).monospacedDigit().foregroundStyle(Theme.title)
                             Text(item.paidThisMonth ? "paid \(shortDay(item.lastDate))" : "due \(shortDay(item.nextDate))")
