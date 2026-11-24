@@ -341,72 +341,88 @@ struct RingGauge: View {
     }
 }
 
+/// Hand-drawn, not Swift Charts: 6 separate fixes in a row (y-domain, chart identity,
+/// data-readiness gating, explicit axis ticks, dropping chartXScale, removing all animation)
+/// each addressed something real and verified, none stopped a crash inside Charts' own closed
+/// source internals (confirmed via register dump: NaN already present several frames before it
+/// reaches Charts' own axis-tick code, further than is practical to keep tracing blind). Doing
+/// the arithmetic here instead means there is no framework left that can mishandle it.
 struct TrendLineChart: View {
     let points: [TrendPoint]
     let monthly: Bool
-
-    var body: some View {
-        Chart {
-            ForEach(points) { p in
-                AreaMark(x: .value("day", p.date), y: .value("spend", Double(p.cents) / 100))
-                    .foregroundStyle(LinearGradient(colors: [Color.white.opacity(0.3), Color.white.opacity(0)], startPoint: .top, endPoint: .bottom))
-                LineMark(x: .value("day", p.date), y: .value("spend", Double(p.cents) / 100))
-                    .foregroundStyle(Color.white)
-                    .lineStyle(StrokeStyle(lineWidth: 2))
-            }
-        }
-        // no animation at all on this chart: every targeted fix (y-domain, chart identity,
-        // explicit ticks, dropping chartXScale) was real and correct, none stopped the 7D crash,
-        // and every crash traced to a live animation frame (CADisplayLink in the backtrace every
-        // time). Removing the "grow in" draw-on-appear and forbidding SwiftUI from animating this
-        // view's own changes removes Charts' animation code path from running at all, trading the
-        // smooth range-switch crossfade for not crashing.
-        .animation(nil, value: points)
-        .chartLegend(.hidden)
-        // pinned explicitly, not .automatic: real, correct fix for a zero-span domain even
-        // though it wasn't the actual trigger behind the 7D crash (see above)
-        .chartYScale(domain: 0...yUpperBound)
-        .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { v in
-                AxisGridLine().foregroundStyle(Theme.line)
-                AxisValueLabel {
-                    if let d = v.as(Double.self) { Text(d >= 1000 ? "\(Int(d / 1000))k" : "\(Int(d))").foregroundStyle(Theme.tertiary) }
-                }
-            }
-        }
-        // explicit tick dates, not .automatic: Charts' own "nice stride" algorithm for picking
-        // date ticks has to find a clean calendar-aligned spacing to hit desiredCount, and a 7D
-        // chart's ~8 day span may not resolve that cleanly (1M/3M/1Y/ALL all have more room).
-        .chartXAxis {
-            AxisMarks(values: xTickDates) { _ in
-                AxisValueLabel(format: monthly ? .dateTime.month(.abbreviated).year(.twoDigits) : .dateTime.month(.abbreviated).day())
-                    .foregroundStyle(Theme.secondary)
-            }
-        }
-        .frame(height: 120)
-        // plain view padding, not .chartXScale(domain:): a register dump at the 7D crash traced
-        // the NaN to a value already invalid *before* Charts' own axis code ever saw it, which
-        // chartXScale's domain extension is the one remaining suspect for (every other theory
-        // that could be fixed and verified has been, and didn't stop it). Trailing padding here
-        // can't touch Charts' internal domain math at all, so it can't be the source of this.
-        .padding(.trailing, 16)
-    }
 
     private var yUpperBound: Double {
         let maxCents = points.map(\.cents).max() ?? 0
         return max(Double(maxCents) / 100, 1)
     }
 
-    /// Picked from the real point dates directly, roughly 4 evenly spaced, always ending on the
-    /// last point. No "nice calendar stride" guessing, which is exactly the computation that
-    /// crashed for a 7D chart's ~8 day span (see the .chartXAxis comment above).
-    private var xTickDates: [Date] {
-        guard points.count > 1 else { return points.map(\.date) }
+    /// Start of the x-axis and its span in seconds, floored at 1 so a division by it can never
+    /// be zero or negative, regardless of how many points there are or how close together.
+    private var xSpan: (start: Date, seconds: Double)? {
+        guard let first = points.first?.date, let last = points.last?.date else { return nil }
+        return (first, max(last.timeIntervalSince(first), 1))
+    }
+
+    /// Roughly 4 evenly spaced labels, always ending on the last point.
+    private var tickIndices: [Int] {
+        guard points.count > 1 else { return Array(points.indices) }
         let desired = min(4, points.count)
         let step = max(1, (points.count - 1) / (desired - 1))
-        var picked = stride(from: 0, to: points.count, by: step).map { points[$0].date }
-        if picked.last != points.last?.date { picked.append(points.last!.date) }
+        var picked = Array(stride(from: 0, to: points.count, by: step))
+        if picked.last != points.count - 1 { picked.append(points.count - 1) }
         return picked
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            if let xSpan, points.count > 0 {
+                let w = max(geo.size.width - 34 - 16, 1)  // room for y-labels and trailing edge
+                let h = max(geo.size.height - 20, 1)      // room for x-labels at the bottom
+                let xs = points.map { w * ($0.date.timeIntervalSince(xSpan.start) / xSpan.seconds) }
+                let ys = points.map { h * (1 - (Double($0.cents) / 100) / yUpperBound) }
+
+                ZStack(alignment: .topLeading) {
+                    ForEach([0.0, 1.0 / 3, 2.0 / 3, 1.0], id: \.self) { frac in
+                        Path { p in p.move(to: CGPoint(x: 34, y: h * frac)); p.addLine(to: CGPoint(x: 34 + w, y: h * frac)) }
+                            .stroke(Theme.line, lineWidth: 0.5)
+                        Text(yLabel(for: frac)).font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+                            .position(x: 14, y: max(6, min(h - 6, h * frac)))
+                    }
+                    Path { p in
+                        guard let fx = xs.first else { return }
+                        p.move(to: CGPoint(x: 34 + fx, y: h))
+                        for (x, y) in zip(xs, ys) { p.addLine(to: CGPoint(x: 34 + x, y: y)) }
+                        p.addLine(to: CGPoint(x: 34 + xs.last!, y: h))
+                        p.closeSubpath()
+                    }
+                    .fill(LinearGradient(colors: [Color.white.opacity(0.3), Color.white.opacity(0)], startPoint: .top, endPoint: .bottom))
+                    Path { p in
+                        guard let fx = xs.first, let fy = ys.first else { return }
+                        p.move(to: CGPoint(x: 34 + fx, y: fy))
+                        for (x, y) in zip(xs, ys).dropFirst() { p.addLine(to: CGPoint(x: 34 + x, y: y)) }
+                    }
+                    .stroke(Color.white, style: StrokeStyle(lineWidth: 2, lineJoin: .round))
+                    ForEach(tickIndices, id: \.self) { i in
+                        Text(xLabel(for: points[i].date)).font(.system(size: 11)).foregroundStyle(Theme.secondary)
+                            .fixedSize()
+                            .position(x: min(max(34 + xs[i], 34), geo.size.width - 14), y: h + 10)
+                    }
+                }
+            }
+        }
+        .frame(height: 120)
+    }
+
+    private func yLabel(for frac: Double) -> String {
+        let v = yUpperBound * (1 - frac)
+        return v >= 1000 ? "\(Int(v / 1000))k" : "\(Int(v))"
+    }
+
+    private func xLabel(for date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = monthly ? "MMM yy" : "MMM d"
+        return f.string(from: date)
     }
 }
 
