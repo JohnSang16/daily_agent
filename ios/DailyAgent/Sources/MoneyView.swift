@@ -31,15 +31,30 @@ enum MoneyRange: String, CaseIterable, Identifiable {
         }
     }
 
-    var label: String {
+    /// How many trailing days the category donut should sum over. Always sent to the backend
+    /// (unlike dailyDays, which only the two daily-resolution ranges need).
+    var categoryDays: Int {
         switch self {
-        case .d7: return "spent, last 7 days"
-        case .m1: return "spent, last 30 days"
-        case .m3: return "spent, last 3 months"
-        case .y1: return "spent, last year"
-        case .all: return "spent, all time"
+        case .d7: return 7
+        case .m1: return 31
+        case .m3: return 92
+        case .y1: return 366
+        case .all: return 3650  // this account's real history is a few months, 10 years covers "all"
         }
     }
+
+    private var windowPhrase: String {
+        switch self {
+        case .d7: return "last 7 days"
+        case .m1: return "last 30 days"
+        case .m3: return "last 3 months"
+        case .y1: return "last year"
+        case .all: return "all time"
+        }
+    }
+
+    var label: String { "spent, \(windowPhrase)" }
+    var categoryLabel: String { "where it went, \(windowPhrase)" }
 }
 
 struct TrendPoint: Identifiable {
@@ -111,7 +126,7 @@ struct MoneyOverviewView: View {
     @State private var editing: BudgetGoal?
     @State private var adding = false
     @State private var range: MoneyRange = .m1
-    @State private var dailyDaysLoaded = 31  // matches AppState's default fetch, so .m1 needs no refetch
+    @State private var loadedRange: MoneyRange = .m1  // matches AppState's default fetch
     @Namespace private var heroPick
 
     var body: some View {
@@ -160,9 +175,11 @@ struct MoneyOverviewView: View {
             ForEach(MoneyRange.allCases) { m in
                 Button {
                     withAnimation(Theme.spring) { range = m }
-                    if let days = m.dailyDays, days != dailyDaysLoaded {
-                        dailyDaysLoaded = days
-                        Task { await state.loadMoneyDaily(days: days) }
+                    // the category donut needs this even for the month ranges, so every switch
+                    // refetches, not just the two that also need a re-anchored daily series
+                    if m != loadedRange {
+                        loadedRange = m
+                        Task { await state.loadMoneySummary(dailyDays: m.dailyDays, categoryDays: m.categoryDays) }
                     }
                 } label: {
                     Text(m.rawValue).font(.system(size: 12, weight: range == m ? .medium : .regular))
@@ -208,7 +225,7 @@ struct MoneyOverviewView: View {
 
     private func categories(_ s: MoneySummary) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            sectionLabel("where it went this month")
+            sectionLabel(range.categoryLabel)
             if s.categories.isEmpty {
                 Text("nothing spent yet.").font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
             } else {

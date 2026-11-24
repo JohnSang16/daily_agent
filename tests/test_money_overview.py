@@ -125,6 +125,16 @@ def test_categories_this_month_sorted_largest_first(tmp_path):
     ]
 
 
+def test_category_days_widens_the_window_past_the_calendar_month(tmp_path):
+    """The app's category donut follows the range picker (7D/1M/3M/1Y/ALL), not always just the
+    current calendar month, so a wide enough window pulls in october's food purchase too."""
+    app, c = ready(tmp_path)
+    cats = c.get("/money/summary", headers=H, params={"category_days": 45}).json()["categories"]
+    by = {x["category"]: x["spend_cents"] for x in cats}
+    assert by["FOOD_AND_DRINK"] == 14000  # oct 100 + nov 40
+    assert by["GENERAL_MERCHANDISE"] == 4000 and by["TRANSPORTATION"] == 3000
+
+
 def test_a_disabled_account_leaves_the_totals(tmp_path):
     app, c = ready(tmp_path)
     card = next(a for a in c.get("/banks", headers=H).json()["accounts"] if a["nickname"] == "Card")

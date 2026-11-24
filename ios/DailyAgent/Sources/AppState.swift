@@ -287,21 +287,24 @@ final class AppState: ObservableObject {
     }
 
     /// months=24 so 3M/1Y/ALL can slice client side with no refetch; daily_days anchors the
-    /// rolling window the 7D/1M chart needs (not pinned to the 1st of the calendar month).
-    private func moneyQuery(days: Int) -> [URLQueryItem] {
-        [URLQueryItem(name: "months", value: "24"), URLQueryItem(name: "daily_days", value: String(days))]
+    /// rolling window the 7D/1M chart needs (not pinned to the 1st of the calendar month);
+    /// category_days does the same for the category donut, across every range, not just those two.
+    private func moneyQuery(dailyDays: Int?, categoryDays: Int) -> [URLQueryItem] {
+        var q = [URLQueryItem(name: "months", value: "24"), URLQueryItem(name: "category_days", value: String(categoryDays))]
+        if let dailyDays { q.append(URLQueryItem(name: "daily_days", value: String(dailyDays))) }
+        return q
     }
 
-    /// Re-anchors the daily series to a different rolling window (7D vs 1M) when the money
-    /// screen's range picker changes. The month-resolution ranges reuse what's already loaded.
-    func loadMoneyDaily(days: Int) async {
-        await call { c in summary = try await c.get("/money/summary", query: moneyQuery(days: days)) }
+    /// Re-fetches for a different range picker selection (7D/1M/3M/1Y/ALL): re-anchors the daily
+    /// series when that range needs one, and always re-sums the category donut to match.
+    func loadMoneySummary(dailyDays: Int?, categoryDays: Int) async {
+        await call { c in summary = try await c.get("/money/summary", query: moneyQuery(dailyDays: dailyDays, categoryDays: categoryDays)) }
     }
 
     /// Everything the money screen shows, fetched side by side.
     func loadAllMoney() async {
         await call { c in
-            async let s: MoneySummary = c.get("/money/summary", query: moneyQuery(days: 31))
+            async let s: MoneySummary = c.get("/money/summary", query: moneyQuery(dailyDays: 31, categoryDays: 31))
             async let b: [BudgetGoal] = c.get("/budgets")
             async let bk: Banks = c.get("/banks")
             async let p: TxnPage = c.get("/transactions", query: [URLQueryItem(name: "limit", value: "100")])
@@ -313,7 +316,7 @@ final class AppState: ObservableObject {
 
     private func loadOverview() async {
         await call { c in
-            async let s: MoneySummary = c.get("/money/summary", query: moneyQuery(days: 31))
+            async let s: MoneySummary = c.get("/money/summary", query: moneyQuery(dailyDays: 31, categoryDays: 31))
             async let b: [BudgetGoal] = c.get("/budgets")
             let (s1, b1) = try await (s, b)
             summary = s1; budgets = b1

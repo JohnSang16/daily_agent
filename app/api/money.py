@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.auth import require_token
 from app.clock import Clock, get_clock
 from app.models import Budget
-from app.money import daily_cumulative_spend, holdings, last_months, month_totals, recurring
+from app.money import category_spend, daily_cumulative_spend, holdings, last_months, month_totals, recurring
 
 router = APIRouter(dependencies=[Depends(require_token)])
 
@@ -24,6 +24,7 @@ def summary(
     request: Request,
     months: int = Query(6, ge=1, le=24),
     daily_days: int | None = Query(None, ge=1, le=400),
+    category_days: int | None = Query(None, ge=1, le=20000),
     clock: Clock = Depends(get_clock),
 ):
     today = _today(request, clock)
@@ -32,6 +33,10 @@ def summary(
     with request.app.state.session_factory() as db:
         totals, cats = month_totals(db, keys)
         now = totals[keys[-1]]
+        # category_days follows the app's range picker (7D/1M/3M/1Y/ALL); without it, the
+        # category donut always falls back to just the current calendar month
+        if category_days:
+            cats = category_spend(db, today, today - timedelta(days=category_days - 1))
         return {
             "months": [
                 {"month": m, "income_cents": totals[m]["income"], "spend_cents": totals[m]["spend"]}

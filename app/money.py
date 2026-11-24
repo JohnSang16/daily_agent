@@ -107,6 +107,29 @@ def daily_cumulative_spend(db: Session, today: date, start: date | None = None) 
     return out
 
 
+def category_spend(db: Session, today: date, start: date) -> dict[str, int]:
+    """Net spend by category between start and today, same filtering as month_totals: internal
+    transfers and income are excluded, a refund reduces its own category instead of counting
+    separately. For the app's category donut to follow the trend chart's range picker instead of
+    always reading the current calendar month."""
+    rows = db.execute(
+        select(Transaction.direction, Transaction.amount_cents, Transaction.category, Transaction.category_detail)
+        .join(BankAccount, BankAccount.id == Transaction.account_id)
+        .where(
+            BankAccount.enabled.is_(True),
+            Transaction.posted_date >= start,
+            Transaction.posted_date <= today,
+        )
+    ).all()
+    cats: dict[str, int] = {}
+    for direction, cents, cat, detail in rows:
+        if is_internal(cat, detail) or (direction == "in" and cat == "INCOME"):
+            continue
+        signed = cents if direction == "out" else -cents
+        cats[cat or "OTHER"] = cats.get(cat or "OTHER", 0) + signed
+    return {k: v for k, v in cats.items() if v > 0}
+
+
 def _next_month(d: date) -> date:
     y, m = (d.year, d.month + 1) if d.month < 12 else (d.year + 1, 1)
     return date(y, m, min(d.day, monthrange(y, m)[1]))
