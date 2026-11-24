@@ -6,9 +6,40 @@ enum MoneyTab: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-enum HeroMode: String, CaseIterable, Identifiable {
-    case day, month
+/// Stocks-style range picker. Plaid transactions are date only (no time of day), so there's no
+/// real sub-day data: 7D/1M read the daily series, 3M/1Y/ALL read the monthly totals.
+enum MoneyRange: String, CaseIterable, Identifiable {
+    case d7 = "7D", m1 = "1M", m3 = "3M", y1 = "1Y", all = "ALL"
     var id: String { rawValue }
+
+    /// Non-nil for the two daily-resolution ranges: how many days AppState should fetch.
+    var dailyDays: Int? {
+        switch self {
+        case .d7: return 7
+        case .m1: return 31
+        case .m3, .y1, .all: return nil
+        }
+    }
+
+    /// Non-nil for the three month-resolution ranges: how many trailing months to show.
+    /// `.all` is nil meaning "everything already loaded", not a magic large number.
+    var monthCount: Int? {
+        switch self {
+        case .m3: return 3
+        case .y1: return 12
+        case .d7, .m1, .all: return nil
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .d7: return "spent, last 7 days"
+        case .m1: return "spent, last 30 days"
+        case .m3: return "spent, last 3 months"
+        case .y1: return "spent, last year"
+        case .all: return "spent, all time"
+        }
+    }
 }
 
 struct TrendPoint: Identifiable {
@@ -79,7 +110,8 @@ struct MoneyOverviewView: View {
     @EnvironmentObject var state: AppState
     @State private var editing: BudgetGoal?
     @State private var adding = false
-    @State private var heroMode: HeroMode = .day
+    @State private var range: MoneyRange = .m1
+    @State private var dailyDaysLoaded = 31  // matches AppState's default fetch, so .m1 needs no refetch
     @Namespace private var heroPick
 
     var body: some View {
@@ -99,14 +131,14 @@ struct MoneyOverviewView: View {
     private func heroCard(_ s: MoneySummary) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                sectionLabel(heroMode == .day ? "spent today" : "spent this month")
+                sectionLabel(range.label)
                 Spacer()
                 heroToggle
             }
-            Text(dollars(heroMode == .day ? todaySpendCents(s) : s.thisMonth.spendCents))
+            Text(dollars(rangeSpendCents(s)))
                 .font(.system(size: 34, weight: .light))
                 .monospacedDigit().foregroundStyle(Theme.title).contentTransition(.numericText())
-            TrendLineChart(points: heroPoints(s), showAxes: heroMode == .month)
+            TrendLineChart(points: heroPoints(s))
             HStack {
                 if let line = averageComparisonLine(current: s.thisMonth.spendCents, others: s.months.dropLast().map(\.spendCents)) {
                     Text(line).font(.system(size: 12)).foregroundStyle(Theme.secondary)
@@ -122,13 +154,19 @@ struct MoneyOverviewView: View {
 
     private var heroToggle: some View {
         HStack(spacing: 2) {
-            ForEach(HeroMode.allCases) { m in
-                Button { withAnimation(Theme.spring) { heroMode = m } } label: {
-                    Text(m.rawValue).font(.system(size: 11.5, weight: heroMode == m ? .medium : .regular))
-                        .foregroundStyle(heroMode == m ? Color.black : Theme.secondary)
+            ForEach(MoneyRange.allCases) { m in
+                Button {
+                    withAnimation(Theme.spring) { range = m }
+                    if let days = m.dailyDays, days != dailyDaysLoaded {
+                        dailyDaysLoaded = days
+                        Task { await state.loadMoneyDaily(days: days) }
+                    }
+                } label: {
+                    Text(m.rawValue).font(.system(size: 11.5, weight: range == m ? .medium : .regular))
+                        .foregroundStyle(range == m ? Color.black : Theme.secondary)
                         .padding(.horizontal, 10).frame(minHeight: 26)
                         .background {
-                            if heroMode == m {
+                            if range == m {
                                 Capsule().fill(Color.white).matchedGeometryEffect(id: "hero-mode", in: heroPick)
                             }
                         }
@@ -138,19 +176,25 @@ struct MoneyOverviewView: View {
         .padding(2).glass(Capsule())
     }
 
+    /// AppState keeps `daily` re-anchored to whichever window was last requested (7 or 31 days),
+    /// so 7D/1M read it straight; the month ranges slice the already-loaded `months` history.
     private func heroPoints(_ s: MoneySummary) -> [TrendPoint] {
-        switch heroMode {
-        case .day: return s.daily.map { TrendPoint(id: $0.date, label: $0.date, cents: $0.cumulativeSpendCents) }
-        case .month: return s.months.map { TrendPoint(id: $0.month, label: monthShort($0.month), cents: $0.spendCents) }
+        switch range {
+        case .d7, .m1:
+            return s.daily.map { TrendPoint(id: $0.date, label: shortDay($0.date), cents: $0.cumulativeSpendCents) }
+        case .m3, .y1, .all:
+            let months = s.months.suffix(range.monthCount ?? s.months.count)
+            return months.map { TrendPoint(id: $0.month, label: monthShort($0.month), cents: $0.spendCents) }
         }
     }
 
-    /// `daily` is a running total through the month (no gaps), so today's own spend is the
-    /// last step up from the day before, not the cumulative figure itself.
-    private func todaySpendCents(_ s: MoneySummary) -> Int {
-        guard let last = s.daily.last else { return 0 }
-        let prior = s.daily.dropLast().last?.cumulativeSpendCents ?? 0
-        return last.cumulativeSpendCents - prior
+    private func rangeSpendCents(_ s: MoneySummary) -> Int {
+        switch range {
+        case .d7, .m1:
+            return s.daily.last?.cumulativeSpendCents ?? 0
+        case .m3, .y1, .all:
+            return s.months.suffix(range.monthCount ?? s.months.count).reduce(0) { $0 + $1.spendCents }
+        }
     }
 
     /// White down to darker grays; "other" always takes the darkest.
@@ -263,7 +307,6 @@ struct RingGauge: View {
 
 struct TrendLineChart: View {
     let points: [TrendPoint]
-    let showAxes: Bool  // x-axis only: day mode has ~30 points, too many labels to show
     @State private var grown = false
 
     var body: some View {
@@ -278,14 +321,15 @@ struct TrendLineChart: View {
         }
         .chartLegend(.hidden)
         .chartYAxis {
-            AxisMarks(position: .leading) { v in
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { v in
                 AxisGridLine().foregroundStyle(Theme.line)
                 AxisValueLabel {
                     if let d = v.as(Double.self) { Text(d >= 1000 ? "\(Int(d / 1000))k" : "\(Int(d))").foregroundStyle(Theme.tertiary) }
                 }
             }
         }
-        .chartXAxis { AxisMarks { _ in if showAxes { AxisValueLabel().foregroundStyle(Theme.secondary) } } }
+        // thinned to a handful of labels: up to 31 points (1M) would be unreadable one-per-mark
+        .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) { _ in AxisValueLabel().foregroundStyle(Theme.secondary) } }
         .frame(height: 120)
         .onAppear { withAnimation(Theme.spring.delay(0.15)) { grown = true } }
     }

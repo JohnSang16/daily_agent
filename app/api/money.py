@@ -1,6 +1,6 @@
 """Money overview: spend vs income, categories, holdings, and monthly budget goals."""
 
-from datetime import date
+from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
@@ -21,10 +21,14 @@ def _today(request: Request, clock: Clock) -> date:
 
 @router.get("/money/summary")
 def summary(
-    request: Request, months: int = Query(6, ge=1, le=24), clock: Clock = Depends(get_clock)
+    request: Request,
+    months: int = Query(6, ge=1, le=24),
+    daily_days: int | None = Query(None, ge=1, le=400),
+    clock: Clock = Depends(get_clock),
 ):
     today = _today(request, clock)
     keys = last_months(today, months)
+    daily_start = today - timedelta(days=daily_days - 1) if daily_days else None
     with request.app.state.session_factory() as db:
         totals, cats = month_totals(db, keys)
         now = totals[keys[-1]]
@@ -46,7 +50,7 @@ def summary(
             "holdings": holdings(db),
             "daily": [
                 {"date": d.isoformat(), "cumulative_spend_cents": cents}
-                for d, cents in daily_cumulative_spend(db, today)
+                for d, cents in daily_cumulative_spend(db, today, daily_start)
             ],
         }
 

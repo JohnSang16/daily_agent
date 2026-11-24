@@ -286,10 +286,22 @@ final class AppState: ObservableObject {
         await refresh()
     }
 
+    /// months=24 so 3M/1Y/ALL can slice client side with no refetch; daily_days anchors the
+    /// rolling window the 7D/1M chart needs (not pinned to the 1st of the calendar month).
+    private func moneyQuery(days: Int) -> [URLQueryItem] {
+        [URLQueryItem(name: "months", value: "24"), URLQueryItem(name: "daily_days", value: String(days))]
+    }
+
+    /// Re-anchors the daily series to a different rolling window (7D vs 1M) when the money
+    /// screen's range picker changes. The month-resolution ranges reuse what's already loaded.
+    func loadMoneyDaily(days: Int) async {
+        await call { c in summary = try await c.get("/money/summary", query: moneyQuery(days: days)) }
+    }
+
     /// Everything the money screen shows, fetched side by side.
     func loadAllMoney() async {
         await call { c in
-            async let s: MoneySummary = c.get("/money/summary", query: [URLQueryItem(name: "months", value: "6")])
+            async let s: MoneySummary = c.get("/money/summary", query: moneyQuery(days: 31))
             async let b: [BudgetGoal] = c.get("/budgets")
             async let bk: Banks = c.get("/banks")
             async let p: TxnPage = c.get("/transactions", query: [URLQueryItem(name: "limit", value: "100")])
@@ -301,7 +313,7 @@ final class AppState: ObservableObject {
 
     private func loadOverview() async {
         await call { c in
-            async let s: MoneySummary = c.get("/money/summary", query: [URLQueryItem(name: "months", value: "6")])
+            async let s: MoneySummary = c.get("/money/summary", query: moneyQuery(days: 31))
             async let b: [BudgetGoal] = c.get("/budgets")
             let (s1, b1) = try await (s, b)
             summary = s1; budgets = b1

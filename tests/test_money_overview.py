@@ -247,6 +247,17 @@ def test_daily_is_a_running_total_through_today_with_gaps_carried_forward(tmp_pa
     assert daily[-1]["cumulative_spend_cents"] == this_month["spend_cents"]
 
 
+def test_daily_days_anchors_a_rolling_window_instead_of_the_calendar_month(tmp_path):
+    """The app's 7D/1M chart needs a window that isn't reset by the calendar month, e.g. on
+    nov 19 a 7 day window starts nov 13, inside the same month here but not pinned to day 1."""
+    app, c = ready(tmp_path)
+    daily = c.get("/money/summary", headers=H, params={"daily_days": 7}).json()["daily"]
+    assert len(daily) == 7
+    assert daily[0]["date"] == "2026-11-13"
+    # all of this fixture's spend lands by nov 9, so a window starting nov 13 sees none of it
+    assert daily[-1] == {"date": "2026-11-19", "cumulative_spend_cents": 0}
+
+
 def test_daily_excludes_transfers_and_card_payments(tmp_path):
     page = {
         "added": [
