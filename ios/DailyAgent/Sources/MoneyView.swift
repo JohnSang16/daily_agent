@@ -1,4 +1,3 @@
-import Charts
 import SwiftUI
 
 enum MoneyTab: String, CaseIterable, Identifiable {
@@ -247,13 +246,8 @@ struct MoneyOverviewView: View {
             } else {
                 let buckets = Array(topCategoriesWithOther(s.categories).enumerated())
                 HStack(alignment: .center, spacing: 18) {
-                    Chart(buckets, id: \.offset) { i, c in
-                        SectorMark(angle: .value("spend", c.spendCents), innerRadius: .ratio(0.65), angularInset: 1.5)
-                            .foregroundStyle(donutGray(i, c))
-                            .cornerRadius(3)
-                    }
-                    .chartLegend(.hidden)
-                    .frame(width: 96, height: 96)
+                    DonutChart(buckets: buckets, colorFor: donutGray)
+                        .frame(width: 96, height: 96)
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(buckets, id: \.offset) { i, c in
                             HStack {
@@ -347,6 +341,40 @@ struct RingGauge: View {
 /// source internals (confirmed via register dump: NaN already present several frames before it
 /// reaches Charts' own axis-tick code, further than is practical to keep tracing blind). Doing
 /// the arithmetic here instead means there is no framework left that can mishandle it.
+///
+/// Hand-drawn for the same reason as TrendLineChart: this screen's category donut was the only
+/// remaining Swift Charts usage after that fix, and the crash persisted at the identical address
+/// once the category breakdown started following the range picker too (a 7-day slice produces
+/// a different category mix than "this month" always did before).
+struct DonutChart: View {
+    let buckets: [(offset: Int, element: CategorySpend)]
+    let colorFor: (Int, CategorySpend) -> Color
+
+    var body: some View {
+        Canvas { context, size in
+            let total = max(buckets.reduce(0.0) { $0 + Double($1.element.spendCents) }, 1)
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            let outerRadius = min(size.width, size.height) / 2
+            let innerRadius = outerRadius * 0.65
+            var startDeg = -90.0
+            for (i, c) in buckets {
+                let sweep = Double(c.spendCents) / total * 360
+                let endDeg = startDeg + sweep
+                let inset = min(1.5, sweep * 0.3)
+                let a0 = startDeg + inset / 2, a1 = endDeg - inset / 2
+                if a1 > a0 {
+                    var path = Path()
+                    path.addArc(center: center, radius: outerRadius, startAngle: .degrees(a0), endAngle: .degrees(a1), clockwise: false)
+                    path.addArc(center: center, radius: innerRadius, startAngle: .degrees(a1), endAngle: .degrees(a0), clockwise: true)
+                    path.closeSubpath()
+                    context.fill(path, with: .color(colorFor(i, c)))
+                }
+                startDeg = endDeg
+            }
+        }
+    }
+}
+
 struct TrendLineChart: View {
     let points: [TrendPoint]
     let monthly: Bool
