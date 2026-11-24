@@ -371,19 +371,20 @@ struct TrendLineChart: View {
         }
         // explicit tick dates, not .automatic: Charts' own "nice stride" algorithm for picking
         // date ticks has to find a clean calendar-aligned spacing to hit desiredCount, and a 7D
-        // chart's ~8 day span is too short for that to resolve cleanly (1M/3M/1Y/ALL all have
-        // enough room and never crashed) -- this is what was actually behind the "Invalid frame
-        // dimension" crash, not the domain or the animation transition, both already ruled out.
+        // chart's ~8 day span may not resolve that cleanly (1M/3M/1Y/ALL all have more room).
         .chartXAxis {
             AxisMarks(values: xTickDates) { _ in
                 AxisValueLabel(format: monthly ? .dateTime.month(.abbreviated).year(.twoDigits) : .dateTime.month(.abbreviated).day())
                     .foregroundStyle(Theme.secondary)
             }
         }
-        // without this the domain ends exactly on the last point, so its label sits flush on
-        // the trailing edge with no room to breathe
-        .chartXScale(domain: xDomain)
         .frame(height: 120)
+        // plain view padding, not .chartXScale(domain:): a register dump at the 7D crash traced
+        // the NaN to a value already invalid *before* Charts' own axis code ever saw it, which
+        // chartXScale's domain extension is the one remaining suspect for (every other theory
+        // that could be fixed and verified has been, and didn't stop it). Trailing padding here
+        // can't touch Charts' internal domain math at all, so it can't be the source of this.
+        .padding(.trailing, 16)
         .onAppear { withAnimation(Theme.spring.delay(0.15)) { grown = true } }
     }
 
@@ -402,14 +403,6 @@ struct TrendLineChart: View {
         var picked = stride(from: 0, to: points.count, by: step).map { points[$0].date }
         if picked.last != points.last?.date { picked.append(points.last!.date) }
         return picked
-    }
-
-    private var xDomain: ClosedRange<Date> {
-        guard let first = points.first?.date, let last = points.last?.date else {
-            let now = Date(); return now...now.addingTimeInterval(1)
-        }
-        let trailingPad: TimeInterval = monthly ? 86400 * 15 : 86400 * 2
-        return first...last.addingTimeInterval(trailingPad)
     }
 }
 
