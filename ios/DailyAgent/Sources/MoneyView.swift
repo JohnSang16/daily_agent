@@ -57,7 +57,7 @@ enum MoneyRange: String, CaseIterable, Identifiable {
     var categoryLabel: String { "where it went, \(windowPhrase)" }
 }
 
-struct TrendPoint: Identifiable {
+struct TrendPoint: Identifiable, Equatable {
     let id: String
     let date: Date
     let cents: Int
@@ -158,7 +158,6 @@ struct MoneyOverviewView: View {
             // showing data for the wrong point count under a range it hasn't actually landed yet.
             TrendLineChart(points: heroPoints(s), monthly: chartRange == .m3 || chartRange == .y1 || chartRange == .all)
                 .id(chartRange)
-                .transition(.opacity)
             heroToggle
             HStack {
                 if let line = averageComparisonLine(current: s.thisMonth.spendCents, others: s.months.dropLast().map(\.spendCents)) {
@@ -182,10 +181,11 @@ struct MoneyOverviewView: View {
                     withAnimation(Theme.spring) { range = m }
                     guard m != loadedRange else { return }
                     loadedRange = m
+                    // chartRange changes are never animated: see TrendLineChart's comment.
                     if m.dailyDays == nil {
                         // month-resolution: s.months is already loaded and stable, the chart is
                         // correct right away. Still refetch in the background for category_days.
-                        withAnimation(Theme.spring) { chartRange = m }
+                        chartRange = m
                         Task { await state.loadMoneySummary(dailyDays: m.dailyDays, categoryDays: m.categoryDays) }
                     } else {
                         // 7D/1M: don't touch the chart until the re-anchored daily series is
@@ -193,7 +193,7 @@ struct MoneyOverviewView: View {
                         // so a slow response can't clobber a newer selection.
                         Task {
                             await state.loadMoneySummary(dailyDays: m.dailyDays, categoryDays: m.categoryDays)
-                            if range == m { withAnimation(Theme.spring) { chartRange = m } }
+                            if range == m { chartRange = m }
                         }
                     }
                 } label: {
@@ -344,22 +344,27 @@ struct RingGauge: View {
 struct TrendLineChart: View {
     let points: [TrendPoint]
     let monthly: Bool
-    @State private var grown = false
 
     var body: some View {
         Chart {
             ForEach(points) { p in
-                AreaMark(x: .value("day", p.date), y: .value("spend", grown ? Double(p.cents) / 100 : 0))
+                AreaMark(x: .value("day", p.date), y: .value("spend", Double(p.cents) / 100))
                     .foregroundStyle(LinearGradient(colors: [Color.white.opacity(0.3), Color.white.opacity(0)], startPoint: .top, endPoint: .bottom))
-                LineMark(x: .value("day", p.date), y: .value("spend", grown ? Double(p.cents) / 100 : 0))
+                LineMark(x: .value("day", p.date), y: .value("spend", Double(p.cents) / 100))
                     .foregroundStyle(Color.white)
                     .lineStyle(StrokeStyle(lineWidth: 2))
             }
         }
+        // no animation at all on this chart: every targeted fix (y-domain, chart identity,
+        // explicit ticks, dropping chartXScale) was real and correct, none stopped the 7D crash,
+        // and every crash traced to a live animation frame (CADisplayLink in the backtrace every
+        // time). Removing the "grow in" draw-on-appear and forbidding SwiftUI from animating this
+        // view's own changes removes Charts' animation code path from running at all, trading the
+        // smooth range-switch crossfade for not crashing.
+        .animation(nil, value: points)
         .chartLegend(.hidden)
-        // pinned explicitly: .automatic alone picks a zero-span domain while every point sits at
-        // y=0 (grown == false, the moment a fresh .id(range) resets this chart's own animation
-        // state), and Charts crashes laying out gridlines for a zero-height axis
+        // pinned explicitly, not .automatic: real, correct fix for a zero-span domain even
+        // though it wasn't the actual trigger behind the 7D crash (see above)
         .chartYScale(domain: 0...yUpperBound)
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { v in
@@ -385,7 +390,6 @@ struct TrendLineChart: View {
         // that could be fixed and verified has been, and didn't stop it). Trailing padding here
         // can't touch Charts' internal domain math at all, so it can't be the source of this.
         .padding(.trailing, 16)
-        .onAppear { withAnimation(Theme.spring.delay(0.15)) { grown = true } }
     }
 
     private var yUpperBound: Double {
