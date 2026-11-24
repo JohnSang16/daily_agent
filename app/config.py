@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     # the solver ladder, cheapest first (spec 13 component 7)
     solver_models: str = "gemini-3.6-flash,gemini-3.8-flash,claude-sonnet-5-5,claude-opus-5-5"
     school_notes_globs: str = "career/school/*"  # what homework mode searches (spec 19)
+    # deadline questions read dated lines from these notes (spec 14)
+    deadline_notes_globs: str = "career/faang-prep/oa-tracker.md,career/school/*"
     ask_llm_blocked_globs: str = "cox/*"  # searchable, but text never sent to the LLM
     sync_interval_minutes: int = 0  # 0 = off. Set 15 to sync on a timer while the app runs locally
 

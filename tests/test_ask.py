@@ -265,3 +265,31 @@ def test_AC14_9_soonest_hides_stale_and_leads_with_undated_oa(tmp_path):
     assert j["route"] == "tasks" and not j["used_llm"]
     assert "LEETCODE" not in j["answer"] and "Exam 3" in j["answer"]
     assert j["answer"].splitlines()[0].startswith("Akuna OA")
+
+
+DEADLINE_NOTES = {
+    "career/faang-prep/oa-tracker.md": "## Pending\n- **Akuna Capital** OA\n  - Due: 2026-12-17\n",
+    "career/school/fall.md": "### Physics\n- Sep 23 - Test 1\n- Dec 14 - Final\n",
+    "career/school/old.md": "### Old stuff\n- Sep 1 - Lab zero\n",
+    "personal/ideas.md": "# Ideas\nShip it by Dec 1.\n",
+}
+
+
+def test_AC14_9b_deadline_question_reads_logged_dates_from_the_vault(tmp_path):
+    llm = FakeLlm()
+    app, c, _ = build(tmp_path, DEADLINE_NOTES, llm=llm)
+    j = ask(c, "what's due the soonest for school and interviews").json()
+    assert j["route"] == "tasks" and j["used_llm"]
+    p = llm.prompts[0]
+    assert "2026-11-16" in p and "Akuna" in p and "Dec 14" in p
+    assert "Lab zero" not in p and "Ship it" not in p  # past only, or not a deadline note
+    assert {s["path"] for s in j["sources"]} == {
+        "career/faang-prep/oa-tracker.md",
+        "career/school/fall.md",
+    }
+
+
+def test_AC14_9b_without_llm_falls_back_to_the_task_list(tmp_path):
+    app, c, _ = build(tmp_path, DEADLINE_NOTES)
+    j = ask(c, "what's due the soonest").json()
+    assert j["route"] == "tasks" and not j["used_llm"]

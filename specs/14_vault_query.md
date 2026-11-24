@@ -44,6 +44,7 @@ All LLM calls use a fake model client in tests. Fixture vault is synthetic.
 * AC14.7 Logs contain no question text and no note text.
 * AC14.8 The token budget is enforced and a budget error returns a clear message.
 * AC14.9 "What's due this week" is answered from the database without an LLM call, or with only a formatting call, and matches `/today` data.
+* AC14.9b (added 2026-11-23, John: "it would reply properly without gmail or google connected since its logged") With the vault on, a deadline question also reads chunks from `DEADLINE_NOTES_GLOBS` that hold a date in the next 60 days. Those chunks, today's date and the task list go to the model, which lists only items due today or later. Overdue tasks older than `STALE_OVERDUE_DAYS` are hidden like `/today`, undated OA invites lead. With no model, no matching notes, or a failed call, the plain task list is returned.
 * AC14.10 A homework request routes to a "needs your tap" response and starts no browser session.
 * AC14.11 `POST /ask` returns 401 without the bearer token.
 * AC14.12 Search over a 2,000 note fixture returns in under 500 ms before the LLM call.
