@@ -16,6 +16,7 @@ struct DashboardView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
+                WhyCard().reveal(0)
                 VStack(alignment: .leading, spacing: 4) {
                     BigTitle(text: f("EEEE"))
                     Text(f("MMMM d").lowercased()).font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
@@ -275,6 +276,21 @@ struct TaskSheet: View {
     }
 }
 
+
+/// The reason underneath everything else on the dashboard. Static, not pulled from the vault:
+/// it doesn't change day to day the way the goal or the plan does.
+struct WhyCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("the why")
+            Text("I do it for God and my family: my parents, wife, future daughter and kids, "
+                 + "and siblings, so they can live a good life. I'll sacrifice my own enjoyment for that.")
+                .font(.system(size: 15.5)).foregroundStyle(Theme.title).lineSpacing(4)
+        }
+        .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+        .glass(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+}
 
 /// The #1 task: heavier than the rest, with when to do it and the plan for what gets in the way.
 struct FocusCard: View {
