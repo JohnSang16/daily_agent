@@ -369,10 +369,13 @@ struct TrendLineChart: View {
                 }
             }
         }
-        // a Date x-axis thins itself properly; the String axis this replaced just listed every
-        // single category with no spacing, since a nominal scale has nothing to sample between
+        // explicit tick dates, not .automatic: Charts' own "nice stride" algorithm for picking
+        // date ticks has to find a clean calendar-aligned spacing to hit desiredCount, and a 7D
+        // chart's ~8 day span is too short for that to resolve cleanly (1M/3M/1Y/ALL all have
+        // enough room and never crashed) -- this is what was actually behind the "Invalid frame
+        // dimension" crash, not the domain or the animation transition, both already ruled out.
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+            AxisMarks(values: xTickDates) { _ in
                 AxisValueLabel(format: monthly ? .dateTime.month(.abbreviated).year(.twoDigits) : .dateTime.month(.abbreviated).day())
                     .foregroundStyle(Theme.secondary)
             }
@@ -387,6 +390,18 @@ struct TrendLineChart: View {
     private var yUpperBound: Double {
         let maxCents = points.map(\.cents).max() ?? 0
         return max(Double(maxCents) / 100, 1)
+    }
+
+    /// Picked from the real point dates directly, roughly 4 evenly spaced, always ending on the
+    /// last point. No "nice calendar stride" guessing, which is exactly the computation that
+    /// crashed for a 7D chart's ~8 day span (see the .chartXAxis comment above).
+    private var xTickDates: [Date] {
+        guard points.count > 1 else { return points.map(\.date) }
+        let desired = min(4, points.count)
+        let step = max(1, (points.count - 1) / (desired - 1))
+        var picked = stride(from: 0, to: points.count, by: step).map { points[$0].date }
+        if picked.last != points.last?.date { picked.append(points.last!.date) }
+        return picked
     }
 
     private var xDomain: ClosedRange<Date> {
