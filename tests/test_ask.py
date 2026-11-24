@@ -240,3 +240,28 @@ def test_AC14_16_general_question_budget_and_usage(tmp_path):
         db.commit()
     j = ask(c2, "explain kirchhoff's law").json()
     assert not j["used_llm"] and "budget" in j["answer"].lower() and llm2.prompts == []
+
+
+def test_AC14_9_soonest_hides_stale_and_leads_with_undated_oa(tmp_path):
+    from app.models import Task
+
+    app, c, _ = build(tmp_path, NOTES, llm=FakeLlm())
+    with app.state.session_factory() as db:
+        sync_tasks(
+            db,
+            "obsidian",
+            "a.md",
+            [
+                TaskIn(title="LEETCODE", scope="a.md", source_ref="x", due_date=date(2026, 5, 24)),
+                TaskIn(title="Exam 3", scope="a.md", source_ref="y", due_date=date(2026, 12, 4)),
+            ],
+            NOW,
+            NY,
+        )
+        kw = dict(scope="m", source_ref="m", created_at=NOW, updated_at=NOW, last_seen_at=NOW)
+        db.add(Task(source="gmail", fingerprint="a", title="Akuna OA", **kw))
+        db.commit()
+    j = ask(c, "which work is due the soonest").json()
+    assert j["route"] == "tasks" and not j["used_llm"]
+    assert "LEETCODE" not in j["answer"] and "Exam 3" in j["answer"]
+    assert j["answer"].splitlines()[0].startswith("Akuna OA")

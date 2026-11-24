@@ -13,6 +13,7 @@ from app.auth import require_token
 from app.clock import Clock, get_clock
 from app.models import LlmUsage, Task
 from app.search.query import search
+from app.sources.gmail import NO_DEADLINE
 
 router = APIRouter(dependencies=[Depends(require_token)])
 
@@ -83,19 +84,37 @@ def _tasks_answer(request: Request, q: str, now: datetime) -> dict:
     tz = ZoneInfo(request.app.state.settings.user_timezone)
     today = now.astimezone(tz).date()
     days = (
-        1 if re.search(r"\btoday\b", q, re.I) else 2 if re.search(r"\btomorrow\b", q, re.I) else 7
+        1
+        if re.search(r"\btoday\b", q, re.I)
+        else 2
+        if re.search(r"\btomorrow\b", q, re.I)
+        else 7
+        if re.search(r"\b(this )?week\b", q, re.I)
+        else 3650  # "soonest", no window named: everything upcoming
     )
     end = datetime.combine(today + timedelta(days=days), time(), tz).astimezone(UTC)
+    stale = request.app.state.settings.stale_overdue_days  # same hiding as /today, 0 shows all
+    start = now - timedelta(days=stale) if stale > 0 else datetime.min.replace(tzinfo=UTC)
     with request.app.state.session_factory() as db:
         rows = db.scalars(
             select(Task)
-            .where(Task.status == "open", Task.due_at.is_not(None), Task.due_at < end)
+            .where(
+                Task.status == "open",
+                Task.due_at.is_not(None),
+                Task.due_at >= start,
+                Task.due_at < end,
+            )
             .order_by(Task.due_at)
         ).all()
         rows = [t for t in rows if not (t.snoozed_until and t.snoozed_until > now)][:10]
-    if not rows:
+        # spec 15: an OA invite with no stated deadline is do first, never given an invented date
+        undated = db.scalars(
+            select(Task).where(Task.status == "open", Task.source == "gmail", Task.due_at.is_(None))
+        ).all()
+    if not rows and not undated:
         return reply("Nothing due in that window.", "tasks")
-    lines = [f"{t.title}, due {t.due_at.astimezone(tz):%a %b %d}" for t in rows]
+    lines = [f"{t.title}, {NO_DEADLINE}" for t in undated]
+    lines += [f"{t.title}, due {t.due_at.astimezone(tz):%a %b %d}" for t in rows]
     return reply("\n".join(lines), "tasks")
 
 
