@@ -207,6 +207,9 @@ let ds = dailySpend([DailyPoint(date: "2026-11-01", cumulativeSpendCents: 0), Da
 check(ds.map(\.cents) == [0, 500, 0, 600], "daily spend from the running total, refund day reads 0")
 check(leadingBlanks("2026-11-01") == 6 && leadingBlanks("2026-12-01") == 1 && leadingBlanks("2026-06-01") == 0, "monday first calendar offset")
 check(shortDay("2026-11-04") == "nov 4", "short day")
+let pd = plainDate("2026-11-14")!
+check(Calendar(identifier: .gregorian).dateComponents(in: TimeZone(identifier: "UTC")!, from: pd).day == 14, "plain date parses a bare day")
+check(plainDate("2026-11") != nil && Calendar(identifier: .gregorian).dateComponents(in: TimeZone(identifier: "UTC")!, from: plainDate("2026-11")!).day == 1, "plain date treats a month key as its first day")
 let rec = try! makeDecoder().decode(Recurring.self, from: Data(#"{"items":[{"merchant":"Netflix","amount_cents":1549,"category":"ENTERTAINMENT","last_date":"2026-11-03","next_date":"2026-12-03","paid_this_month":true}],"monthly_cents":1549}"#.utf8))
 check(rec.items[0].nextDate == "2026-12-03" && rec.items[0].paidThisMonth && rec.monthlyCents == 1549, "decodes recurring")
 check(categoryIcon("FOOD_AND_DRINK") == "fork.knife" && categoryIcon(nil) == "circle.dashed", "category icons")

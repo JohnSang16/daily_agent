@@ -44,7 +44,7 @@ enum MoneyRange: String, CaseIterable, Identifiable {
 
 struct TrendPoint: Identifiable {
     let id: String
-    let label: String
+    let date: Date
     let cents: Int
 }
 
@@ -130,15 +130,12 @@ struct MoneyOverviewView: View {
 
     private func heroCard(_ s: MoneySummary) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                sectionLabel(range.label)
-                Spacer()
-                heroToggle
-            }
+            sectionLabel(range.label)
             Text(dollars(rangeSpendCents(s)))
                 .font(.system(size: 34, weight: .light))
                 .monospacedDigit().foregroundStyle(Theme.title).contentTransition(.numericText())
-            TrendLineChart(points: heroPoints(s))
+            TrendLineChart(points: heroPoints(s), monthly: range == .m3 || range == .y1 || range == .all)
+            heroToggle
             HStack {
                 if let line = averageComparisonLine(current: s.thisMonth.spendCents, others: s.months.dropLast().map(\.spendCents)) {
                     Text(line).font(.system(size: 12)).foregroundStyle(Theme.secondary)
@@ -152,6 +149,8 @@ struct MoneyOverviewView: View {
         .glass(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
+    /// Full width, equal segments. Squeezed next to the header label instead, 5 of them had no
+    /// room left over and truncated to "..." (confirmed with an offscreen render before this fix).
     private var heroToggle: some View {
         HStack(spacing: 2) {
             ForEach(MoneyRange.allCases) { m in
@@ -162,9 +161,9 @@ struct MoneyOverviewView: View {
                         Task { await state.loadMoneyDaily(days: days) }
                     }
                 } label: {
-                    Text(m.rawValue).font(.system(size: 11.5, weight: range == m ? .medium : .regular))
+                    Text(m.rawValue).font(.system(size: 12, weight: range == m ? .medium : .regular))
                         .foregroundStyle(range == m ? Color.black : Theme.secondary)
-                        .padding(.horizontal, 10).frame(minHeight: 26)
+                        .frame(maxWidth: .infinity, minHeight: 30)
                         .background {
                             if range == m {
                                 Capsule().fill(Color.white).matchedGeometryEffect(id: "hero-mode", in: heroPick)
@@ -181,10 +180,10 @@ struct MoneyOverviewView: View {
     private func heroPoints(_ s: MoneySummary) -> [TrendPoint] {
         switch range {
         case .d7, .m1:
-            return s.daily.map { TrendPoint(id: $0.date, label: shortDay($0.date), cents: $0.cumulativeSpendCents) }
+            return s.daily.map { TrendPoint(id: $0.date, date: plainDate($0.date) ?? Date(), cents: $0.cumulativeSpendCents) }
         case .m3, .y1, .all:
             let months = s.months.suffix(range.monthCount ?? s.months.count)
-            return months.map { TrendPoint(id: $0.month, label: monthShort($0.month), cents: $0.spendCents) }
+            return months.map { TrendPoint(id: $0.month, date: plainDate($0.month) ?? Date(), cents: $0.spendCents) }
         }
     }
 
@@ -307,14 +306,15 @@ struct RingGauge: View {
 
 struct TrendLineChart: View {
     let points: [TrendPoint]
+    let monthly: Bool
     @State private var grown = false
 
     var body: some View {
         Chart {
             ForEach(points) { p in
-                AreaMark(x: .value("x", p.label), y: .value("spend", grown ? Double(p.cents) / 100 : 0))
+                AreaMark(x: .value("day", p.date), y: .value("spend", grown ? Double(p.cents) / 100 : 0))
                     .foregroundStyle(LinearGradient(colors: [Color.white.opacity(0.3), Color.white.opacity(0)], startPoint: .top, endPoint: .bottom))
-                LineMark(x: .value("x", p.label), y: .value("spend", grown ? Double(p.cents) / 100 : 0))
+                LineMark(x: .value("day", p.date), y: .value("spend", grown ? Double(p.cents) / 100 : 0))
                     .foregroundStyle(Color.white)
                     .lineStyle(StrokeStyle(lineWidth: 2))
             }
@@ -328,8 +328,14 @@ struct TrendLineChart: View {
                 }
             }
         }
-        // thinned to a handful of labels: up to 31 points (1M) would be unreadable one-per-mark
-        .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) { _ in AxisValueLabel().foregroundStyle(Theme.secondary) } }
+        // a Date x-axis thins itself properly; the String axis this replaced just listed every
+        // single category with no spacing, since a nominal scale has nothing to sample between
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                AxisValueLabel(format: monthly ? .dateTime.month(.abbreviated).year(.twoDigits) : .dateTime.month(.abbreviated).day())
+                    .foregroundStyle(Theme.secondary)
+            }
+        }
         .frame(height: 120)
         .onAppear { withAnimation(Theme.spring.delay(0.15)) { grown = true } }
     }

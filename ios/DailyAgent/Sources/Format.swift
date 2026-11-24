@@ -423,6 +423,12 @@ func leadingBlanks(_ isoFirst: String) -> Int {
     return (cal.component(.weekday, from: d) + 5) % 7  // sunday 1 -> 6, monday 2 -> 0
 }
 
+/// "2026-11-14" -> that date at UTC midnight. A month key like "2026-11" also parses, as day 1.
+func plainDate(_ s: String) -> Date? {
+    let padded = s.count == 7 ? s + "-01" : s
+    return fmt("yyyy-MM-dd", TimeZone(identifier: "UTC")!).date(from: padded)
+}
+
 /// "2026-11-14" -> "nov 14"
 func shortDay(_ iso: String) -> String {
     guard iso.count >= 10, let d = Int(iso.suffix(2)) else { return iso }
