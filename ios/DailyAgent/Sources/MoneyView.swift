@@ -149,10 +149,14 @@ struct MoneyOverviewView: View {
             Text(dollars(rangeSpendCents(s)))
                 .font(.system(size: 34, weight: .light))
                 .monospacedDigit().foregroundStyle(Theme.title).contentTransition(.numericText())
-            // a fresh id per range turns a switch into an insert/remove crossfade instead of
-            // Chart trying to diff two data sets with a different point count and shape in place
+            // keyed on range AND count, not just range: for 7D/1M, s.daily's length changes a
+            // second time once the async refetch lands (stale old-range data, then the real
+            // count), with range itself unchanged in between. An id keyed on range alone misses
+            // that second change, so Chart tries to animate an in-place 31-to-7-point swap
+            // mid-flight and crashes laying out a degenerate frame. 3M/1Y/ALL never hit this,
+            // their point count is stable (always a slice of the same 24-month array).
             TrendLineChart(points: heroPoints(s), monthly: range == .m3 || range == .y1 || range == .all)
-                .id(range)
+                .id("\(range.rawValue)-\(heroPoints(s).count)")
                 .transition(.opacity)
             heroToggle
             HStack {
