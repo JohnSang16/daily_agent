@@ -99,11 +99,12 @@ struct MoneyOverviewView: View {
     private func heroCard(_ s: MoneySummary) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                sectionLabel("spent this month")
+                sectionLabel(heroMode == .day ? "spent today" : "spent this month")
                 Spacer()
                 heroToggle
             }
-            Text(dollars(s.thisMonth.spendCents)).font(.system(size: 34, weight: .light))
+            Text(dollars(heroMode == .day ? todaySpendCents(s) : s.thisMonth.spendCents))
+                .font(.system(size: 34, weight: .light))
                 .monospacedDigit().foregroundStyle(Theme.title).contentTransition(.numericText())
             TrendLineChart(points: heroPoints(s), showAxes: heroMode == .month)
             HStack {
@@ -142,6 +143,14 @@ struct MoneyOverviewView: View {
         case .day: return s.daily.map { TrendPoint(id: $0.date, label: $0.date, cents: $0.cumulativeSpendCents) }
         case .month: return s.months.map { TrendPoint(id: $0.month, label: monthShort($0.month), cents: $0.spendCents) }
         }
+    }
+
+    /// `daily` is a running total through the month (no gaps), so today's own spend is the
+    /// last step up from the day before, not the cumulative figure itself.
+    private func todaySpendCents(_ s: MoneySummary) -> Int {
+        guard let last = s.daily.last else { return 0 }
+        let prior = s.daily.dropLast().last?.cumulativeSpendCents ?? 0
+        return last.cumulativeSpendCents - prior
     }
 
     /// White down to darker grays; "other" always takes the darkest.
