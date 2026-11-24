@@ -254,7 +254,7 @@ struct RingGauge: View {
 
 struct TrendLineChart: View {
     let points: [TrendPoint]
-    let showAxes: Bool
+    let showAxes: Bool  // x-axis only: day mode has ~30 points, too many labels to show
     @State private var grown = false
 
     var body: some View {
@@ -270,11 +270,9 @@ struct TrendLineChart: View {
         .chartLegend(.hidden)
         .chartYAxis {
             AxisMarks(position: .leading) { v in
-                if showAxes {
-                    AxisGridLine().foregroundStyle(Theme.line)
-                    AxisValueLabel {
-                        if let d = v.as(Double.self) { Text(d >= 1000 ? "\(Int(d / 1000))k" : "\(Int(d))").foregroundStyle(Theme.tertiary) }
-                    }
+                AxisGridLine().foregroundStyle(Theme.line)
+                AxisValueLabel {
+                    if let d = v.as(Double.self) { Text(d >= 1000 ? "\(Int(d / 1000))k" : "\(Int(d))").foregroundStyle(Theme.tertiary) }
                 }
             }
         }
