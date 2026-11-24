@@ -127,6 +127,11 @@ struct MoneyOverviewView: View {
     @State private var adding = false
     @State private var range: MoneyRange = .m1
     @State private var loadedRange: MoneyRange = .m1  // matches AppState's default fetch
+    /// The chart only ever reads this, never `range` directly. For 7D/1M, s.daily's point count
+    /// depends on which daily_days was last actually fetched, so the chart must not touch a range
+    /// until its data has really landed, or it shows the wrong point count under the new label
+    /// for one frame, a transition Charts' own animation machinery can't always handle safely.
+    @State private var chartRange: MoneyRange = .m1
     @Namespace private var heroPick
 
     var body: some View {
@@ -149,14 +154,10 @@ struct MoneyOverviewView: View {
             Text(dollars(rangeSpendCents(s)))
                 .font(.system(size: 34, weight: .light))
                 .monospacedDigit().foregroundStyle(Theme.title).contentTransition(.numericText())
-            // keyed on range AND count, not just range: for 7D/1M, s.daily's length changes a
-            // second time once the async refetch lands (stale old-range data, then the real
-            // count), with range itself unchanged in between. An id keyed on range alone misses
-            // that second change, so Chart tries to animate an in-place 31-to-7-point swap
-            // mid-flight and crashes laying out a degenerate frame. 3M/1Y/ALL never hit this,
-            // their point count is stable (always a slice of the same 24-month array).
-            TrendLineChart(points: heroPoints(s), monthly: range == .m3 || range == .y1 || range == .all)
-                .id("\(range.rawValue)-\(heroPoints(s).count)")
+            // chartRange (not range): see the property's comment. Keeps the chart from ever
+            // showing data for the wrong point count under a range it hasn't actually landed yet.
+            TrendLineChart(points: heroPoints(s), monthly: chartRange == .m3 || chartRange == .y1 || chartRange == .all)
+                .id(chartRange)
                 .transition(.opacity)
             heroToggle
             HStack {
@@ -179,11 +180,21 @@ struct MoneyOverviewView: View {
             ForEach(MoneyRange.allCases) { m in
                 Button {
                     withAnimation(Theme.spring) { range = m }
-                    // the category donut needs this even for the month ranges, so every switch
-                    // refetches, not just the two that also need a re-anchored daily series
-                    if m != loadedRange {
-                        loadedRange = m
+                    guard m != loadedRange else { return }
+                    loadedRange = m
+                    if m.dailyDays == nil {
+                        // month-resolution: s.months is already loaded and stable, the chart is
+                        // correct right away. Still refetch in the background for category_days.
+                        withAnimation(Theme.spring) { chartRange = m }
                         Task { await state.loadMoneySummary(dailyDays: m.dailyDays, categoryDays: m.categoryDays) }
+                    } else {
+                        // 7D/1M: don't touch the chart until the re-anchored daily series is
+                        // actually in hand. Bail if the user has since picked something else,
+                        // so a slow response can't clobber a newer selection.
+                        Task {
+                            await state.loadMoneySummary(dailyDays: m.dailyDays, categoryDays: m.categoryDays)
+                            if range == m { withAnimation(Theme.spring) { chartRange = m } }
+                        }
                     }
                 } label: {
                     Text(m.rawValue).font(.system(size: 12, weight: range == m ? .medium : .regular))
@@ -202,12 +213,13 @@ struct MoneyOverviewView: View {
 
     /// AppState keeps `daily` re-anchored to whichever window was last requested (7 or 31 days),
     /// so 7D/1M read it straight; the month ranges slice the already-loaded `months` history.
+    /// Reads chartRange, not range: see chartRange's comment.
     private func heroPoints(_ s: MoneySummary) -> [TrendPoint] {
-        switch range {
+        switch chartRange {
         case .d7, .m1:
             return s.daily.map { TrendPoint(id: $0.date, date: plainDate($0.date) ?? Date(), cents: $0.cumulativeSpendCents) }
         case .m3, .y1, .all:
-            let months = s.months.suffix(range.monthCount ?? s.months.count)
+            let months = s.months.suffix(chartRange.monthCount ?? s.months.count)
             return months.map { TrendPoint(id: $0.month, date: plainDate($0.month) ?? Date(), cents: $0.spendCents) }
         }
     }
