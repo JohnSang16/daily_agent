@@ -40,12 +40,6 @@ struct AgentView: View {
     private var canSend: Bool { !waiting && !draft.trimmingCharacters(in: .whitespaces).isEmpty && (mode == .ask || course != nil) }
     private var selectedCourse: Course? { state.courses.first { $0.course == course } }
 
-    private var suggestions: [String] {
-        mode == .ask
-            ? ["daily full", "what's due this week", "what did i write about interviews"]
-            : ["summarize my lecture notes", "what should i review first", "quiz me on this week"]
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             modeSwitch.padding(.top, 6)
@@ -71,6 +65,7 @@ struct AgentView: View {
         .task {
             if state.courses.isEmpty { await state.loadCourses() }
             if course == nil { course = state.courses.first?.course }
+            if session == nil { session = await state.activeHomeworkSession() }
         }
         .onChange(of: state.courses) { _, cs in if course == nil { course = cs.first?.course } }
         .onChange(of: dictation.text) { _, t in if dictation.listening { draft = t } }
@@ -116,7 +111,7 @@ struct AgentView: View {
     private var askHome: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("ask anything").font(.system(size: 28, weight: .light)).tracking(-0.5).foregroundStyle(Theme.title)
-            Text("your notes, deadlines and schedule. answers cite the notes they came from.")
+            Text("connected to your vault, calendar and school deadlines.")
                 .font(.system(size: 14)).foregroundStyle(Theme.secondary)
         }.reveal()
     }
@@ -127,7 +122,7 @@ struct AgentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(course.map { courseLabel($0, max: 40) } ?? "homework").font(.system(size: 28, weight: .light))
                     .tracking(-0.5).foregroundStyle(Theme.title)
-                Text("study help from your own school notes. it explains and quizzes, it never does or submits the work.")
+                Text("connected to your school notes, iCollege and Pearson, always with you watching.")
                     .font(.system(size: 14)).foregroundStyle(Theme.secondary)
             }
             if let c = selectedCourse {
@@ -175,21 +170,6 @@ struct AgentView: View {
 
     private var composer: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if turns.isEmpty || !typing {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(suggestions, id: \.self) { s in
-                            Button { send(s) } label: {
-                                Text(s).font(.system(size: 14)).foregroundStyle(Theme.body)
-                                    .padding(.horizontal, 16).frame(minHeight: 38)
-                                    .overlay(Capsule().strokeBorder(Theme.line, lineWidth: 1))
-                            }
-                            .buttonStyle(PressStyle()).disabled(waiting || (mode == .homework && course == nil))
-                        }
-                    }.padding(.horizontal, 24)
-                }
-                .transition(.opacity)
-            }
             scopeChip.padding(.horizontal, 24)
             HStack(spacing: 8) {
                 TextField(mode == .ask ? "ask anything" : "ask about this course", text: $draft, axis: .vertical)
@@ -259,6 +239,9 @@ struct AgentView: View {
         Task {
             if let s = await state.startHomework(taskId: a.id, site: site) {
                 session = s
+                showing = true
+            } else if state.problem?.contains("already running") == true, let s = await state.activeHomeworkSession() {
+                session = s  // the 409 case: don't dead end, open the one that's already going
                 showing = true
             } else {
                 startNote = state.problem ?? (state.offline ? "offline. can't reach the agent." : "the browser couldn't start.")

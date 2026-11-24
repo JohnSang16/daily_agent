@@ -394,6 +394,21 @@ def test_only_one_session_at_a_time(tmp_path):
     assert c.post("/agent/sessions", headers=H, json={"task_id": 1}).status_code == 409
 
 
+def test_active_session_findable_after_the_409(tmp_path):
+    """A client that lost track of the session id (new view, new app launch) can still find the
+    one the 409 is talking about, instead of hitting a dead end."""
+    app, c = build(tmp_path, FakeLlm(), FakeDriver())
+    s = start(c)
+    assert c.post("/agent/sessions", headers=H, json={"task_id": 1}).status_code == 409
+    found = c.get("/agent/sessions/active", headers=H)
+    assert found.status_code == 200 and found.json()["id"] == s["id"]
+
+
+def test_active_session_404_when_nothing_is_running(tmp_path):
+    app, c = build(tmp_path, FakeLlm(), FakeDriver())
+    assert c.get("/agent/sessions/active", headers=H).status_code == 404
+
+
 def test_off_without_keys(tmp_path):
     st = Settings(_env_file=None, api_token="tok", database_url=f"sqlite:///{tmp_path}/t.db")
     app = create_app(st, sources={})

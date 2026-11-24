@@ -164,8 +164,19 @@ def test_AC14_8_budget(tmp_path):
     assert llm.prompts == []
 
 
-def test_AC14_9_due_this_week_from_db_no_llm(tmp_path):
-    llm = FakeLlm()
+def test_AC14_9_due_this_week_uses_llm_to_format(tmp_path):
+    """AC14.9 allows "a formatting call": the ranking is still read straight from the
+    database, the LLM is only used to phrase it, same pattern as /today's explain()."""
+
+    class TaskLlm:
+        def __init__(self):
+            self.prompts = []
+
+        def complete(self, prompt):
+            self.prompts.append(prompt)
+            return LlmResult("Start with Essay, it's due this week.", 50, 10)
+
+    llm = TaskLlm()
     app, c, _ = build(tmp_path, NOTES, llm=llm)
     with app.state.session_factory() as db:
         sync_tasks(
@@ -181,7 +192,7 @@ def test_AC14_9_due_this_week_from_db_no_llm(tmp_path):
         )
     j = ask(c, "what's due this week").json()
     assert "Essay" in j["answer"] and "Far away" not in j["answer"]
-    assert not j["used_llm"] and llm.prompts == [] and j["route"] == "tasks"
+    assert j["used_llm"] and llm.prompts and j["route"] == "tasks"
 
 
 def test_AC14_10_homework_needs_tap(tmp_path):

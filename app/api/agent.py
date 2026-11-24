@@ -116,6 +116,17 @@ def start(body: StartIn, request: Request):
     return _view(request, sid)
 
 
+@router.get("/agent/sessions/active")
+def active_session(request: Request):
+    """So a client that lost track of a session id (new view, new app launch) can still find the
+    one session the 409 on POST /agent/sessions is talking about."""
+    agent = _agent(request)
+    sid = next(iter(agent.live), None)
+    if sid is None:
+        raise HTTPException(404, "no active session")
+    return _view(request, sid)
+
+
 @router.get("/agent/sessions/{sid}")
 def get_session(sid: int, request: Request):
     return _view(request, sid)

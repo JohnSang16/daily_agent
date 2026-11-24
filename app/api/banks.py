@@ -61,6 +61,32 @@ def connect_complete(body: CompleteIn, request: Request, clock: Clock = Depends(
         return {"id": item.id, "bank": item.institution_name}
 
 
+@router.post("/banks/{item_id}/reauth")
+def reauth(item_id: int, request: Request):
+    """Plaid flagged this login as stale (ITEM_LOGIN_REQUIRED and similar): send it through
+    Link's update mode instead of deleting and reconnecting, so the transaction history stays."""
+    plaid, box = _plaid(request), _box(request)
+    with request.app.state.session_factory() as db:
+        item = db.get(BankItem, item_id)
+        if item is None:
+            raise HTTPException(404, "not found")
+        access = box.decrypt(item.access_token_enc)
+    return plaid.link_token_create(access_token=access)
+
+
+class ReauthCompleteIn(BaseModel):
+    link_token: str
+
+
+@router.post("/banks/{item_id}/reauth/complete")
+def reauth_complete(item_id: int, body: ReauthCompleteIn, request: Request):
+    plaid = _plaid(request)
+    if plaid.link_token_public_token(body.link_token) is None:
+        raise HTTPException(409, "the bank screen is not finished yet")
+    request.app.state.runner.run_sync("banks")
+    return {"id": item_id}
+
+
 @router.post("/banks/sandbox")
 def sandbox(request: Request, clock: Clock = Depends(get_clock)):
     if request.app.state.settings.plaid_env != "sandbox":

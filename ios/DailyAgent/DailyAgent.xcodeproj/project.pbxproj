@@ -41,7 +41,7 @@
 		B10F81F1AD7DC577DF15F653 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		B15879FD4EB3CBCA8BBF91EE /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		B4722FE10D5AA2B12A0EE802 /* Format.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Format.swift; sourceTree = "<group>"; };
-		BDA93D4148085E1242793FD5 /* DailyAgent.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = DailyAgent.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BDA93D4148085E1242793FD5 /* DailyAgent.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DailyAgent.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC0F232C5DC203188079E210 /* Keychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keychain.swift; sourceTree = "<group>"; };
 		F2F545371BD6B74701FB8278 /* DailyAgentApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAgentApp.swift; sourceTree = "<group>"; };
 		F53D0AD650F865B3DD64C3C0 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -185,6 +185,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = R9VQ4XWFKJ;
 				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -260,6 +261,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = R9VQ4XWFKJ;
 				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

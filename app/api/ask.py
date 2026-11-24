@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 
 from app.auth import require_token
 from app.clock import Clock, get_clock
+from app.llm.explain import build_payload, explain, format_due
 from app.models import LlmUsage, Task
 from app.search.query import search
 
@@ -64,7 +65,7 @@ def courses(request: Request, clock: Clock = Depends(get_clock)):
 
 
 def _digest_answer(request: Request, clock: Clock) -> dict:
-    from app.api.digest import digest  # same ranking as the brief, no LLM
+    from app.api.digest import digest  # same ranking as the brief, no LLM (AC19.1)
 
     d = digest(request, clock)
     if not d["deadlines"]:
@@ -80,12 +81,14 @@ def reply(answer, route, sources=(), used_llm=False):
 
 
 def _tasks_answer(request: Request, q: str, now: datetime) -> dict:
-    tz = ZoneInfo(request.app.state.settings.user_timezone)
+    st = request.app.state.settings
+    tz = ZoneInfo(st.user_timezone)
     today = now.astimezone(tz).date()
     days = (
         1 if re.search(r"\btoday\b", q, re.I) else 2 if re.search(r"\btomorrow\b", q, re.I) else 7
     )
     end = datetime.combine(today + timedelta(days=days), time(), tz).astimezone(UTC)
+    midnight = datetime.combine(today, time(), tz).astimezone(UTC)
     with request.app.state.session_factory() as db:
         rows = db.scalars(
             select(Task)
@@ -93,10 +96,27 @@ def _tasks_answer(request: Request, q: str, now: datetime) -> dict:
             .order_by(Task.due_at)
         ).all()
         rows = [t for t in rows if not (t.snoozed_until and t.snoozed_until > now)][:10]
-    if not rows:
-        return reply("Nothing due in that window.", "tasks")
-    lines = [f"{t.title}, due {t.due_at.astimezone(tz):%a %b %d}" for t in rows]
-    return reply("\n".join(lines), "tasks")
+        if not rows:
+            return reply("Nothing due in that window.", "tasks")
+        payload = build_payload(
+            [
+                {
+                    "title": t.title,
+                    "due_local": format_due(t.due_at.astimezone(UTC).isoformat(), st.user_timezone),
+                }
+                for t in rows
+            ]
+        )
+        text, source, _ = explain(
+            db,
+            request.app.state.llm,
+            st.llm_model,
+            st.llm_daily_token_budget,
+            payload,
+            now,
+            midnight,
+        )
+    return reply(text, "tasks", used_llm=(source == "llm"))
 
 
 def _prompt(question: str, chunks) -> str:

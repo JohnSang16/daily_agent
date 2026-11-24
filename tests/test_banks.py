@@ -45,11 +45,13 @@ class FakePlaid:
         ]
         self.removed, self.cursors = [], []
 
-    def link_token_create(self):
+    def link_token_create(self, access_token=None):
+        if access_token:
+            return {"link_token": "relink-1", "hosted_link_url": "https://hosted.plaid.test/re"}
         return {"link_token": "link-1", "hosted_link_url": "https://hosted.plaid.test/x"}
 
     def link_token_public_token(self, link_token):
-        return "public-1" if link_token == "link-1" else None
+        return "public-1" if link_token in ("link-1", "relink-1") else None
 
     def sandbox_public_token(self):
         return "public-sbx"
@@ -182,6 +184,27 @@ def test_AC16_4_bank_filter_and_chip(tmp_path):
     )
     assert c.get("/banks", headers=H).json()["chip"] == "banks: 2 of 3"
     assert "Netflix" not in [t["merchant"] for t in txs(c)["transactions"]]
+
+
+def test_reauth_uses_update_mode_and_resyncs_on_completion(tmp_path):
+    fp = FakePlaid([PAGE])
+    app, c = build(tmp_path, fp)
+    item_id = connect(c).json()["id"]
+    r = c.post(f"/banks/{item_id}/reauth", headers=H)
+    assert r.status_code == 200
+    assert r.json() == {"link_token": "relink-1", "hosted_link_url": "https://hosted.plaid.test/re"}
+
+    not_done = c.post(f"/banks/{item_id}/reauth/complete", headers=H, json={"link_token": "nope"})
+    assert not_done.status_code == 409
+
+    done = c.post(f"/banks/{item_id}/reauth/complete", headers=H, json={"link_token": "relink-1"})
+    assert done.status_code == 200
+    assert txs(c)["transactions"]  # the resync it triggers actually ran
+
+
+def test_reauth_unknown_bank_is_404(tmp_path):
+    app, c = build(tmp_path, FakePlaid([PAGE]))
+    assert c.post("/banks/999/reauth", headers=H).status_code == 404
 
 
 class Spy:

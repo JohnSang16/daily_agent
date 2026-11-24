@@ -3,7 +3,7 @@ import Foundation
 enum APIError: Error, Equatable {
     case notConfigured
     case offline
-    case http(Int)
+    case http(Int, String?)
 }
 
 struct APIClient {
@@ -28,13 +28,20 @@ struct APIClient {
         do {
             let (data, resp) = try await session.data(for: r)
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
-            guard (200..<300).contains(code) else { throw APIError.http(code) }
+            guard (200..<300).contains(code) else { throw APIError.http(code, detail(from: data)) }
             return data
         } catch let e as APIError {
             throw e
         } catch {
             throw APIError.offline  // no route to the Mac: show cached data instead
         }
+    }
+
+    /// FastAPI error bodies look like {"detail": "..."}; surface that instead of a bare status code.
+    private func detail(from data: Data) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data),
+              let obj = json as? [String: Any] else { return nil }
+        return obj["detail"] as? String
     }
 
     func get<T: Decodable>(_ path: String, query: [URLQueryItem] = []) async throws -> T {

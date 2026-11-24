@@ -62,8 +62,9 @@ final class AppState: ObservableObject {
         if let a = e as? APIError, a == .offline { offline = true; problem = nil; return }
         offline = false
         switch e {
-        case APIError.http(401): problem = "the token was refused. check settings."
+        case APIError.http(401, _): problem = "the token was refused. check settings."
         case APIError.notConfigured: problem = "add the address and token in settings."
+        case APIError.http(_, let detail?): problem = detail
         default: problem = "something went wrong reading the agent."
         }
     }
@@ -150,6 +151,13 @@ final class AppState: ObservableObject {
 
     func loadCourses() async {
         await call { c in courses = try await c.get("/courses") }
+    }
+
+    /// Whatever homework session is running right now, if any. A 404 here just means none is
+    /// active, not a real problem, so this stays quiet instead of going through `call`.
+    func activeHomeworkSession() async -> HomeworkSession? {
+        guard let c = client else { return nil }
+        return try? await c.get("/agent/sessions/active")
     }
 
     // MARK: follow through (spec 18)

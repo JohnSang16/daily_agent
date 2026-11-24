@@ -14,15 +14,18 @@ class PlaidClient:
         r.raise_for_status()
         return r.json()
 
-    def link_token_create(self) -> dict:
+    def link_token_create(self, access_token: str | None = None) -> dict:
+        """With access_token: Link's update mode, to fix a login Plaid has flagged as stale.
+        No new item or access token comes out of update mode, the same one keeps working."""
+        extra = {"access_token": access_token} if access_token else {"products": ["transactions"]}
         j = self._post(
             "/link/token/create",
             client_name="daily agent",
             language="en",
             country_codes=["US"],
             user={"client_user_id": "1"},
-            products=["transactions"],
             hosted_link={},
+            **extra,
         )
         return {"link_token": j["link_token"], "hosted_link_url": j.get("hosted_link_url")}
 
