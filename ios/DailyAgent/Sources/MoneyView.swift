@@ -134,7 +134,11 @@ struct MoneyOverviewView: View {
             Text(dollars(rangeSpendCents(s)))
                 .font(.system(size: 34, weight: .light))
                 .monospacedDigit().foregroundStyle(Theme.title).contentTransition(.numericText())
+            // a fresh id per range turns a switch into an insert/remove crossfade instead of
+            // Chart trying to diff two data sets with a different point count and shape in place
             TrendLineChart(points: heroPoints(s), monthly: range == .m3 || range == .y1 || range == .all)
+                .id(range)
+                .transition(.opacity)
             heroToggle
             HStack {
                 if let line = averageComparisonLine(current: s.thisMonth.spendCents, others: s.months.dropLast().map(\.spendCents)) {
@@ -336,8 +340,19 @@ struct TrendLineChart: View {
                     .foregroundStyle(Theme.secondary)
             }
         }
+        // without this the domain ends exactly on the last point, so its label sits flush on
+        // the trailing edge with no room to breathe
+        .chartXScale(domain: xDomain)
         .frame(height: 120)
         .onAppear { withAnimation(Theme.spring.delay(0.15)) { grown = true } }
+    }
+
+    private var xDomain: ClosedRange<Date> {
+        guard let first = points.first?.date, let last = points.last?.date else {
+            let now = Date(); return now...now
+        }
+        let trailingPad: TimeInterval = monthly ? 86400 * 15 : 86400 * 2
+        return first...last.addingTimeInterval(trailingPad)
     }
 }
 
