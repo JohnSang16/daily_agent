@@ -41,6 +41,7 @@ Names are the settings in `app/config.py`, upper case.
 | OBSIDIAN_VAULT_PATH | for notes | local vault folder, hosted use needs a git checkout (separate spec) |
 | OBSIDIAN_IGNORE_GLOBS | no | default templates/*,archive/*,_archive/* |
 | SCHOOL_NOTES_GLOBS | no | default career/school/*, the notes homework mode searches (spec 19) |
+| DEADLINE_NOTES_GLOBS | no | default career/faang-prep/oa-tracker.md,career/school/*, notes whose upcoming dates join deadline answers in ask (spec 14) |
 | KERNEL_API_KEY | for homework | Kernel cloud browser key (spec 13). The agent is off without it |
 | KERNEL_PROFILE | no | default school, the browser profile that keeps you signed in |
 | GEMINI_API_KEY | no | free tier AI Studio key for the homework solver (spec 13). Without it the solver uses only the Claude rungs |
