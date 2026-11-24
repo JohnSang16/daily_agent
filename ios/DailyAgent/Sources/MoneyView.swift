@@ -341,6 +341,10 @@ struct TrendLineChart: View {
             }
         }
         .chartLegend(.hidden)
+        // pinned explicitly: .automatic alone picks a zero-span domain while every point sits at
+        // y=0 (grown == false, the moment a fresh .id(range) resets this chart's own animation
+        // state), and Charts crashes laying out gridlines for a zero-height axis
+        .chartYScale(domain: 0...yUpperBound)
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { v in
                 AxisGridLine().foregroundStyle(Theme.line)
@@ -364,9 +368,14 @@ struct TrendLineChart: View {
         .onAppear { withAnimation(Theme.spring.delay(0.15)) { grown = true } }
     }
 
+    private var yUpperBound: Double {
+        let maxCents = points.map(\.cents).max() ?? 0
+        return max(Double(maxCents) / 100, 1)
+    }
+
     private var xDomain: ClosedRange<Date> {
         guard let first = points.first?.date, let last = points.last?.date else {
-            let now = Date(); return now...now
+            let now = Date(); return now...now.addingTimeInterval(1)
         }
         let trailingPad: TimeInterval = monthly ? 86400 * 15 : 86400 * 2
         return first...last.addingTimeInterval(trailingPad)
