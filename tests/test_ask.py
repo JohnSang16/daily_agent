@@ -164,19 +164,8 @@ def test_AC14_8_budget(tmp_path):
     assert llm.prompts == []
 
 
-def test_AC14_9_due_this_week_uses_llm_to_format(tmp_path):
-    """AC14.9 allows "a formatting call": the ranking is still read straight from the
-    database, the LLM is only used to phrase it, same pattern as /today's explain()."""
-
-    class TaskLlm:
-        def __init__(self):
-            self.prompts = []
-
-        def complete(self, prompt):
-            self.prompts.append(prompt)
-            return LlmResult("Start with Essay, it's due this week.", 50, 10)
-
-    llm = TaskLlm()
+def test_AC14_9_due_this_week_from_db_no_llm(tmp_path):
+    llm = FakeLlm()
     app, c, _ = build(tmp_path, NOTES, llm=llm)
     with app.state.session_factory() as db:
         sync_tasks(
@@ -192,7 +181,7 @@ def test_AC14_9_due_this_week_uses_llm_to_format(tmp_path):
         )
     j = ask(c, "what's due this week").json()
     assert "Essay" in j["answer"] and "Far away" not in j["answer"]
-    assert j["used_llm"] and llm.prompts and j["route"] == "tasks"
+    assert not j["used_llm"] and llm.prompts == [] and j["route"] == "tasks"
 
 
 def test_AC14_10_homework_needs_tap(tmp_path):
@@ -251,3 +240,56 @@ def test_AC14_16_general_question_budget_and_usage(tmp_path):
         db.commit()
     j = ask(c2, "explain kirchhoff's law").json()
     assert not j["used_llm"] and "budget" in j["answer"].lower() and llm2.prompts == []
+
+
+def test_AC14_9_soonest_hides_stale_and_leads_with_undated_oa(tmp_path):
+    from app.models import Task
+
+    app, c, _ = build(tmp_path, NOTES, llm=FakeLlm())
+    with app.state.session_factory() as db:
+        sync_tasks(
+            db,
+            "obsidian",
+            "a.md",
+            [
+                TaskIn(title="LEETCODE", scope="a.md", source_ref="x", due_date=date(2026, 5, 24)),
+                TaskIn(title="Exam 3", scope="a.md", source_ref="y", due_date=date(2026, 12, 4)),
+            ],
+            NOW,
+            NY,
+        )
+        kw = dict(scope="m", source_ref="m", created_at=NOW, updated_at=NOW, last_seen_at=NOW)
+        db.add(Task(source="gmail", fingerprint="a", title="Akuna OA", **kw))
+        db.commit()
+    j = ask(c, "which work is due the soonest").json()
+    assert j["route"] == "tasks" and not j["used_llm"]
+    assert "LEETCODE" not in j["answer"] and "Exam 3" in j["answer"]
+    assert j["answer"].splitlines()[0].startswith("Akuna OA")
+
+
+DEADLINE_NOTES = {
+    "career/faang-prep/oa-tracker.md": "## Pending\n- **Akuna Capital** OA\n  - Due: 2026-12-17\n",
+    "career/school/fall.md": "### Physics\n- Sep 23 - Test 1\n- Dec 14 - Final\n",
+    "career/school/old.md": "### Old stuff\n- Sep 1 - Lab zero\n",
+    "personal/ideas.md": "# Ideas\nShip it by Dec 1.\n",
+}
+
+
+def test_AC14_9b_deadline_question_reads_logged_dates_from_the_vault(tmp_path):
+    llm = FakeLlm()
+    app, c, _ = build(tmp_path, DEADLINE_NOTES, llm=llm)
+    j = ask(c, "what's due the soonest for school and interviews").json()
+    assert j["route"] == "tasks" and j["used_llm"]
+    p = llm.prompts[0]
+    assert "2026-11-16" in p and "Akuna" in p and "Dec 14" in p
+    assert "Lab zero" not in p and "Ship it" not in p  # past only, or not a deadline note
+    assert {s["path"] for s in j["sources"]} == {
+        "career/faang-prep/oa-tracker.md",
+        "career/school/fall.md",
+    }
+
+
+def test_AC14_9b_without_llm_falls_back_to_the_task_list(tmp_path):
+    app, c, _ = build(tmp_path, DEADLINE_NOTES)
+    j = ask(c, "what's due the soonest").json()
+    assert j["route"] == "tasks" and not j["used_llm"]

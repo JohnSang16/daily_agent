@@ -252,20 +252,6 @@ func centsFromDisplay(_ s: String) -> Int {
     return whole * 100 + frac
 }
 
-/// Income rows grouped by month, newest month first, with a subtotal for each.
-func incomeByMonth(_ txns: [Txn]) -> [(month: String, totalCents: Int, items: [Txn])] {
-    var out: [(month: String, totalCents: Int, items: [Txn])] = []
-    for t in txns {
-        let m = String(t.date.prefix(7))
-        if let i = out.firstIndex(where: { $0.month == m }) {
-            out[i].items.append(t); out[i].totalCents += centsFromDisplay(t.amount)
-        } else {
-            out.append((m, centsFromDisplay(t.amount), [t]))
-        }
-    }
-    return out
-}
-
 /// How far through a goal: 0 to 1 (a goal that is over reads as 1), and whether it is over.
 func goalProgress(spent: Int, limit: Int) -> (fraction: Double, over: Bool) {
     guard limit > 0 else { return (0, false) }
@@ -374,5 +360,93 @@ func sessionStatusLine(_ status: String) -> String {
     case "needs_approval": return "needs your approval"
     case "ended": return "ended"
     default: return status.replacingOccurrences(of: "_", with: " ")
+    }
+}
+
+// MARK: money tabs redesign
+
+/// What each part of holdings is as a share of everything owned (cash + savings + invested).
+func holdingShares(_ h: Holdings) -> (cash: Double, savings: Double, invested: Double) {
+    let total = Double(max(h.cashCents, 0) + max(h.savingsCents, 0) + max(h.investedCents, 0))
+    guard total > 0 else { return (0, 0, 0) }
+    return (Double(max(h.cashCents, 0)) / total, Double(max(h.savingsCents, 0)) / total, Double(max(h.investedCents, 0)) / total)
+}
+
+/// 2340 -> "$23.40", with "+" or "-" in front when signed.
+func dollarsAndCents(_ cents: Int, signed: Bool = false) -> String {
+    let f = NumberFormatter()
+    f.numberStyle = .decimal
+    f.minimumFractionDigits = 2
+    f.maximumFractionDigits = 2
+    f.locale = Locale(identifier: "en_US")
+    let body = "$" + (f.string(from: NSNumber(value: Double(abs(cents)) / 100)) ?? "\(abs(cents))")
+    return cents < 0 ? "-" + body : (signed ? "+" + body : body)
+}
+
+/// Money in minus money out for a set of rows.
+func netCents(_ txns: [Txn]) -> Int {
+    txns.reduce(0) { $0 + ($1.direction == "in" ? 1 : -1) * centsFromDisplay($1.amount) }
+}
+
+enum ActivityFilter: String, CaseIterable, Identifiable {
+    case all, spending, income, pending
+    var id: String { rawValue }
+}
+
+/// Filters the loaded activity page by kind, and to one day when a day is picked.
+func filterTxns(_ txns: [Txn], filter: ActivityFilter, day: String? = nil) -> [Txn] {
+    txns.filter { t in
+        if let day, t.date != day { return false }
+        switch filter {
+        case .all: return true
+        case .spending: return t.direction == "out"
+        case .income: return t.direction == "in"
+        case .pending: return t.pending
+        }
+    }
+}
+
+/// Spend on each day, from the running total (a refund day reads as 0, not negative).
+func dailySpend(_ daily: [DailyPoint]) -> [(date: String, cents: Int)] {
+    var prev = 0
+    return daily.map { p in
+        defer { prev = p.cumulativeSpendCents }
+        return (p.date, max(p.cumulativeSpendCents - prev, 0))
+    }
+}
+
+/// Empty cells before day 1 in a monday first week grid.
+func leadingBlanks(_ isoFirst: String) -> Int {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(identifier: "UTC")!
+    guard let d = fmt("yyyy-MM-dd", cal.timeZone).date(from: isoFirst) else { return 0 }
+    return (cal.component(.weekday, from: d) + 5) % 7  // sunday 1 -> 6, monday 2 -> 0
+}
+
+/// "2026-11-14" -> "nov 14"
+func shortDay(_ iso: String) -> String {
+    guard iso.count >= 10, let d = Int(iso.suffix(2)) else { return iso }
+    return "\(monthShort(String(iso.prefix(7)))) \(d)"
+}
+
+/// SF Symbol for a Plaid primary category.
+func categoryIcon(_ c: String?) -> String {
+    switch c ?? "" {
+    case "FOOD_AND_DRINK": return "fork.knife"
+    case "GENERAL_MERCHANDISE": return "bag"
+    case "TRANSPORTATION": return "car"
+    case "TRAVEL": return "airplane"
+    case "ENTERTAINMENT": return "music.note"
+    case "RENT_AND_UTILITIES": return "house"
+    case "INCOME": return "arrow.down.left"
+    case "TRANSFER_IN", "TRANSFER_OUT": return "arrow.left.arrow.right"
+    case "LOAN_PAYMENTS": return "creditcard"
+    case "MEDICAL": return "cross.case"
+    case "PERSONAL_CARE": return "sparkles"
+    case "GENERAL_SERVICES": return "wrench.and.screwdriver"
+    case "HOME_IMPROVEMENT": return "hammer"
+    case "BANK_FEES": return "building.columns"
+    case "GOVERNMENT_AND_NON_PROFIT": return "building.2"
+    default: return "circle.dashed"
     }
 }

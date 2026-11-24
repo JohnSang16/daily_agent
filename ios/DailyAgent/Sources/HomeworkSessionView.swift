@@ -197,33 +197,6 @@ struct HomeworkSessionView: View {
     }
 }
 
-/// WKWebView ignores a page's own `.focus()` call on an input unless WebKit considers it a direct
-/// user gesture, which Kernel's live view keyboard toggle doesn't satisfy, so tapping it does
-/// nothing. Long standing WebKit limitation (not specific to this app); the standard fix is to
-/// patch the private "is the user interacting" check so it is always true. Runs once per process.
-#if os(iOS)
-private enum WebViewKeyboardFix {
-    static let apply: Void = {
-        let selectors = [
-            "_startAssistingNode:userIsInteracting:blurPreviousNode:changingActivityState:userObject:",
-            "_elementDidFocus:userIsInteracting:blurPreviousNode:activityStateChanges:userObject:",
-        ]
-        guard let cls = NSClassFromString("WKContentView") else { return }
-        for name in selectors {
-            let sel = NSSelectorFromString(name)
-            guard let method = class_getInstanceMethod(cls, sel) else { continue }
-            typealias Fn = @convention(c) (AnyObject, Selector, AnyObject, Bool, Bool, Bool, AnyObject?) -> Void
-            let original = unsafeBitCast(method_getImplementation(method), to: Fn.self)
-            let block: @convention(block) (AnyObject, AnyObject, Bool, Bool, Bool, AnyObject?) -> Void = {
-                me, node, _, blurPrevious, changingState, userObject in
-                original(me, sel, node, true, blurPrevious, changingState, userObject)
-            }
-            method_setImplementation(method, imp_implementationWithBlock(block))
-        }
-    }()
-}
-#endif
-
 /// Kernel's live view page. You can watch, or tap into it to drive the browser yourself.
 #if os(iOS)
 struct LiveBrowser: UIViewRepresentable {
@@ -237,7 +210,7 @@ struct LiveBrowser: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> WKWebView {
-        _ = WebViewKeyboardFix.apply
+        _ = WKWebView.focusRaisesKeyboard
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
         config.websiteDataStore = .nonPersistent()  // the live view link is a credential: keep nothing
@@ -255,6 +228,24 @@ struct LiveBrowser: UIViewRepresentable {
             v.load(URLRequest(url: url))
         }
     }
+}
+
+/// WKWebView only raises the keyboard for a focus() it counts as a user tap. Kernel's keyboard
+/// button focuses a hidden input from script, so nothing pops up. This marks every focus as
+/// user driven. Private WebKit selector (fine for a personal app, not App Store safe); if Apple
+/// renames it, the lookup fails and nothing changes.
+extension WKWebView {
+    static let focusRaisesKeyboard: Void = {
+        guard let cls = NSClassFromString("WKContentView") else { return }
+        let sel = sel_getUid("_elementDidFocus:userIsInteracting:blurPreviousNode:activityStateChanges:userObject:")
+        guard let method = class_getInstanceMethod(cls, sel) else { return }
+        typealias Original = @convention(c) (AnyObject, Selector, UnsafeRawPointer, Bool, Bool, UInt64, AnyObject?) -> Void
+        let original = unsafeBitCast(method_getImplementation(method), to: Original.self)
+        let patched: @convention(block) (AnyObject, UnsafeRawPointer, Bool, Bool, UInt64, AnyObject?) -> Void = {
+            me, node, _, blur, changes, obj in original(me, sel, node, true, blur, changes, obj)
+        }
+        method_setImplementation(method, imp_implementationWithBlock(patched))
+    }()
 }
 #else
 struct LiveBrowser: View {

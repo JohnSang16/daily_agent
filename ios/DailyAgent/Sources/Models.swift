@@ -211,6 +211,21 @@ struct MoneySummary: Codable, Equatable {
     var daily: [DailyPoint]
 }
 
+struct RecurringItem: Codable, Equatable, Identifiable {
+    var merchant: String
+    var amountCents: Int
+    var category: String?
+    var lastDate: String
+    var nextDate: String
+    var paidThisMonth: Bool
+    var id: String { merchant }
+}
+
+struct Recurring: Codable, Equatable {
+    var items: [RecurringItem]
+    var monthlyCents: Int
+}
+
 struct BudgetGoal: Codable, Equatable, Identifiable {
     var category: String
     var limitCents: Int
