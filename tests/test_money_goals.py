@@ -47,7 +47,7 @@ def test_AC16_17_current_amounts_come_from_balances_and_income(tmp_path):
     put(c, "cc", name="cards", kind="cards_owed", target_cents=0)
     put(
         c,
-        "st",
+        "stretch",
         name="stretch",
         kind="income_since",
         start="2026-11-01",
@@ -82,14 +82,16 @@ def test_AC16_18_grouped_by_due_date_and_needs_token(tmp_path):
         assert c.request(m, u, json={}).status_code == 401, u
 
 
-def test_AC16_19_one_stretch_goal_with_floor_below_target(tmp_path):
+def test_AC16_19_floor_must_be_below_target_and_income_since_needs_a_start(tmp_path):
+    """The stretch card is identified by its reserved id, not its kind (so it can be net_worth,
+    income_since, or anything else), but floor-below-target and income_since needing a start
+    still apply regardless of kind."""
     app, c = ready(tmp_path)
     ok = dict(name="s", kind="income_since", start="2026-11-25", target_cents=1000, floor_cents=500)
-    assert put(c, "s1", **ok).status_code == 200
-    assert (
-        put(c, "s1", **ok | {"target_cents": 2000}).status_code == 200
-    )  # replacing the same one is fine
-    assert put(c, "s2", **ok).status_code == 409
-    assert put(c, "s1", **ok | {"floor_cents": 1000}).status_code == 422
-    assert put(c, "s1", **ok | {"start": None}).status_code == 422
+    assert put(c, "stretch", **ok).status_code == 200
+    assert put(c, "stretch", **ok | {"target_cents": 2000}).status_code == 200  # editing is fine
+    assert put(c, "stretch", **ok | {"floor_cents": 1000}).status_code == 422
+    assert put(c, "stretch", **ok | {"start": None}).status_code == 422
+    assert put(c, "other", **ok | {"kind": "net_worth", "floor_cents": 1000}).status_code == 422
+    # the stretch goal (reserved id) never appears in the season breakdown, regardless of kind
     assert c.get("/money/goals", headers=H).json()["seasons"] == []

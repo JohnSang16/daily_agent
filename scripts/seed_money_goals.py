@@ -51,10 +51,10 @@ def main() -> None:
             SavingsGoal(
                 id="stretch",
                 name="stretch",
-                kind="income_since",
+                kind="net_worth",
                 account_id=None,
                 target_cents=606_000_00,
-                start=date(2026, 11, 25),
+                start=None,
                 due=date(2027, 11, 25),
                 floor_cents=100_000_00,
             )

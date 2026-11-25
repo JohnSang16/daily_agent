@@ -85,13 +85,17 @@ CATEGORY = Path(pattern=r"^[A-Z_]{2,40}$")
 
 @router.get("/budgets")
 def list_budgets(request: Request, clock: Clock = Depends(get_clock)):
-    keys = last_months(_today(request, clock), 1)
+    today = _today(request, clock)
+    tz = ZoneInfo(request.app.state.settings.user_timezone)
     with request.app.state.session_factory() as db:
-        totals, cats = month_totals(db, keys)
         rows = db.scalars(select(Budget)).all()
 
+        # spend tracked since the budget was set (updated_at), not the whole calendar month: a
+        # budget you just created reads $0 spent right away, not the month's pre-existing total
         def spent(b: Budget) -> int:
-            return totals[keys[0]]["spend"] if b.category == "TOTAL" else cats.get(b.category, 0)
+            start = b.updated_at.astimezone(tz).date()
+            cats = category_spend(db, today, start)
+            return sum(cats.values()) if b.category == "TOTAL" else cats.get(b.category, 0)
 
         out = [
             {"category": b.category, "limit_cents": b.limit_cents, "spent_cents": spent(b)}
@@ -176,12 +180,14 @@ def list_goals(request: Request):
         h = holdings(db)
         rows = db.scalars(select(SavingsGoal).order_by(SavingsGoal.due, SavingsGoal.id)).all()
         out = [_goal_out(g, h, db) for g in rows]
+    # the stretch card is identified by its reserved id, not its kind: kind only decides how a
+    # goal's current value is computed, and is not exclusive to the one stretch goal
     seasons: dict[str, list] = {}
     for g in out:
-        if g["kind"] != "income_since":
+        if g["id"] != "stretch":
             seasons.setdefault(g["due"], []).append(g)
     return {
-        "stretch": next((g for g in out if g["kind"] == "income_since"), None),
+        "stretch": next((g for g in out if g["id"] == "stretch"), None),
         "seasons": [{"due": d, "goals": gs} for d, gs in seasons.items()],
     }
 
@@ -190,24 +196,17 @@ def list_goals(request: Request):
 def set_goal(request: Request, goal_id: str = GOAL_ID, body: GoalIn = ...):
     if body.target_cents == 0 and body.kind != "cards_owed":
         raise HTTPException(422, "target must be above 0")
-    if body.kind == "income_since":
-        if body.start is None:
-            raise HTTPException(422, "a stretch goal needs a start date")
-        if body.floor_cents is not None and body.floor_cents >= body.target_cents:
-            raise HTTPException(422, "floor must be below the target")
+    if body.kind == "income_since" and body.start is None:
+        raise HTTPException(422, "an income_since goal needs a start date")
+    # floor is a generic "don't let the bar read below this" marker (the stretch card draws it
+    # regardless of kind), not specific to any one kind
+    if body.floor_cents is not None and body.floor_cents >= body.target_cents:
+        raise HTTPException(422, "floor must be below the target")
     with request.app.state.session_factory() as db:
         if body.kind == "account" and (
             body.account_id is None or db.get(BankAccount, body.account_id) is None
         ):
             raise HTTPException(422, "account goal needs an existing account")
-        if body.kind == "income_since":
-            other = db.scalars(
-                select(SavingsGoal).where(
-                    SavingsGoal.kind == "income_since", SavingsGoal.id != goal_id
-                )
-            ).first()
-            if other is not None:
-                raise HTTPException(409, "only one stretch goal")
         db.merge(SavingsGoal(id=goal_id, **body.model_dump()))
         db.commit()
     return {"id": goal_id}

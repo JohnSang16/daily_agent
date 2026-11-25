@@ -933,7 +933,10 @@ struct GoalsView: View {
                     let left = g.limitCents - g.spentCents
                     Button { editing = g } label: {
                         VStack(alignment: .leading, spacing: 4) {
-                            (Text(left >= 0 ? dollars(left) : "over").font(.system(size: 24)).foregroundColor(Theme.title)
+                            // over budget is said in red now, at John's request: the real negative
+                            // number instead of the word "over" (a deliberate break from the
+                            // monochrome rule, for this one spot only)
+                            (Text(dollars(left)).font(.system(size: 24)).foregroundColor(left >= 0 ? Theme.title : .red)
                                 + Text(" / \(dollars(g.limitCents))").font(.system(size: 13)).foregroundColor(Theme.body))
                                 .monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
                             Text(categoryLabel(g.category)).font(.system(size: 13)).foregroundStyle(Theme.body).lineLimit(1)
