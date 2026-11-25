@@ -86,6 +86,11 @@ struct RootView: View {
         }
         .sensoryFeedback(.impact(weight: .light), trigger: drawerOpen)
         .onChange(of: state.configured) { _, ok in if !ok { screen = .settings } }
+        .onChange(of: state.jumpTo) { _, s in
+            guard let s else { return }
+            withAnimation(motion) { screen = s }
+            state.jumpTo = nil
+        }
         .onChange(of: scenePhase) { _, p in
             if p == .active, state.configured, state.isStale { Task { await state.refresh() } }
         }

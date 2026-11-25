@@ -213,7 +213,7 @@ def test_migration_adds_the_new_columns_and_table(tmp_path):
     )
     assert r.returncode == 0, r.stderr
     insp = inspect(create_engine(url))
-    assert "budgets" in insp.get_table_names()
+    assert {"budgets", "savings_goals"} <= set(insp.get_table_names())
     assert {"type", "balance_cents"} <= {c["name"] for c in insp.get_columns("bank_accounts")}
     assert "category_detail" in {c["name"] for c in insp.get_columns("transactions")}
     assert text  # keep the import used

@@ -21,6 +21,10 @@ struct DashboardView: View {
                     BigTitle(text: f("EEEE"))
                     Text(f("MMMM d").lowercased()).font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
                 }
+                if let g = state.moneyGoals?.stretch {
+                    Button { state.openMoneyGoals() } label: { StretchCard(goal: g, link: true) }
+                        .buttonStyle(PressStyle()).accessibilityHint("opens money goals").reveal(1)
+                }
                 if checkinDue(Date(), answered: state.checkin?.today.didTop != nil), state.checkin != nil {
                     CheckinCard(topTitle: state.today?.ranked.first?.title).reveal(1)
                 }
@@ -56,6 +60,7 @@ struct DashboardView: View {
         .scrollDismissesKeyboard(.interactively)
         .refreshable { await state.refresh() }
         .task { if state.isStale { await state.refresh() } }
+        .task { await state.loadMoneyGoals() }
         .sheet(item: $picked) { t in TaskSheet(task: t).environmentObject(state) }
     }
 

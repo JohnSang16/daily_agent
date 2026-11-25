@@ -49,3 +49,9 @@ At John's request, borrowing Rocket Money's layout patterns while staying monoch
 
 ## Update 2026-11-23: banks and activity, income tab removed
 Picked from localhost mocks. Banks opens with a glass net worth card (big number, one bar split into cash, savings and invested in white and two grays, what's owed below), then one glass card per bank. Activity opens with a spending calendar (this month as a monday first grid, each day shaded white by what was spent, tap a day to show only it), then a compact row of recurring bills, then filter chips (all, spending, income, pending, banks), a category symbol on each row and a net total per day. The income tab is gone: the activity income filter lists income, and the overview footer shows this month's income and net.
+
+## Update 2026-11-24: trend chart and donut hand drawn, not Swift Charts
+After repeated crashes traced to Swift Charts' own internals on the 7D range (confirmed via register dump, never resolved despite six targeted fixes), both the trend hero card's line and area and the category donut were replaced with plain GeometryReader/Canvas drawing. Same look, arithmetic computed and verified directly instead of handed to a closed source framework.
+
+## Update 2026-11-25: money goals and the stretch card
+At John's request Money has a fifth view, goals: the stretch goal (big number, a bar with a tick at the floor, days left), the budget as three columns showing what is left over the cap ("$120 / $205"), and savings and investing goals behind a season switch (2026, spring, summer), one two line row per goal. The dashboard shows the stretch goal as a card right under the date; tapping it opens money goals. This breaks the "no progress bars on the dashboard" line on purpose, for that one card only.
