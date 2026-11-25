@@ -135,3 +135,4 @@ Acceptance criteria passing: AC16.16 to AC16.19 (all failed first).
 Tests and lint: 358 passed, ruff clean, iOS typecheck passed (no Xcode on this Mac, not run on a device).
 Found: bank_accounts has the three Marcus accounts twice (ids 3 to 5 and 9 to 11), so savings and net worth count them double. Turn the second set off in the banks sheet.
 Next step: on the host Mac, `uv run alembic upgrade head`, then `uv run python -m scripts.seed_money_goals`, then build the app.
+Done same day: duplicate Marcus login removed with `DELETE /banks/6` (Plaid item removed too). Backup before the change: `~/projects/daily_agent-backups/dev-before-marcus-dedupe-20261125.sqlite3`.
