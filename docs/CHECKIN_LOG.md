@@ -128,3 +128,10 @@ What: ask answers any question. Notes that match are used and cited; when none m
 Acceptance criteria passing: AC14.3 and AC14.13 (rewritten), AC14.16, AC13.25 (all failed first).
 Tests and lint: 351 passed, ruff clean.
 Still blocked: the ANTHROPIC_API_KEY in .env was invalid on 2026-11-20, so no live check. Billing is Console credits (LLM_BACKEND=api); do not use the cli backend on the Cox Mac.
+
+## 2026-11-25 money goals tab (spec 16, approved by John)
+What: `savings_goals` table (migration 0011) and `GET/PUT/DELETE /money/goals` (`/goals` was taken by spec 18). Goal kinds: one account's balance, net worth, invested, cards owed, and one `income_since` stretch goal with a floor. iOS: a goals tab in Money (stretch, budget columns, season switch) and a stretch card on the dashboard that jumps to it. `scripts/seed_money_goals.py` loads John's goals ($606k stretch from 2026-11-25, floor $100k, three seasons) and budgets (food $205, gas $120, shopping $60), found by account last four.
+Acceptance criteria passing: AC16.16 to AC16.19 (all failed first).
+Tests and lint: 358 passed, ruff clean, iOS typecheck passed (no Xcode on this Mac, not run on a device).
+Found: bank_accounts has the three Marcus accounts twice (ids 3 to 5 and 9 to 11), so savings and net worth count them double. Turn the second set off in the banks sheet.
+Next step: on the host Mac, `uv run alembic upgrade head`, then `uv run python -m scripts.seed_money_goals`, then build the app.

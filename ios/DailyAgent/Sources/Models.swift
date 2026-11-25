@@ -210,6 +210,33 @@ struct BudgetGoal: Codable, Equatable, Identifiable {
     var id: String { category }
 }
 
+// Spec 16 goals tab: GET /money/goals
+
+struct MoneyGoal: Codable, Equatable, Identifiable {
+    var id: String
+    var name: String
+    var kind: String
+    var accountId: Int?
+    var targetCents: Int
+    var currentCents: Int
+    var fraction: Double
+    var met: Bool
+    var start: String?
+    var due: String
+    var floorCents: Int?
+}
+
+struct GoalSeason: Codable, Equatable, Identifiable {
+    var due: String
+    var goals: [MoneyGoal]
+    var id: String { due }
+}
+
+struct MoneyGoals: Codable, Equatable {
+    var stretch: MoneyGoal?
+    var seasons: [GoalSeason]
+}
+
 // Spec 18: check-in and goals
 
 struct Checkin: Codable, Equatable {

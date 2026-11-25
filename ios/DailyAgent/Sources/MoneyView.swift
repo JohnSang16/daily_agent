@@ -2,7 +2,7 @@ import Charts
 import SwiftUI
 
 enum MoneyTab: String, CaseIterable, Identifiable {
-    case overview, banks, income, activity
+    case overview, banks, income, activity, goals
     var id: String { rawValue }
 }
 
@@ -11,7 +11,6 @@ enum MoneyTab: String, CaseIterable, Identifiable {
 struct MoneyView: View {
     @EnvironmentObject var state: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var tab: MoneyTab = .overview
     @Namespace private var pick
 
     var body: some View {
@@ -24,15 +23,16 @@ struct MoneyView: View {
                 }
                 tabs
                 Group {
-                    switch tab {
+                    switch state.moneyTab {
                     case .overview: MoneyOverviewView()
                     case .banks: BanksView()
                     case .income: IncomeView()
                     case .activity: ActivityView()
+                    case .goals: GoalsView()
                     }
                 }
                 .transition(.opacity)
-                .id(tab)
+                .id(state.moneyTab)
                 if let p = state.problem, state.summary != nil { Text(p).font(.system(size: 12.5)).foregroundStyle(Theme.secondary) }
             }
             .page()
@@ -45,12 +45,12 @@ struct MoneyView: View {
     private var tabs: some View {
         HStack(spacing: 4) {
             ForEach(MoneyTab.allCases) { t in
-                Button { withAnimation(reduceMotion ? Theme.ease : Theme.spring) { tab = t } } label: {
-                    Text(t.rawValue).font(.system(size: 14, weight: tab == t ? .medium : .regular))
-                        .foregroundStyle(tab == t ? Color.black : Theme.secondary)
+                Button { withAnimation(reduceMotion ? Theme.ease : Theme.spring) { state.moneyTab = t } } label: {
+                    Text(t.rawValue).font(.system(size: 13, weight: state.moneyTab == t ? .medium : .regular))
+                        .foregroundStyle(state.moneyTab == t ? Color.black : Theme.secondary)
                         .frame(maxWidth: .infinity, minHeight: 40)
                         .background {
-                            if tab == t {
+                            if state.moneyTab == t {
                                 Capsule().fill(LinearGradient(colors: [.white, Color(white: 0.84)], startPoint: .top, endPoint: .bottom))
                                     .matchedGeometryEffect(id: "money-tab", in: pick)
                             }
@@ -59,7 +59,7 @@ struct MoneyView: View {
             }
         }
         .padding(4).glass(Capsule())
-        .sensoryFeedback(.selection, trigger: tab)
+        .sensoryFeedback(.selection, trigger: state.moneyTab)
     }
 }
 
@@ -460,5 +460,180 @@ struct BanksSheet: View {
         .padding(24).padding(.top, 8).frame(maxWidth: .infinity, alignment: .leading)
         }
         .sheetChrome()
+    }
+}
+
+// MARK: goals
+
+private func dueDate(_ s: String) -> Date? {
+    let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
+    return f.date(from: s)
+}
+
+private func daysLeft(_ due: String) -> Int {
+    guard let d = dueDate(due) else { return 0 }
+    let cal = Calendar.current
+    return max(cal.dateComponents([.day], from: cal.startOfDay(for: Date()), to: d).day ?? 0, 0)
+}
+
+/// "2026" for a year end, "spring" or "summer" for those seasons, else the short month.
+private func seasonLabel(_ due: String) -> String {
+    guard let d = dueDate(due) else { return due }
+    let c = Calendar.current.dateComponents([.year, .month], from: d)
+    switch c.month ?? 0 {
+    case 12: return String(c.year ?? 0)
+    case 3...6: return "spring"
+    case 7...9: return "summer"
+    default:
+        let f = DateFormatter(); f.dateFormat = "MMM"; return f.string(from: d).lowercased()
+    }
+}
+
+private func shortDue(_ due: String) -> String {
+    guard let d = dueDate(due) else { return due }
+    let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "MMM d"
+    return f.string(from: d).lowercased()
+}
+
+private func compact(_ cents: Int) -> String {
+    cents >= 100_000_00 && cents % 100_000 == 0 ? "$\(cents / 100_000)k" : dollars(cents)
+}
+
+/// The stretch goal: big number, bar with a tick at the floor, days left. Used on the dashboard too.
+struct StretchCard: View {
+    let goal: MoneyGoal
+    var link = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("stretch · provide value worth the number")
+            HStack(alignment: .firstTextBaseline) {
+                (Text(dollars(goal.currentCents)).font(.system(size: link ? 24 : 34, weight: link ? .regular : .light))
+                    .foregroundColor(Theme.title)
+                    + Text(" / \(dollars(goal.targetCents))").font(.system(size: link ? 13 : 14)).foregroundColor(Theme.body))
+                    .monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
+                Spacer()
+                if link { Text("goals →").font(.system(size: 13)).foregroundStyle(Theme.title) }
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Bar(fraction: goal.fraction, strong: true)
+                    if let f = goal.floorCents, goal.targetCents > 0 {
+                        Rectangle().fill(Theme.secondary).frame(width: 1.4, height: 12)
+                            .offset(x: geo.size.width * Double(f) / Double(goal.targetCents))
+                    }
+                }
+            }.frame(height: 12).padding(.top, 4)
+            HStack {
+                if let f = goal.floorCents { Text("floor \(compact(f))") }
+                Spacer()
+                Text("\(daysLeft(goal.due)) days left")
+            }.font(.system(size: 12)).foregroundStyle(Theme.body)
+        }
+        .padding(link ? 18 : 0)
+        .background { if link { RoundedRectangle(cornerRadius: 22).fill(Color.white.opacity(0.05)) } }
+        .overlay { if link { RoundedRectangle(cornerRadius: 22).strokeBorder(Color.white.opacity(0.09)) } }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct GoalsView: View {
+    @EnvironmentObject var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var season = 0
+    @State private var editing: BudgetGoal?
+    @State private var adding = false
+    @Namespace private var pick
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 30) {
+            if let s = state.moneyGoals?.stretch { StretchCard(goal: s).reveal(0) }
+            budget.reveal(1)
+            goals.reveal(2)
+        }
+        .sheet(item: $editing) { g in BudgetSheet(existing: g, categories: cats).environmentObject(state) }
+        .sheet(isPresented: $adding) { BudgetSheet(existing: nil, categories: cats).environmentObject(state) }
+    }
+
+    private var cats: [String] { state.summary?.categories.map(\.category) ?? [] }
+
+    private var budget: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                sectionLabel("budget")
+                Spacer()
+                Button { adding = true } label: { Text("+ add").font(.system(size: 13)).foregroundStyle(Theme.title).frame(minHeight: 44) }
+                    .buttonStyle(PressStyle())
+            }
+            if state.budgets.isEmpty {
+                Text("no budget yet.").font(.system(size: 14)).foregroundStyle(Theme.secondary)
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14, alignment: .leading), count: 3), spacing: 18) {
+                ForEach(state.budgets) { g in
+                    let left = g.limitCents - g.spentCents
+                    Button { editing = g } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            (Text(left >= 0 ? dollars(left) : "over").font(.system(size: 24)).foregroundColor(Theme.title)
+                                + Text(" / \(dollars(g.limitCents))").font(.system(size: 13)).foregroundColor(Theme.body))
+                                .monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+                            Text(categoryLabel(g.category)).font(.system(size: 13)).foregroundStyle(Theme.body).lineLimit(1)
+                            Bar(fraction: max(Double(left), 0) / Double(max(g.limitCents, 1)), strong: true).padding(.top, 4)
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }.buttonStyle(PressStyle())
+                }
+            }
+        }
+    }
+
+    private var goals: some View {
+        let seasons = state.moneyGoals?.seasons ?? []
+        let i = min(season, max(seasons.count - 1, 0))
+        return VStack(alignment: .leading, spacing: 14) {
+            sectionLabel("goals")
+            if seasons.isEmpty {
+                Text("no goals yet.").font(.system(size: 14)).foregroundStyle(Theme.secondary)
+            } else {
+                HStack(spacing: 2) {
+                    ForEach(Array(seasons.enumerated()), id: \.element.id) { n, s in
+                        Button { withAnimation(reduceMotion ? Theme.ease : Theme.spring) { season = n } } label: {
+                            Text(seasonLabel(s.due)).font(.system(size: 13, weight: i == n ? .medium : .regular))
+                                .foregroundStyle(i == n ? Color.black : Theme.secondary)
+                                .frame(maxWidth: .infinity, minHeight: 36)
+                                .background {
+                                    if i == n {
+                                        Capsule().fill(LinearGradient(colors: [.white, Color(white: 0.84)], startPoint: .top, endPoint: .bottom))
+                                            .matchedGeometryEffect(id: "season", in: pick)
+                                    }
+                                }
+                        }.buttonStyle(PressStyle())
+                    }
+                }
+                .padding(4).glass(Capsule())
+                .sensoryFeedback(.selection, trigger: season)
+                Text("\(shortDue(seasons[i].due)) · \(daysLeft(seasons[i].due)) days left")
+                    .font(.system(size: 12)).foregroundStyle(Theme.body)
+                VStack(spacing: 0) {
+                    ForEach(seasons[i].goals) { g in row(g) }
+                }
+                .id(i).transition(.opacity)
+            }
+        }
+    }
+
+    private func row(_ g: MoneyGoal) -> some View {
+        let cards = g.kind == "cards_owed"
+        return VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(g.name).font(.system(size: 16)).foregroundStyle(Theme.title)
+                Spacer()
+                Text(cards ? "\(dollars(g.currentCents)) owed" : "\(dollars(g.currentCents)) of \(dollars(g.targetCents))")
+                    .font(.system(size: 14)).monospacedDigit().foregroundStyle(Theme.title)
+            }
+            Bar(fraction: g.fraction, strong: true)
+            Text(g.met ? (cards ? "clear" : "hit") : cards ? "pay it off" : "\(dollars(g.targetCents - g.currentCents)) to go · \(Int((g.fraction * 100).rounded()))%")
+                .font(.system(size: 12)).foregroundStyle(Theme.body)
+        }
+        .padding(.vertical, 14)
+        .accessibilityElement(children: .combine)
     }
 }

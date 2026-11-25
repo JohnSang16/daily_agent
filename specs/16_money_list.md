@@ -62,6 +62,18 @@ The screen is now four views: **overview**, **banks**, **income** and **activity
 * AC16.15 Budget limits must be positive, categories must look like Plaid categories, and each goal reports its spending for the current month.
 Still out of scope: bills, subscription cancelling, moving money, and any write action.
 
+## Goals tab (added 2026-11-25 at John's request)
+Money gets a fifth view, **goals**, after activity. It only reads balances and income, it never moves money.
+1. **Stretch goal** at the top: one big income target with a due date and a floor (for example $606,000 earned by 2027-11-25, floor $100,000). Progress is INCOME transactions since the goal's start date. The floor is a quiet mark on the bar.
+2. **This month**: the existing budget goals (same data as the overview), shown again here.
+3. **Seasons**: goals grouped by due date (end of 2026, end of spring, end of summer). Each goal has a name, a target in cents, a due date and what it tracks: one account's balance, net worth, invested total, or owed on cards (target 0, met when nothing is owed). The current season opens first, later ones are collapsed.
+4. Table `savings_goals` (id, name, kind, account id or null, target cents, start date or null, due date, floor cents or null). Kinds: `account`, `net_worth`, `invested`, `cards_owed`, `income_since` (the stretch goal, at most one).
+5. API: `GET /money/goals` returns every goal with its current cents and fraction, grouped by due date. `PUT /money/goals/{id}` creates or replaces one, `DELETE /money/goals/{id}` removes it.
+* AC16.16 Targets must be positive (0 allowed only for `cards_owed`), the due date is required, and an `account` goal must name an existing account.
+* AC16.17 Current amounts come from the latest balances (account, net worth, invested, cards owed) or from INCOME transactions on or after the start date, with turned off accounts left out.
+* AC16.18 `GET /money/goals` groups goals by due date, soonest first, and returns 401 without the bearer token.
+* AC16.19 Only one `income_since` goal can exist, and its floor must be below its target.
+
 ## Decisions (2026-11-19, replacing the open questions)
 1. Aggregator: Plaid, free Trial plan (10 live Items) once Production access is approved. Built and tested against Plaid Sandbox first. Real banks wait for me to read Plaid's terms (security rule 6).
 2. Banks to connect first: chosen by me later, at connect time.

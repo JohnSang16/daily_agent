@@ -84,3 +84,18 @@ def holdings(db: Session) -> dict:
             h["cash"] += b
     net = h["cash"] + h["savings"] + h["invested"] - h["credit_owed"] - h["loans_owed"]
     return {f"{k}_cents": v for k, v in h.items()} | {"net_cents": net}
+
+
+def income_since(db: Session, start: date) -> int:
+    """INCOME cents into enabled accounts on or after start."""
+    rows = db.execute(
+        select(Transaction.amount_cents, Transaction.category, Transaction.category_detail)
+        .join(BankAccount, BankAccount.id == Transaction.account_id)
+        .where(
+            BankAccount.enabled.is_(True),
+            Transaction.posted_date >= start,
+            Transaction.direction == "in",
+            Transaction.category == "INCOME",
+        )
+    ).all()
+    return sum(c for c, cat, detail in rows if not is_internal(cat, detail))

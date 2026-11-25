@@ -218,6 +218,23 @@ class Budget(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
 
 
+class SavingsGoal(Base):
+    """Spec 16 goals tab: a target for one account, net worth, invested, cards owed, or income."""
+
+    __tablename__ = "savings_goals"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    kind: Mapped[str] = mapped_column(
+        String
+    )  # account, net_worth, invested, cards_owed, income_since
+    account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # bank_accounts.id
+    target_cents: Mapped[int] = mapped_column(Integer)
+    start: Mapped[date | None] = mapped_column(Date, nullable=True)
+    due: Mapped[date] = mapped_column(Date)
+    floor_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
 class DailyCheckin(Base):
     """Spec 18: the morning obstacle and if-then plan, and the nightly answer about #1."""
 

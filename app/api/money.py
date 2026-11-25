@@ -1,6 +1,7 @@
-"""Money overview: spend vs income, categories, holdings, and monthly budget goals."""
+"""Money overview: spend vs income, categories, holdings, budget goals, and savings goals."""
 
 from datetime import date
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
@@ -9,8 +10,8 @@ from sqlalchemy import select
 
 from app.auth import require_token
 from app.clock import Clock, get_clock
-from app.models import Budget
-from app.money import holdings, last_months, month_totals
+from app.models import BankAccount, Budget, SavingsGoal
+from app.money import holdings, income_since, last_months, month_totals
 
 router = APIRouter(dependencies=[Depends(require_token)])
 
@@ -92,3 +93,103 @@ def delete_budget(request: Request, category: str = CATEGORY):
         db.delete(b)
         db.commit()
     return {"deleted": category}
+
+
+class GoalIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    kind: Literal["account", "net_worth", "invested", "cards_owed", "income_since"]
+    account_id: int | None = None
+    target_cents: int = Field(ge=0, le=10_000_000_000)
+    start: date | None = None
+    due: date
+    floor_cents: int | None = Field(None, gt=0)
+
+
+GOAL_ID = Path(pattern=r"^[a-z0-9_-]{1,40}$")
+
+
+def _goal_out(g: SavingsGoal, h: dict, db) -> dict:
+    if g.kind == "account":
+        a = db.get(BankAccount, g.account_id)
+        cur = (a.balance_cents or 0) if a and a.enabled else 0
+    elif g.kind == "income_since":
+        cur = income_since(db, g.start)
+    else:
+        cur = h[
+            {
+                "net_worth": "net_cents",
+                "invested": "invested_cents",
+                "cards_owed": "credit_owed_cents",
+            }[g.kind]
+        ]
+    met = cur <= g.target_cents if g.kind == "cards_owed" else cur >= g.target_cents
+    frac = (
+        (1.0 if met else 0.0) if g.kind == "cards_owed" else min(max(cur, 0) / g.target_cents, 1.0)
+    )
+    return {
+        "id": g.id,
+        "name": g.name,
+        "kind": g.kind,
+        "account_id": g.account_id,
+        "target_cents": g.target_cents,
+        "current_cents": cur,
+        "fraction": round(frac, 4),
+        "met": met,
+        "start": g.start.isoformat() if g.start else None,
+        "due": g.due.isoformat(),
+        "floor_cents": g.floor_cents,
+    }
+
+
+@router.get("/money/goals")
+def list_goals(request: Request):
+    with request.app.state.session_factory() as db:
+        h = holdings(db)
+        rows = db.scalars(select(SavingsGoal).order_by(SavingsGoal.due, SavingsGoal.id)).all()
+        out = [_goal_out(g, h, db) for g in rows]
+    seasons: dict[str, list] = {}
+    for g in out:
+        if g["kind"] != "income_since":
+            seasons.setdefault(g["due"], []).append(g)
+    return {
+        "stretch": next((g for g in out if g["kind"] == "income_since"), None),
+        "seasons": [{"due": d, "goals": gs} for d, gs in seasons.items()],
+    }
+
+
+@router.put("/money/goals/{goal_id}")
+def set_goal(request: Request, goal_id: str = GOAL_ID, body: GoalIn = ...):
+    if body.target_cents == 0 and body.kind != "cards_owed":
+        raise HTTPException(422, "target must be above 0")
+    if body.kind == "income_since":
+        if body.start is None:
+            raise HTTPException(422, "a stretch goal needs a start date")
+        if body.floor_cents is not None and body.floor_cents >= body.target_cents:
+            raise HTTPException(422, "floor must be below the target")
+    with request.app.state.session_factory() as db:
+        if body.kind == "account" and (
+            body.account_id is None or db.get(BankAccount, body.account_id) is None
+        ):
+            raise HTTPException(422, "account goal needs an existing account")
+        if body.kind == "income_since":
+            other = db.scalars(
+                select(SavingsGoal).where(
+                    SavingsGoal.kind == "income_since", SavingsGoal.id != goal_id
+                )
+            ).first()
+            if other is not None:
+                raise HTTPException(409, "only one stretch goal")
+        db.merge(SavingsGoal(id=goal_id, **body.model_dump()))
+        db.commit()
+    return {"id": goal_id}
+
+
+@router.delete("/money/goals/{goal_id}")
+def delete_goal(request: Request, goal_id: str = GOAL_ID):
+    with request.app.state.session_factory() as db:
+        g = db.get(SavingsGoal, goal_id)
+        if g is None:
+            raise HTTPException(404, "not found")
+        db.delete(g)
+        db.commit()
+    return {"deleted": goal_id}

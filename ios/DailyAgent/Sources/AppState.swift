@@ -27,6 +27,10 @@ final class AppState: ObservableObject {
     @Published var digest: Digest?
     @Published var summary: MoneySummary?
     @Published var budgets: [BudgetGoal] = []
+    @Published var moneyGoals: MoneyGoals?
+    @Published var moneyTab: MoneyTab = .overview
+    /// set to switch screens from inside a screen (the dashboard stretch card opens money goals)
+    @Published var jumpTo: Screen?
     @Published var incomeRows: [Txn] = []
     @Published var checkin: CheckinDay?
     @Published var goals: [GoalItem] = []
@@ -273,9 +277,19 @@ final class AppState: ObservableObject {
             async let p: TxnPage = c.get("/transactions", query: [URLQueryItem(name: "limit", value: "100")])
             async let inc: TxnPage = c.get("/transactions", query: [URLQueryItem(name: "kind", value: "income"),
                                                                      URLQueryItem(name: "limit", value: "500")])
-            let (s1, b1, bk1, p1, inc1) = try await (s, b, bk, p, inc)
-            summary = s1; budgets = b1; banks = bk1; page = p1; incomeRows = inc1.transactions
+            async let g: MoneyGoals = c.get("/money/goals")
+            let (s1, b1, bk1, p1, inc1, g1) = try await (s, b, bk, p, inc, g)
+            summary = s1; budgets = b1; banks = bk1; page = p1; incomeRows = inc1.transactions; moneyGoals = g1
         }
+    }
+
+    func loadMoneyGoals() async {
+        await call { c in moneyGoals = try await c.get("/money/goals") }
+    }
+
+    func openMoneyGoals() {
+        moneyTab = .goals
+        jumpTo = .money
     }
 
     private func loadOverview() async {

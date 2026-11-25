@@ -43,3 +43,6 @@ At John's request the iPhone app uses frosted glass surfaces, a soft sheen on th
 
 ## Update 2026-11-19: money charts and goals
 At John's request Money has an overview with a grouped bar chart (income in white, spend in gray), category bars, budget goal bars, holdings and a bank by bank view. These break the old "no charts, no progress indicators" line on purpose. They stay monochrome: bars are white on a dark track, and over budget is said in words, never in a color.
+
+## Update 2026-11-25: money goals and the stretch card
+At John's request Money has a fifth view, goals: the stretch goal (big number, a bar with a tick at the floor, days left), the budget as three columns showing what is left over the cap ("$120 / $205"), and savings and investing goals behind a season switch (2026, spring, summer), one two line row per goal. The dashboard shows the stretch goal as a card right under the date; tapping it opens money goals. This breaks the "no progress bars on the dashboard" line on purpose, for that one card only.
