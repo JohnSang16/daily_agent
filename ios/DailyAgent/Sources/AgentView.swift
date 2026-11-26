@@ -259,10 +259,19 @@ struct AgentView: View {
         draft = ""
         let turn = ChatTurn(question: q)
         let m = mode, ctx = context, crs = mode == .homework ? course : nil
+        let history = Self.history(m == .ask ? askTurns : hwTurns)
         withAnimation(Theme.spring) { append(turn, to: m) }
         Task {
-            let r = await state.ask(q, context: ctx, course: crs)
+            let r = await state.ask(q, context: ctx, course: crs, history: history)
             withAnimation(Theme.spring) { finish(turn.id, in: m, with: r) }
+        }
+    }
+
+    /// The last 6 answered turns as user/assistant pairs, so follow ups make sense to the backend.
+    static func history(_ turns: [ChatTurn]) -> [[String: String]] {
+        turns.filter { $0.reply != nil }.suffix(6).flatMap { t in
+            [["role": "user", "text": t.question],
+             ["role": "assistant", "text": String(t.reply!.answer.prefix(2000))]]
         }
     }
 

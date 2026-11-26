@@ -293,3 +293,27 @@ def test_AC14_9b_without_llm_falls_back_to_the_task_list(tmp_path):
     app, c, _ = build(tmp_path, DEADLINE_NOTES)
     j = ask(c, "what's due the soonest").json()
     assert j["route"] == "tasks" and not j["used_llm"]
+
+
+def test_follow_up_sees_earlier_turns_and_finds_notes(tmp_path):
+    llm = FakeLlm()
+    app, c, _ = build(tmp_path, NOTES, llm=llm)
+    history = [
+        {"role": "user", "text": "what did I write about regression"},
+        {"role": "assistant", "text": "You wrote about regression in stats."},
+    ]
+    r = c.post(
+        "/ask",
+        headers=H,
+        json={"question": "and the second part?", "context": ALL, "history": history},
+    ).json()
+    assert r["route"] == "vault" and r["used_llm"]  # found notes via the earlier question
+    assert "Earlier in this chat" in llm.prompts[-1]
+    assert "John: what did I write about regression" in llm.prompts[-1]
+
+
+def test_no_history_leaves_the_prompt_alone(tmp_path):
+    llm = FakeLlm()
+    app, c, _ = build(tmp_path, NOTES, llm=llm)
+    ask(c, "what did I write about regression")
+    assert "Earlier in this chat" not in llm.prompts[-1]
