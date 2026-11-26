@@ -31,6 +31,7 @@ struct AgentView: View {
     @State private var context: AskContext = .all
     @State private var course: String?
     @State private var draft = ""
+    @State private var draftBeforeDictation = ""
     @State private var askTurns: [ChatTurn] = []
     @State private var hwTurns: [ChatTurn] = []
     @State private var chats: [Chat] = ChatStore.load()
@@ -87,7 +88,7 @@ struct AgentView: View {
             if session == nil { session = await state.activeHomeworkSession() }
         }
         .onChange(of: state.courses) { _, cs in if course == nil { course = cs.first?.course } }
-        .onChange(of: dictation.text) { _, t in if dictation.listening { draft = t } }
+        .onChange(of: dictation.text) { _, t in if dictation.listening { draft = Self.joined(draftBeforeDictation, t) } }
         .onChange(of: askTurns) { _, t in
             guard !t.isEmpty else { return }
             chats.removeAll { $0.id == chatId }
@@ -208,7 +209,10 @@ struct AgentView: View {
                     .font(.system(size: 16)).foregroundStyle(Theme.title).lineLimit(1...4)
                     .focused($typing).submitLabel(.send).onSubmit { send(draft) }
                     .padding(.leading, 20).padding(.vertical, 12)
-                Button { dictation.toggle() } label: {
+                Button {
+                    if !dictation.listening { draftBeforeDictation = draft }
+                    dictation.toggle()
+                } label: {
                     Image(systemName: dictation.listening ? "waveform" : "mic")
                         .font(.system(size: 17)).foregroundStyle(dictation.listening ? Theme.title : Theme.secondary)
                         .symbolEffect(.variableColor.iterative, isActive: dictation.listening)
@@ -280,6 +284,11 @@ struct AgentView: View {
             }
             starting = nil
         }
+    }
+
+    /// Dictation adds to what's already typed instead of replacing it.
+    static func joined(_ typed: String, _ spoken: String) -> String {
+        typed.isEmpty || spoken.isEmpty || typed.last?.isWhitespace == true ? typed + spoken : typed + " " + spoken
     }
 
     // MARK: sending
