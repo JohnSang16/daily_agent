@@ -6,6 +6,12 @@ struct Chat: Codable, Identifiable, Equatable {
     var turns: [ChatTurn] = []
     var updated = Date()
     var title: String { turns.first.map { String($0.question.prefix(60)) } ?? "new chat" }
+    /// The first line of the latest answer, for the chat list.
+    var preview: String? {
+        guard let a = turns.last?.reply?.answer else { return nil }
+        let line = a.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        return String(line.replacingOccurrences(of: "**", with: "").prefix(90))
+    }
 }
 
 /// Ask chats saved on the phone only, never on the agent (rule 15: the backend keeps no questions).

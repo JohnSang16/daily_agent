@@ -456,3 +456,42 @@ func categoryIcon(_ c: String?) -> String {
     default: return "circle.dashed"
     }
 }
+
+/// The folder a note sits in, "" for a note at the vault root.
+func noteFolder(_ path: String) -> String {
+    let parts = path.split(separator: "/")
+    return parts.count > 1 ? String(parts[parts.count - 2]) : ""
+}
+
+func wordCount(_ s: String) -> Int { s.split(whereSeparator: \.isWhitespace).count }
+
+/// The first n words of a reply, for typing it in. Keeps the spacing and line breaks, and closes a half
+/// typed **bold** so the markdown never flashes raw asterisks.
+func streamPrefix(_ s: String, words n: Int) -> String {
+    var count = 0, end = s.endIndex, inWord = false
+    for i in s.indices {
+        let space = s[i].isWhitespace
+        if !space && !inWord {
+            count += 1
+            if count > n { end = i; break }
+        }
+        inWord = !space
+    }
+    let out = String(s[..<end])
+    let trimmed = out.trimmingCharacters(in: .whitespacesAndNewlines)
+    return out.components(separatedBy: "**").count % 2 == 0 ? trimmed + "**" : out
+}
+
+let chatGroupOrder = ["today", "yesterday", "previous 7 days", "previous 30 days", "older"]
+
+/// Which day group a chat falls in, like the chat lists in other AI apps.
+func chatGroup(_ d: Date, now: Date, calendar: Calendar = .current) -> String {
+    let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: d), to: calendar.startOfDay(for: now)).day ?? 0
+    switch days {
+    case ...0: return "today"
+    case 1: return "yesterday"
+    case 2...7: return "previous 7 days"
+    case 8...30: return "previous 30 days"
+    default: return "older"
+    }
+}

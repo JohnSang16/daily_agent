@@ -214,5 +214,13 @@ let rec = try! makeDecoder().decode(Recurring.self, from: Data(#"{"items":[{"mer
 check(rec.items[0].nextDate == "2026-12-03" && rec.items[0].paidThisMonth && rec.monthlyCents == 1549, "decodes recurring")
 check(categoryIcon("FOOD_AND_DRINK") == "fork.knife" && categoryIcon(nil) == "circle.dashed", "category icons")
 
+check(streamPrefix("start the **physics retake** tonight", words: 2) == "start the" + " ", "types in by word")
+check(streamPrefix("start the **physics retake** tonight", words: 3) == "start the **physics**", "closes half typed bold")
+check(streamPrefix("a b", words: 9) == "a b" && wordCount("a\nb  c") == 3, "full reply once every word is in")
+check(noteFolder("career/school/physics-test2-100.md") == "school" && noteFolder("root.md") == "", "note folder")
+let day = Date(timeIntervalSince1970: 1_795_000_000), cal = Calendar(identifier: .gregorian)
+check(chatGroup(day, now: day, calendar: cal) == "today" && chatGroup(day, now: day + 86_400, calendar: cal) == "yesterday"
+      && chatGroup(day, now: day + 5 * 86_400, calendar: cal) == "previous 7 days" && chatGroup(day, now: day + 90 * 86_400, calendar: cal) == "older", "chat day groups")
+
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)
