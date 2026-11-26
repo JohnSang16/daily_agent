@@ -5,9 +5,7 @@ import UIKit
 #else
 import AppKit
 #endif
-#if os(iOS)
 import AVFoundation
-#endif
 
 enum AgentMode: String, CaseIterable, Identifiable {
     case ask, homework
@@ -56,8 +54,8 @@ struct AgentView: View {
                 modeSwitch
                 if mode == .ask {
                     Button { withAnimation(reduceMotion ? Theme.ease : Theme.spring) { showChats = true } } label: {
-                        Image(systemName: "bubble.left.and.text.bubble.right").font(.system(size: 16))
-                            .foregroundStyle(Theme.body).frame(width: 44, height: 44)
+                        Image(systemName: "text.bubble").font(.system(size: 16))
+                            .foregroundStyle(Theme.title).frame(width: 44, height: 44).glass(Circle())
                     }
                     .buttonStyle(PressStyle()).accessibilityLabel("chats")
                     .padding(.trailing, 12).transition(.opacity)
@@ -69,7 +67,9 @@ struct AgentView: View {
                     VStack(alignment: .leading, spacing: 28) {
                         if mode == .homework && turns.isEmpty { homeworkHome }
                         if mode == .ask && turns.isEmpty { askHome }
-                        ForEach(turns) { t in TurnView(turn: t).id(t.id) }
+                        ForEach(turns) { t in
+                            TurnView(turn: t, retry: t.id == turns.last?.id && !waiting ? { regenerate() } : nil).id(t.id)
+                        }
                         if waiting { AgentMark(working: true, status: "thinking").id("working") }
                     }
                     .padding(.horizontal, 24).padding(.top, 28).padding(.bottom, 16)
@@ -83,9 +83,11 @@ struct AgentView: View {
             }
             composer
         }
-        .blur(radius: showChats ? 8 : 0)
+        .scaleEffect(showChats && !reduceMotion ? 0.94 : 1, anchor: .leading)
+        .offset(x: showChats ? -panelWidth * 0.7 : 0)
+        .brightness(showChats ? -0.55 : 0)
         .allowsHitTesting(!showChats)
-        if showChats { chatsCard }
+        if showChats { chatsPanel }
         }
         .task {
             if state.courses.isEmpty { await state.loadCourses() }
@@ -116,52 +118,61 @@ struct AgentView: View {
 
     // MARK: pieces
 
+    private let panelWidth: CGFloat = 300
+
     @ViewBuilder
-    private var chatsCard: some View {
-        Color.black.opacity(0.3).ignoresSafeArea()
+    private var chatsPanel: some View {
+        Color.black.opacity(0.001).ignoresSafeArea()
             .onTapGesture { closeChats() }
-            .transition(.opacity)
+            .gesture(DragGesture(minimumDistance: 20).onEnded { v in if v.translation.width > 60 { closeChats() } })
             .accessibilityLabel("close chats").accessibilityAddTraits(.isButton)
-        ChatsCard(chats: $chats, current: chatId, open: { c in
+        ChatsPanel(chats: $chats, current: chatId, open: { c in
             chatId = c.id; askTurns = c.turns; closeChats()
         }, new: {
             chatId = UUID(); askTurns = []; closeChats()
         })
-        .padding(.top, 50).padding(.horizontal, 12)
-        .transition(reduceMotion ? .opacity : .scale(scale: 0.2, anchor: .topTrailing).combined(with: .opacity))
+        .frame(width: panelWidth)
+        .frame(maxHeight: .infinity)
+        .gesture(DragGesture(minimumDistance: 20).onEnded { v in if v.translation.width > 60 { closeChats() } })
+        .transition(.move(edge: .trailing))
     }
 
     private func closeChats() { withAnimation(reduceMotion ? Theme.ease : Theme.spring) { showChats = false } }
 
     private var modeSwitch: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 0) {
             ForEach(AgentMode.allCases) { m in
                 Button { withAnimation(reduceMotion ? Theme.ease : Theme.spring) { mode = m } } label: {
-                    Text(m.rawValue).font(.system(size: 15, weight: mode == m ? .medium : .regular))
+                    Text(m.rawValue).font(.system(size: 13.5, weight: mode == m ? .medium : .regular))
                         .foregroundStyle(mode == m ? Theme.title : Theme.secondary)
-                        .frame(width: 104, height: 40)
+                        .padding(.horizontal, 18).frame(height: 32)
                         .background {
                             if mode == m {
-                                Capsule().fill(Color.white.opacity(0.12))
-                                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.14), lineWidth: 0.6))
+                                Capsule().fill(Color.white.opacity(0.13))
                                     .matchedGeometryEffect(id: "agent-mode", in: pick)
                             }
                         }
                 }.buttonStyle(PressStyle())
             }
         }
-        .padding(4).glass(Capsule())
+        .padding(3)
+        .background(Capsule().fill(Color.white.opacity(0.07)))
+        .overlay(Capsule().strokeBorder(LinearGradient(colors: [Color.white.opacity(0.22), .clear], startPoint: .top, endPoint: .bottom), lineWidth: 0.6))
         .sensoryFeedback(.selection, trigger: mode)
         .frame(maxWidth: .infinity)
         .padding(.leading, 40)  // clear of the menu button
     }
 
     private var askHome: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("ask anything").font(.system(size: 28, weight: .light)).tracking(-0.5).foregroundStyle(Theme.title)
-            Text("connected to your vault, calendar, deadlines and money.")
-                .font(.system(size: 14)).foregroundStyle(Theme.secondary)
-        }.reveal()
+        VStack(spacing: 14) {
+            Image("Logo").resizable().scaledToFit().frame(width: 56)
+            Text("what's on your mind").font(.system(size: 21, weight: .medium)).foregroundStyle(Theme.title)
+            FlowChips(items: ["what's due this week", "daily full", "money this month"]) { send($0) }
+                .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity)
+        .containerRelativeFrame(.vertical, alignment: .center) { h, _ in h - 80 }
+        .reveal()
     }
 
     @ViewBuilder
@@ -217,41 +228,47 @@ struct AgentView: View {
     }
 
     private var composer: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            scopeChip.padding(.horizontal, 24)
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 TextField(mode == .ask ? "ask anything" : "ask about this course", text: $draft, axis: .vertical)
-                    .font(.system(size: 16)).foregroundStyle(Theme.title).lineLimit(1...4)
+                    .font(.system(size: 16)).foregroundStyle(Theme.title).lineLimit(1...5)
                     .focused($typing).submitLabel(.send).onSubmit { send(draft) }
-                    .padding(.leading, 20).padding(.vertical, 12)
-                Button {
-                    if !dictation.listening { draftBeforeDictation = draft }
-                    dictation.toggle()
-                } label: {
-                    Image(systemName: dictation.listening ? "waveform" : "mic")
-                        .font(.system(size: 17)).foregroundStyle(dictation.listening ? Theme.title : Theme.secondary)
-                        .symbolEffect(.variableColor.iterative, isActive: dictation.listening)
-                        .frame(width: 40, height: 44)
+                    .padding(.horizontal, 6).padding(.top, 4)
+                HStack(spacing: 2) {
+                    scopeChip
+                    Spacer(minLength: 8)
+                    Button {
+                        if !dictation.listening { draftBeforeDictation = draft }
+                        dictation.toggle()
+                    } label: {
+                        Image(systemName: dictation.listening ? "waveform" : "mic")
+                            .font(.system(size: 17)).foregroundStyle(dictation.listening ? Theme.title : Theme.secondary)
+                            .symbolEffect(.variableColor.iterative, isActive: dictation.listening)
+                            .frame(width: 40, height: 44)
+                    }
+                    .buttonStyle(PressStyle())
+                    .accessibilityLabel(dictation.listening ? "stop dictation" : "dictate")
+                    Button { send(draft) } label: {
+                        Image(systemName: "arrow.up").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.black)
+                            .frame(width: 36, height: 36)
+                            .background(Circle().fill(LinearGradient(colors: [.white, Color(white: 0.82)], startPoint: .top, endPoint: .bottom)))
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(PressStyle()).disabled(!canSend).opacity(canSend ? 1 : 0.4)
+                    .animation(Theme.ease, value: canSend)
+                    .accessibilityLabel("send")
                 }
-                .buttonStyle(PressStyle())
-                .accessibilityLabel(dictation.listening ? "stop dictation" : "dictate")
-                Button { send(draft) } label: {
-                    Image(systemName: "arrow.up").font(.system(size: 17, weight: .medium)).foregroundStyle(Color.black)
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(LinearGradient(colors: [.white, Color(white: 0.82)], startPoint: .top, endPoint: .bottom)))
-                }
-                .buttonStyle(PressStyle()).disabled(!canSend).opacity(canSend ? 1 : 0.4)
-                .animation(Theme.ease, value: canSend)
-                .accessibilityLabel("send")
-                .padding(.trailing, 5)
             }
-            .glass(Capsule())
-            .padding(.horizontal, 16)
+            .padding(.leading, 12).padding(.trailing, 4).padding(.top, 10).padding(.bottom, 2)
+            .background(RoundedRectangle(cornerRadius: 26, style: .continuous).fill(Color(white: 0.11)))
+            .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(
+                LinearGradient(colors: [Color.white.opacity(0.22), Color.white.opacity(0.05)], startPoint: .top, endPoint: .bottom), lineWidth: 0.6))
+            .padding(.horizontal, 12)
             if let note = dictation.note {
                 Text(note).font(.system(size: 12.5)).foregroundStyle(Theme.secondary).padding(.horizontal, 24)
             }
         }
-        .padding(.bottom, 10)
+        .padding(.bottom, 8)
         .animation(Theme.spring, value: typing)
     }
 
@@ -270,12 +287,12 @@ struct AgentView: View {
                 }
             }
         } label: {
-            HStack(spacing: 6) {
-                Text(mode == .ask ? "context: \(context.rawValue)" : "course: " + (course.map { courseLabel($0, max: 22) } ?? "none"))
-                Image(systemName: "chevron.down").font(.system(size: 11))
+            HStack(spacing: 5) {
+                Text(mode == .ask ? context.label : (course.map { courseLabel($0, max: 22) } ?? "pick a course"))
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .medium))
             }
-            .font(.system(size: 13.5)).foregroundStyle(Theme.body)
-            .padding(.horizontal, 14).frame(minHeight: 36)
+            .font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
+            .padding(.horizontal, 11).frame(height: 28)
             .overlay(Capsule().strokeBorder(Theme.line, lineWidth: 1))
             .frame(minHeight: 44)
         }
@@ -323,6 +340,13 @@ struct AgentView: View {
         }
     }
 
+    /// Asks the last question again in place of its answer.
+    private func regenerate() {
+        guard let last = turns.last, !waiting else { return }
+        if mode == .ask { askTurns.removeLast() } else { hwTurns.removeLast() }
+        send(last.question)
+    }
+
     /// The last 6 answered turns as user/assistant pairs, so follow ups make sense to the backend.
     static func history(_ turns: [ChatTurn]) -> [[String: String]] {
         turns.filter { $0.reply != nil }.suffix(6).flatMap { t in
@@ -348,8 +372,10 @@ struct AgentView: View {
 /// in word by word, then copy and a folded sources list show under it.
 struct TurnView: View {
     @EnvironmentObject var state: AppState
+    @ObservedObject private var speaker = Speaker.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let turn: ChatTurn
+    var retry: (() -> Void)?
     @State private var showSources = false
     @State private var copied = false
     @State private var shownWords: Int?  // nil shows the whole answer, set only while a fresh one types in
@@ -401,31 +427,39 @@ struct TurnView: View {
     }
 
     private func footer(_ r: AskReply) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Button { copy(r.answer) } label: {
-                    Image(systemName: copied ? "checkmark" : "doc.on.doc").font(.system(size: 13))
-                        .foregroundStyle(Theme.tertiary).frame(width: 36, height: 32).contentTransition(.symbolEffect(.replace))
-                }
-                .buttonStyle(PressStyle()).accessibilityLabel(copied ? "copied" : "copy reply")
-                .sensoryFeedback(.success, trigger: copied) { _, now in now }
-                if !r.sources.isEmpty {
-                    Button { withAnimation(Theme.spring) { showSources.toggle() } } label: {
-                        HStack(spacing: 5) {
-                            Text(r.sources.count == 1 ? "1 source" : "\(r.sources.count) sources")
-                            Image(systemName: "chevron.down").font(.system(size: 10, weight: .medium))
-                                .rotationEffect(.degrees(showSources ? 180 : 0))
-                        }
-                        .font(.system(size: 12.5)).foregroundStyle(showSources ? Theme.body : Theme.tertiary).frame(minHeight: 32)
+        VStack(alignment: .leading, spacing: 6) {
+            if !r.sources.isEmpty {
+                Button { withAnimation(Theme.spring) { showSources.toggle() } } label: {
+                    HStack(spacing: 5) {
+                        Text(r.sources.count == 1 ? "1 source" : "\(r.sources.count) sources")
+                        Image(systemName: "chevron.down").font(.system(size: 9, weight: .medium))
+                            .rotationEffect(.degrees(showSources ? 180 : 0))
                     }
-                    .buttonStyle(PressStyle()).accessibilityLabel(showSources ? "hide sources" : "show sources")
+                    .font(.system(size: 12.5)).foregroundStyle(showSources ? Theme.body : Theme.tertiary).frame(minHeight: 32)
+                }
+                .buttonStyle(PressStyle()).accessibilityLabel(showSources ? "hide sources" : "show sources")
+                if showSources {
+                    sourceList(r.sources).transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            }
+            HStack(spacing: 4) {
+                action(copied ? "checkmark" : "doc.on.doc", copied ? "copied" : "copy reply") { copy(r.answer) }
+                    .sensoryFeedback(.success, trigger: copied) { _, now in now }
+                if let retry { action("arrow.clockwise", "regenerate", retry) }
+                action(Speaker.shared.speaking == turn.id ? "stop.fill" : "speaker.wave.2", "read aloud") {
+                    Speaker.shared.toggle(r.answer, id: turn.id)
                 }
             }
             .padding(.leading, -10)
-            if showSources {
-                sourceList(r.sources).transition(.opacity.combined(with: .move(edge: .top)))
-            }
         }
+    }
+
+    private func action(_ icon: String, _ label: String, _ run: @escaping () -> Void) -> some View {
+        Button(action: run) {
+            Image(systemName: icon).font(.system(size: 13)).foregroundStyle(Theme.tertiary)
+                .frame(width: 36, height: 32).contentTransition(.symbolEffect(.replace))
+        }
+        .buttonStyle(PressStyle()).accessibilityLabel(label)
     }
 
     private func sourceList(_ sources: [AskSource]) -> some View {
@@ -517,9 +551,9 @@ struct Shimmer: ViewModifier {
     }
 }
 
-/// Past ask chats in a glass card that grows out of the chats button: search, grouped by day, the start
-/// of the last answer under each title. Long press a chat to delete it.
-struct ChatsCard: View {
+/// Past ask chats in a panel that slides in from the right: search, grouped by day, the start of the last
+/// answer under each title. Long press a chat to delete it, swipe right to close.
+struct ChatsPanel: View {
     @Binding var chats: [Chat]
     let current: UUID
     let open: (Chat) -> Void
@@ -547,15 +581,12 @@ struct ChatsCard: View {
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
             }
             .buttonStyle(PressStyle()).padding(.horizontal, 6)
-            ViewThatFits(in: .vertical) {
-                list
-                ScrollView { list }.scrollIndicators(.hidden)
-            }
+            ScrollView { list }.scrollIndicators(.hidden)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: 460, alignment: .top)
-        .glass(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .shadow(color: .black.opacity(0.5), radius: 30, y: 16)
+        .padding(.horizontal, 12).padding(.top, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.surface.ignoresSafeArea())
+        .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 0.5).ignoresSafeArea() }
     }
 
     @ViewBuilder
@@ -678,5 +709,104 @@ final class Dictation: ObservableObject {
         task?.cancel()
         task = nil
         listening = false
+    }
+}
+
+/// Suggestion chips that wrap onto as many centered lines as they need.
+struct FlowChips: View {
+    let items: [String]
+    let tap: (String) -> Void
+
+    var body: some View {
+        WrapLayout(spacing: 8) {
+            ForEach(items, id: \.self) { t in
+                Button { tap(t) } label: {
+                    Text(t).font(.system(size: 13.5)).foregroundStyle(Theme.body)
+                        .padding(.horizontal, 14).frame(height: 34)
+                        .background(Capsule().fill(Theme.surface))
+                        .overlay(Capsule().strokeBorder(Theme.line, lineWidth: 1))
+                }
+                .buttonStyle(PressStyle())
+            }
+        }
+        .padding(.horizontal, 24)
+    }
+}
+
+/// Lays children out left to right, wrapping to a new centered line when one is full.
+struct WrapLayout: Layout {
+    var spacing: CGFloat = 8
+
+    private func lines(_ width: CGFloat, _ views: Subviews) -> [[(Int, CGSize)]] {
+        var out: [[(Int, CGSize)]] = [[]], used: CGFloat = 0
+        for (i, v) in views.enumerated() {
+            let size = v.sizeThatFits(.unspecified)
+            if used > 0 && used + size.width > width { out.append([]); used = 0 }
+            out[out.count - 1].append((i, size))
+            used += size.width + spacing
+        }
+        return out
+    }
+
+    private func span(_ l: [(Int, CGSize)]) -> CGFloat {
+        var w: CGFloat = 0
+        for (_, size) in l { w += size.width }
+        return w + spacing * CGFloat(max(l.count - 1, 0))
+    }
+
+    private func tallest(_ l: [(Int, CGSize)]) -> CGFloat {
+        var h: CGFloat = 0
+        for (_, size) in l { h = max(h, size.height) }
+        return h
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let ls = lines(proposal.width ?? .infinity, subviews)
+        var height: CGFloat = spacing * CGFloat(max(ls.count - 1, 0)), widest: CGFloat = 0
+        for l in ls { height += tallest(l); widest = max(widest, span(l)) }
+        return CGSize(width: proposal.width ?? widest, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for l in lines(bounds.width, subviews) {
+            var x = bounds.minX + (bounds.width - span(l)) / 2
+            for (i, size) in l {
+                subviews[i].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += tallest(l) + spacing
+        }
+    }
+}
+
+/// Reads one answer aloud at a time on the phone. Tapping again, or another answer, stops it.
+@MainActor
+final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
+    static let shared = Speaker()
+    @Published var speaking: UUID?
+    private let synth = AVSpeechSynthesizer()
+
+    override init() {
+        super.init()
+        synth.delegate = self
+    }
+
+    func toggle(_ text: String, id: UUID) {
+        let was = speaking
+        synth.stopSpeaking(at: .immediate)
+        speaking = nil
+        guard was != id else { return }
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        #endif
+        let plain = text.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "`", with: "")
+        synth.speak(AVSpeechUtterance(string: plain))
+        speaking = id
+    }
+
+    nonisolated func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish u: AVSpeechUtterance) {
+        Task { @MainActor in self.speaking = nil }
     }
 }

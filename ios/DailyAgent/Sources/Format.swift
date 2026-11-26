@@ -325,6 +325,14 @@ func outcomeFraction(_ g: GoalItem) -> Double {
 enum AskContext: String, CaseIterable, Identifiable {
     case all, notes, tasks
     var id: String { rawValue }
+    /// The short name on the composer's context pill.
+    var label: String {
+        switch self {
+        case .all: return "everything"
+        case .notes: return "notes"
+        case .tasks: return "deadlines"
+        }
+    }
     /// What POST /ask may read. Email stays off until spec 06 exists.
     var sources: [String] {
         switch self {
