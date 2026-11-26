@@ -27,6 +27,7 @@ Names are the settings in `app/config.py`, upper case.
 | WORK_END | no | work day end, default 17:00 |
 | DEFAULT_EFFORT_MINUTES | no | effort for tasks with none, default 60 |
 | LLM_MODEL | for AI text | model name, never hard coded |
+| ASK_MODEL | no | model for the chat box, default claude-sonnet-5-5, empty uses LLM_MODEL |
 | ANTHROPIC_API_KEY | for AI text | secret, without it explanations use a plain template |
 | LLM_DAILY_TOKEN_BUDGET | no | daily token cap, default 20000 |
 | LLM_BACKEND | no | api (default, Console credits) or cli (headless Claude Code, bills the logged in subscription) |

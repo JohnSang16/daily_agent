@@ -32,6 +32,7 @@ def create_app(
     agent_driver_factory=None,
 ) -> FastAPI:
     settings = settings or Settings()
+    llm_given = llm is not None  # a test's fake llm answers ask too
     setup_logging(
         secrets=[
             settings.api_token,
@@ -62,6 +63,13 @@ def create_app(
     if llm is None and settings.anthropic_api_key and settings.llm_model:
         llm = AnthropicClient(http, settings.anthropic_api_key, settings.llm_model)
     app.state.llm = llm  # None: explanations use the template
+    ask_llm = None
+    if settings.ask_model and settings.ask_model != settings.llm_model:
+        if settings.llm_backend == "cli":
+            ask_llm = ClaudeCliClient(settings.ask_model, settings.claude_cli_path)
+        elif settings.anthropic_api_key:
+            ask_llm = AnthropicClient(http, settings.anthropic_api_key, settings.ask_model, 2000)
+    app.state.ask_llm = llm if llm_given else (ask_llm or llm)
     if plaid is None and settings.plaid_client_id and settings.plaid_secret:
         plaid = PlaidClient(http, settings)
     app.state.plaid = plaid

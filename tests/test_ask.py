@@ -317,3 +317,17 @@ def test_no_history_leaves_the_prompt_alone(tmp_path):
     app, c, _ = build(tmp_path, NOTES, llm=llm)
     ask(c, "what did I write about regression")
     assert "Earlier in this chat" not in llm.prompts[-1]
+
+
+def test_chat_box_gets_its_own_stronger_model(tmp_path):
+    s = Settings(
+        _env_file=None,
+        api_token="tok",
+        database_url=f"sqlite:///{tmp_path}/t.db",
+        llm_backend="cli",
+        llm_model="claude-haiku-5-5",
+        ask_model="claude-sonnet-5-5",
+    )
+    app = create_app(s, sources={})
+    assert app.state.llm.model == "claude-haiku-5-5"
+    assert app.state.ask_llm.model == "claude-sonnet-5-5"
