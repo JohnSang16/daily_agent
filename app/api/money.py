@@ -85,17 +85,15 @@ CATEGORY = Path(pattern=r"^[A-Z_]{2,40}$")
 
 @router.get("/budgets")
 def list_budgets(request: Request, clock: Clock = Depends(get_clock)):
-    today = _today(request, clock)
-    tz = ZoneInfo(request.app.state.settings.user_timezone)
+    keys = last_months(_today(request, clock), 1)
     with request.app.state.session_factory() as db:
+        totals, cats = month_totals(db, keys)
         rows = db.scalars(select(Budget)).all()
 
-        # spend tracked since the budget was set (updated_at), not the whole calendar month: a
-        # budget you just created reads $0 spent right away, not the month's pre-existing total
+        # the whole calendar month, so the number matches what was really spent (editing or
+        # creating a budget mid month must not reset it to 0)
         def spent(b: Budget) -> int:
-            start = b.updated_at.astimezone(tz).date()
-            cats = category_spend(db, today, start)
-            return sum(cats.values()) if b.category == "TOTAL" else cats.get(b.category, 0)
+            return totals[keys[0]]["spend"] if b.category == "TOTAL" else cats.get(b.category, 0)
 
         out = [
             {"category": b.category, "limit_cents": b.limit_cents, "spent_cents": spent(b)}

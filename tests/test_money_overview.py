@@ -142,40 +142,18 @@ def test_a_disabled_account_leaves_the_totals(tmp_path):
     assert c.get("/money/summary", headers=H).json()["this_month"]["spend_cents"] == 3000
 
 
-def test_budgets_start_at_0_the_moment_they_are_created(tmp_path):
-    """Spend is tracked since the budget was set (updated_at), not the whole calendar month: a
-    budget created today reads $0 right away, it does not retroactively apply to spend that
-    already happened before it existed."""
+def test_budgets_show_spent_this_month(tmp_path):
+    """The whole calendar month counts, even for a budget created today (it read $0/$limit)."""
     app, c = ready(tmp_path)
     assert (
         c.put("/budgets/FOOD_AND_DRINK", headers=H, json={"limit_cents": 5000}).status_code == 200
     )
     assert c.put("/budgets/TOTAL", headers=H, json={"limit_cents": 20000}).status_code == 200
     b = {x["category"]: x for x in c.get("/budgets", headers=H).json()}
-    # the fixture's spend is all from nov 6-9, before "now" (nov 19): none of it counts yet
-    assert b["FOOD_AND_DRINK"]["spent_cents"] == 0 and b["FOOD_AND_DRINK"]["limit_cents"] == 5000
-    assert b["TOTAL"]["spent_cents"] == 0
+    assert b["FOOD_AND_DRINK"]["spent_cents"] == 4000 and b["FOOD_AND_DRINK"]["limit_cents"] == 5000
+    assert b["TOTAL"]["spent_cents"] == 11000
     assert c.delete("/budgets/FOOD_AND_DRINK", headers=H).status_code == 200
     assert [x["category"] for x in c.get("/budgets", headers=H).json()] == ["TOTAL"]
-
-
-def test_budgets_count_spend_from_their_own_creation_date_onward(tmp_path):
-    page2 = {
-        "added": [t("n6", "a2", 15.00, "2026-11-19", "FOOD_AND_DRINK")],
-        "modified": [],
-        "removed": [],
-        "next_cursor": "c2",
-        "has_more": False,
-    }
-    app, c = build(tmp_path, Plaid2([PAGE, page2]))
-    connect(c)
-    sync(app)
-    assert (
-        c.put("/budgets/FOOD_AND_DRINK", headers=H, json={"limit_cents": 5000}).status_code == 200
-    )
-    sync(app)  # pulls the new nov 19 charge, after the budget already exists
-    b = {x["category"]: x for x in c.get("/budgets", headers=H).json()}
-    assert b["FOOD_AND_DRINK"]["spent_cents"] == 1500  # only the new charge counts, not nov 6
 
 
 def test_budget_input_is_validated(tmp_path):
