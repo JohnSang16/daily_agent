@@ -42,7 +42,10 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Turns your dictated question into text on this phone. Nothing is sent until you tap send.</string>
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIImageName</key>
+		<string>Logo</string>
+	</dict>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
