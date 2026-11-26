@@ -77,7 +77,7 @@ Money gets a fifth view, **goals**, after activity. It only reads balances and i
 ## Decisions (2026-11-19, replacing the open questions)
 1. Aggregator: Plaid, free Trial plan (10 live Items) once Production access is approved. Built and tested against Plaid Sandbox first. Real banks wait for me to read Plaid's terms (security rule 6).
 2. Banks to connect first: chosen by me later, at connect time.
-3. Ask mode: money is a separate context, off by default. Reading transactions from ask is not built yet, so with money on it replies that money questions are not supported yet (AC16.9).
+3. Ask mode: money is a separate context (AC16.9). Changed 2026-11-25 with John's OK: the app's "all" context now includes money, and with money on the model answers from the money summary, this month's budgets, top merchants and up to 40 matching plus 30 recent charges from the last 90 days. Never tokens, account ids or account numbers.
 4. Tables: tokens live on a `bank_items` table (one per bank login) and `bank_accounts` points to it, instead of a token reference on each account.
 5. Connection flow: Plaid Hosted Link (their own screen, opened from a link), then the backend collects the result. Sandbox also has `POST /banks/sandbox`, which creates a fake bank without any screen.
 6. The only Plaid products ever requested are `transactions`. The outbound guard refuses any request body that names another product, and allows only these paths on the Plaid hosts: link token create and get, public token exchange, accounts get, institutions get by id, transactions sync, item remove (disconnects my own link, used by DELETE /banks), plus sandbox public token create on the sandbox host only.

@@ -143,7 +143,7 @@ struct AgentView: View {
     private var askHome: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("ask anything").font(.system(size: 28, weight: .light)).tracking(-0.5).foregroundStyle(Theme.title)
-            Text("connected to your vault, calendar and school deadlines.")
+            Text("connected to your vault, calendar, deadlines and money.")
                 .font(.system(size: 14)).foregroundStyle(Theme.secondary)
         }.reveal()
     }
@@ -241,7 +241,7 @@ struct AgentView: View {
         Menu {
             if mode == .ask {
                 Picker("context", selection: $context) {
-                    Text("all: notes, deadlines and schedule").tag(AskContext.all)
+                    Text("all: notes, deadlines, schedule and money").tag(AskContext.all)
                     Text("notes only").tag(AskContext.notes)
                     Text("deadlines and schedule only").tag(AskContext.tasks)
                 }

@@ -14,6 +14,7 @@ from app.clock import FixedClock, get_clock
 from app.config import Settings
 from app.db import Base
 from app.http_client import GuardedHttpClient, RequestDenied
+from app.llm.client import LlmResult
 from app.main import create_app
 from app.models import BankAccount, BankItem, Transaction
 from app.sources.plaid import PlaidClient
@@ -318,7 +319,7 @@ def test_AC16_9_ask_money_is_off_unless_enabled(tmp_path):
         headers=H,
         json={"question": "how much did I spend at Chipotle", "context": ["money"]},
     ).json()
-    assert "Chipotle" not in on["answer"] and "12.50" not in on["answer"]
+    assert on["route"] == "money" and not on["used_llm"]  # no llm here: nothing sent
 
 
 def test_AC16_10_demo_data_when_nothing_connected(tmp_path):
@@ -386,3 +387,39 @@ def test_default_sources_add_banks_only_when_plaid_configured():
     s = Settings(_env_file=None, api_token="tok", database_url="sqlite://")
     assert "banks" not in default_sources(s, http=None)
     assert "banks" in default_sources(s, http=None, plaid=FakePlaid())
+
+
+class MoneyLlm:
+    def __init__(self):
+        self.prompts = []
+
+    def complete(self, prompt):
+        self.prompts.append(prompt)
+        return LlmResult("You spent $12.50 at Chipotle.", 50, 10)
+
+
+def test_ask_answers_money_from_bank_data_when_on(tmp_path):
+    s = Settings(
+        _env_file=None,
+        api_token="tok",
+        database_url=f"sqlite:///{tmp_path}/t.db",
+        token_encryption_key=KEY,
+        plaid_client_id="cid",
+        plaid_secret="SECRETPLAIDSECRET",
+    )
+    llm = MoneyLlm()
+    app = create_app(s, sources={}, plaid=FakePlaid([PAGE]), llm=llm)
+    Base.metadata.create_all(app.state.session_factory.kw["bind"])
+    app.dependency_overrides[get_clock] = lambda: FixedClock(NOW)
+    c = TestClient(app)
+    connect(c)
+    sync(app)
+    r = c.post(
+        "/ask",
+        headers=H,
+        json={"question": "how much did I spend at Chipotle", "context": ["money"]},
+    ).json()
+    assert r["route"] == "money" and r["used_llm"]
+    p = llm.prompts[-1]
+    assert "Charges matching the question:" in p and "Chipotle" in p.split("matching")[1]
+    assert TOKEN not in p and "SECRETPLAIDSECRET" not in p  # no secrets in model input
