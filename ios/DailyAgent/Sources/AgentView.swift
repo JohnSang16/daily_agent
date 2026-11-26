@@ -1,5 +1,10 @@
 import Speech
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#else
+import AppKit
+#endif
 #if os(iOS)
 import AVFoundation
 #endif
@@ -9,8 +14,8 @@ enum AgentMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-struct ChatTurn: Identifiable, Equatable {
-    let id = UUID()
+struct ChatTurn: Identifiable, Equatable, Codable {
+    var id = UUID()
     let question: String
     var reply: AskReply?
     var failed = false
@@ -28,6 +33,9 @@ struct AgentView: View {
     @State private var draft = ""
     @State private var askTurns: [ChatTurn] = []
     @State private var hwTurns: [ChatTurn] = []
+    @State private var chats: [Chat] = ChatStore.load()
+    @State private var chatId = UUID()
+    @State private var showChats = false
     @FocusState private var typing: Bool
     @Namespace private var pick
     @State private var session: HomeworkSession?  // the open homework agent session
@@ -42,7 +50,18 @@ struct AgentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            modeSwitch.padding(.top, 6)
+            ZStack(alignment: .trailing) {
+                modeSwitch
+                if mode == .ask {
+                    Button { showChats = true } label: {
+                        Image(systemName: "bubble.left.and.text.bubble.right").font(.system(size: 16))
+                            .foregroundStyle(Theme.body).frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(PressStyle()).accessibilityLabel("chats")
+                    .padding(.trailing, 12).transition(.opacity)
+                }
+            }
+            .padding(.top, 6)
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 28) {
@@ -69,6 +88,19 @@ struct AgentView: View {
         }
         .onChange(of: state.courses) { _, cs in if course == nil { course = cs.first?.course } }
         .onChange(of: dictation.text) { _, t in if dictation.listening { draft = t } }
+        .onChange(of: askTurns) { _, t in
+            guard !t.isEmpty else { return }
+            chats.removeAll { $0.id == chatId }
+            chats.insert(Chat(id: chatId, turns: t, updated: Date()), at: 0)
+            ChatStore.save(chats)
+        }
+        .sheet(isPresented: $showChats) {
+            ChatsSheet(chats: $chats, current: chatId, open: { c in
+                chatId = c.id; askTurns = c.turns; showChats = false
+            }, new: {
+                chatId = UUID(); askTurns = []; showChats = false
+            })
+        }
         .onChange(of: showing) { _, open in
             if !open, let s = session { Task { if let fresh = await state.homeworkSession(s.id) { session = fresh } } }
         }
@@ -288,47 +320,108 @@ struct AgentView: View {
     }
 }
 
-/// The question small and to the right, the answer as plain text, sources folded under it.
+/// The question in a bubble on the right, the answer as markdown, then copy and sources under it.
 struct TurnView: View {
     @EnvironmentObject var state: AppState
     let turn: ChatTurn
     @State private var showSources = false
+    @State private var copied = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(turn.question).font(.system(size: 16)).foregroundStyle(Theme.secondary)
-                .multilineTextAlignment(.trailing).frame(maxWidth: .infinity, alignment: .trailing)
+            Text(turn.question).font(.system(size: 16)).foregroundStyle(Theme.title)
+                .textSelection(.enabled)
+                .padding(.horizontal, 16).padding(.vertical, 10)
+                .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.white.opacity(0.09)))
+                .frame(maxWidth: 300, alignment: .trailing).frame(maxWidth: .infinity, alignment: .trailing)
             if let r = turn.reply {
-                Text(r.answer).font(.system(size: 17)).foregroundStyle(Theme.title).lineSpacing(5)
+                Text(markdown(r.answer)).font(.system(size: 17)).foregroundStyle(Theme.title).lineSpacing(5)
                     .textSelection(.enabled).transition(.opacity)
-                if !r.sources.isEmpty {
-                    Button { withAnimation(Theme.spring) { showSources.toggle() } } label: {
-                        HStack(spacing: 6) {
-                            Text("\(r.sources.count) source" + (r.sources.count == 1 ? "" : "s"))
-                            Image(systemName: "chevron.down").font(.system(size: 10)).rotationEffect(.degrees(showSources ? 180 : 0))
-                        }
-                        .font(.system(size: 12.5)).foregroundStyle(Theme.secondary).frame(minHeight: 32)
-                    }.buttonStyle(PressStyle())
-                    if showSources {
-                        VStack(alignment: .leading, spacing: 12) {
-                            ForEach(r.sources) { s in
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(noteName(s.path) + (s.heading.isEmpty ? "" : " · " + s.heading.lowercased()))
-                                        .font(.system(size: 13)).foregroundStyle(Theme.body)
-                                    Text(s.excerpt).font(.system(size: 12.5)).foregroundStyle(Theme.tertiary).lineLimit(3)
-                                }
+                    .contextMenu { Button { copy(r.answer) } label: { Label("copy", systemImage: "doc.on.doc") } }
+                HStack(spacing: 4) {
+                    Button { copy(r.answer) } label: {
+                        Image(systemName: copied ? "checkmark" : "doc.on.doc").font(.system(size: 13))
+                            .foregroundStyle(Theme.secondary).frame(width: 36, height: 32).contentTransition(.symbolEffect(.replace))
+                    }
+                    .buttonStyle(PressStyle()).accessibilityLabel(copied ? "copied" : "copy reply")
+                    .sensoryFeedback(.success, trigger: copied) { _, now in now }
+                    if !r.sources.isEmpty {
+                        Button { withAnimation(Theme.spring) { showSources.toggle() } } label: {
+                            Text(showSources ? "hide sources" : "sources")
+                                .font(.system(size: 12.5)).foregroundStyle(Theme.tertiary).frame(minHeight: 32)
+                        }.buttonStyle(PressStyle())
+                    }
+                }
+                .padding(.leading, -10)
+                if showSources {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(r.sources) { s in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(noteName(s.path) + (s.heading.isEmpty ? "" : " · " + s.heading.lowercased()))
+                                    .font(.system(size: 13)).foregroundStyle(Theme.body)
+                                Text(s.excerpt).font(.system(size: 12.5)).foregroundStyle(Theme.tertiary).lineLimit(3)
                             }
                         }
-                        .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                        .glass(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .transition(.opacity.combined(with: .move(edge: .top)))
                     }
+                    .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                    .glass(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             } else if turn.failed {
                 Text(state.offline ? "offline. can't reach the agent." : (state.problem ?? "that didn't go through. try again."))
                     .font(.system(size: 14.5)).foregroundStyle(Theme.secondary)
             }
         }
+    }
+
+    private func copy(_ text: String) {
+        #if canImport(UIKit)
+        UIPasteboard.general.string = text
+        #else
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        #endif
+        withAnimation(Theme.ease) { copied = true }
+        Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            withAnimation(Theme.ease) { copied = false }
+        }
+    }
+}
+
+/// Bold, italics, code and links from the model's markdown; line breaks and "- " lists kept as is.
+func markdown(_ s: String) -> AttributedString {
+    (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+        ?? AttributedString(s)
+}
+
+/// Past ask chats, newest first. Tap to reopen and keep going, swipe to delete.
+struct ChatsSheet: View {
+    @Binding var chats: [Chat]
+    let current: UUID
+    let open: (Chat) -> Void
+    let new: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Button { new() } label: {
+                    Label("new chat", systemImage: "square.and.pencil").foregroundStyle(Theme.title)
+                }
+                ForEach(chats) { c in
+                    Button { open(c) } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(c.title).font(.system(size: 16)).foregroundStyle(Theme.title).lineLimit(1)
+                            Text(c.updated.formatted(.relative(presentation: .named)) + (c.id == current ? " · open" : ""))
+                                .font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
+                        }
+                    }
+                }
+                .onDelete { i in chats.remove(atOffsets: i); ChatStore.save(chats) }
+            }
+            .navigationTitle("chats")
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
