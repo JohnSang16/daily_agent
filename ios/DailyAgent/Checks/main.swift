@@ -154,7 +154,7 @@ let td = try! makeDecoder().decode(Today.self, from: Data(todayJSON.utf8))
 check(td.doneToday == nil && td.topTask?.suggestedBlock == nil, "an older /today without done_today still decodes")
 
 // agent screen (spec 19)
-check(AskContext.all.sources == ["vault", "calendar"] && AskContext.notes.sources == ["vault"] && AskContext.tasks.sources == ["calendar"], "context chip maps to what ask may read")
+check(AskContext.all.sources == ["vault", "calendar", "money"] && AskContext.notes.sources == ["vault"] && AskContext.tasks.sources == ["calendar"], "context chip maps to what ask may read")
 check(noteName("career/school/os-lecture-notes.md") == "os lecture notes" && noteName("a_b") == "a b", "note names for sources")
 check(courseLabel("OPERATING SYSTEMS") == "operating systems" && courseLabel(String(repeating: "A", count: 40)).count == 28, "course chip label")
 let ar = try! makeDecoder().decode(AskReply.self, from: Data(#"{"answer":"x","sources":[{"path":"a.md","heading":"H","excerpt":"e"}],"used_llm":true,"route":"vault"}"#.utf8))

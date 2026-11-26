@@ -328,7 +328,7 @@ enum AskContext: String, CaseIterable, Identifiable {
     /// What POST /ask may read. Email stays off until spec 06 exists.
     var sources: [String] {
         switch self {
-        case .all: return ["vault", "calendar"]
+        case .all: return ["vault", "calendar", "money"]
         case .notes: return ["vault"]
         case .tasks: return ["calendar"]
         }

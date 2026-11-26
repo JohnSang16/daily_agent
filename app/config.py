@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     default_effort_minutes: int = 60
     anthropic_api_key: str = ""
     llm_model: str = ""  # never hard coded: set LLM_MODEL when a real client is wired in
-    llm_daily_token_budget: int = 20000
+    llm_daily_token_budget: int = 100_000
+    # the chat box gets a stronger model than the one line explanations; empty = use llm_model
+    ask_model: str = "claude-sonnet-5-5"
     # api = Console credits, cli = headless Claude Code on the logged in subscription
     llm_backend: str = "api"
     claude_cli_path: str = "claude"

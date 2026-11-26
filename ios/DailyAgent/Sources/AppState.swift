@@ -111,9 +111,9 @@ final class AppState: ObservableObject {
     // MARK: agent screen (spec 19)
 
     /// One question to POST /ask. Returns nil on failure, with the problem line set.
-    func ask(_ question: String, context: AskContext, course: String?) async -> AskReply? {
+    func ask(_ question: String, context: AskContext, course: String?, history: [[String: String]] = []) async -> AskReply? {
         var out: AskReply?
-        var body: [String: Any] = ["question": String(question.prefix(500)), "context": context.sources]
+        var body: [String: Any] = ["question": String(question.prefix(500)), "context": context.sources, "history": history]
         if let course { body["course"] = course; body["context"] = ["vault"] }
         await call { c in out = try await c.post("/ask", json: body) }
         return out
